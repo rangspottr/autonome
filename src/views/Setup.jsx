@@ -37,6 +37,7 @@ export default function Setup({ db, onSave }) {
     maxAutoSpend: db.cfg.riskLimits?.maxAutoSpend || 500,
     refundThreshold: db.cfg.riskLimits?.refundThreshold || 100,
     approvalAbove: db.cfg.riskLimits?.approvalAbove || 5000,
+    typicalDealSize: Math.round((db.cfg.riskLimits?.approvalAbove || 5000) / 2),
     stripeKey: db.cfg.keys?.stripe || "",
     gmailKey: db.cfg.keys?.gmail || "",
     twilioKey: db.cfg.keys?.twilio || "",
@@ -118,7 +119,7 @@ export default function Setup({ db, onSave }) {
       <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
         Set your revenue model parameters.
       </p>
-      <Input label="Typical Deal Size ($)" type="number" value={String(form.approvalAbove / 2)} onChange={(v) => set("approvalAbove")(String(Number(v) * 2))} placeholder="5000" />
+      <Input label="Typical Deal Size ($)" type="number" value={String(form.typicalDealSize)} onChange={(v) => setForm((f) => ({ ...f, typicalDealSize: Number(v) }))} placeholder="5000" />
       <div style={{ display: "flex", gap: 8 }}>
         <Input label="Max Auto-Spend ($)" type="number" value={String(form.maxAutoSpend)} onChange={set("maxAutoSpend")} placeholder="500" style={{ flex: 1 }} />
         <Input label="Approval Threshold ($)" type="number" value={String(form.approvalAbove)} onChange={set("approvalAbove")} placeholder="5000" style={{ flex: 1 }} />
