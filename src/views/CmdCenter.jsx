@@ -153,6 +153,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
     }
 
     try {
+      // DEV ONLY: Direct browser API call — keys should be proxied through a backend server in production
       const model = db.cfg.llmModel || "claude-sonnet-4-20250514";
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -160,7 +161,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
           "Content-Type": "application/json",
           "x-api-key": llmKey,
           "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
+          "anthropic-dangerous-direct-browser-access": "true", // DEV ONLY: remove in production
         },
         body: JSON.stringify({
           model,
@@ -261,7 +262,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
           onClick={() => setShowBriefing((v) => !v)}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span>📋</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: T.bl }}>BRIEF</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: T.bl }}>Daily Briefing</span>
             {briefing.healthDelta !== 0 && (
               <Pill
@@ -282,14 +283,14 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
             }}
           >
             {[
-              { icon: "💰", label: "Collected Today", val: $$(briefing.collectedToday) },
-              { icon: "👤", label: "New Leads", val: briefing.newLeads },
-              { icon: "⚠️", label: "Newly Overdue", val: briefing.newlyOverdue },
-              { icon: "📊", label: "Deals Advanced", val: briefing.dealsAdvanced },
-              { icon: "✅", label: "Tasks Auto-Done", val: briefing.tasksAuto },
-              { icon: "🔄", label: "Workflows Done", val: briefing.workflowsCompleted },
-              { icon: "⏸️", label: "Workflows Paused", val: briefing.workflowsPaused },
-              { icon: "🔔", label: "Need Approval", val: briefing.pendingApprovals },
+              { icon: "$", label: "Collected Today", val: $$(briefing.collectedToday) },
+              { icon: "+", label: "New Leads", val: briefing.newLeads },
+              { icon: "!", label: "Newly Overdue", val: briefing.newlyOverdue },
+              { icon: "~", label: "Deals Advanced", val: briefing.dealsAdvanced },
+              { icon: "x", label: "Tasks Auto-Done", val: briefing.tasksAuto },
+              { icon: ">", label: "Workflows Done", val: briefing.workflowsCompleted },
+              { icon: "||", label: "Workflows Paused", val: briefing.workflowsPaused },
+              { icon: "!", label: "Need Approval", val: briefing.pendingApprovals },
             ].map((item) => (
               <div key={item.label} style={{ background: T.wh, borderRadius: 8, padding: "8px 12px" }}>
                 <span style={{ fontSize: 12 }}>{item.icon} </span>
@@ -322,7 +323,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span>🚀</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: T.tx }}>START</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: T.tx }}>Getting Started</span>
               <span style={{ fontSize: 12, color: T.mt }}>
                 {checklist.filter((c) => c.done).length}/{checklist.length} complete
@@ -340,7 +341,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
                 key={item.label}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}
               >
-                <span style={{ fontSize: 14 }}>{item.done ? "✅" : "⬜"}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: item.done ? T.gn : T.mt, minWidth: 20 }}>{item.done ? "[x]" : "[ ]"}</span>
                 <span style={{ fontSize: 13, color: item.done ? T.dm : T.tx }}>{item.label}</span>
               </div>
             ))}
@@ -359,7 +360,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
         }}
       >
         <div style={{ fontSize: 13, fontWeight: 700, color: T.tx, marginBottom: 10 }}>
-          🤖 Ask Autonome
+          AI Ask Autonome
           {!db.cfg.keys?.llm && (
             <span style={{ fontSize: 11, fontWeight: 400, color: T.mt, marginLeft: 8 }}>
               (Add LLM key in Settings for AI answers)
@@ -417,7 +418,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
           )}
         </h2>
         <Button variant="secondary" size="sm" onClick={() => setShowMissedCall(true)}>
-          📞 Log Missed Call
+          TEL Log Missed Call
         </Button>
       </div>
 
@@ -431,7 +432,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
             border: `1px solid ${T.gn}30`,
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.gn, marginBottom: 8 }}>[OK]</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.gn }}>All clear</div>
           <div style={{ fontSize: 13, color: T.dm, marginTop: 4 }}>No priority actions right now.</div>
         </div>
@@ -463,7 +464,7 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
               {tier.label}
             </div>
             {tier.items.map((decision) => {
-              const meta = AgentMeta[decision.agent] || { icon: "🤖", label: decision.agent, color: T.dm, bg: T.bg };
+              const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: T.dm, bg: T.bg };
               const isRunning = executing === decision.target;
               return (
                 <div
@@ -489,7 +490,10 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 18,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: meta.color,
+                      letterSpacing: 0.5,
                       flexShrink: 0,
                     }}
                   >

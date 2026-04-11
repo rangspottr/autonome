@@ -393,7 +393,7 @@ export default function Setup({ db, onSave }) {
       <div style={{ width: "100%", maxWidth: 520, padding: 32 }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: T.tx, marginBottom: 4 }}>⚡ Autonome</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: T.tx, marginBottom: 4 }}>A Autonome</div>
           <div style={{ fontSize: 13, color: T.dm }}>Your AI Business Operator</div>
         </div>
 

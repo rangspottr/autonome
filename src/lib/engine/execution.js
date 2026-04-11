@@ -54,15 +54,44 @@ export async function executeAction(db, decision, options = {}) {
   if (agent === "finance") {
     const inv = (newDb.txns || []).find((t) => t.id === target);
     if (inv) {
+      // Resolve contact for the invoice
+      let invContact = null;
+      if (inv.contactId) {
+        invContact = (newDb.contacts || []).find((c) => c.id === inv.contactId) || null;
+      }
+      if (!invContact && inv.email) {
+        invContact = (newDb.contacts || []).find(
+          (c) => c.email && c.email.toLowerCase() === inv.email.toLowerCase()
+        ) || null;
+      }
+      const invContactId = invContact?.id || null;
+      const invEmail = invContact?.email || inv.email || null;
+
       if (action === "remind" || action === "pre") {
-        const wf = startWorkflow(newDb, "invoice_collection", inv.id, null);
+        if (!invEmail) {
+          description = `No valid email for invoice: ${inv.desc} — action skipped`;
+          newDb.audit = [
+            ...(newDb.audit || []),
+            { id: uid(), at: now, agent: AGENT_LABELS[agent] || agent, action: "failed", target, desc: description, auto: decision.auto || false, delivered: false },
+          ];
+          return newDb;
+        }
+        const wf = startWorkflow(newDb, "invoice_collection", inv.id, invContactId);
         if (wf) { newDb.workflows = [...(newDb.workflows || []), wf]; workflowStarted = wf.id; }
-        const sent = addEmail(description, inv.email || "client");
+        const sent = addEmail(description, invEmail);
         description = sent
           ? `Sent ${action === "pre" ? "pre-due" : "overdue"} reminder for invoice: ${inv.desc}`
           : `Email skipped (daily limit): ${inv.desc}`;
       } else if (action === "urgent") {
-        const sent = addEmail(`URGENT: ${inv.desc}`, inv.email || "client");
+        if (!invEmail) {
+          description = `No valid email for invoice: ${inv.desc} — action skipped`;
+          newDb.audit = [
+            ...(newDb.audit || []),
+            { id: uid(), at: now, agent: AGENT_LABELS[agent] || agent, action: "failed", target, desc: description, auto: decision.auto || false, delivered: false },
+          ];
+          return newDb;
+        }
+        const sent = addEmail(`URGENT: ${inv.desc}`, invEmail);
         description = sent
           ? `Sent urgent payment notice for: ${inv.desc}`
           : `Email skipped (daily limit): ${inv.desc}`;

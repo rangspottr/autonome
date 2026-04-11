@@ -50,7 +50,7 @@ export default class ErrorBoundary extends Component {
             fontFamily: "'Plus Jakarta Sans', sans-serif",
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: T.am, marginBottom: 12 }}>ERROR</div>
           <h3 style={{ color: T.tx, marginBottom: 8 }}>Something went wrong</h3>
           <p style={{ color: T.dm, fontSize: 14, marginBottom: 20 }}>
             {this.state.error?.message || "An unexpected error occurred."}
