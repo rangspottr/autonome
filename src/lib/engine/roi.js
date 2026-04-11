@@ -3,18 +3,18 @@ export function calcROI(db) {
   const hourlyRate = 35;
   const hoursPerAction = 0.25;
 
+  const sent = db.sent || [];
+  const realSent = sent.filter((s) => s.delivered).length;
+  const loggedSent = sent.filter((s) => !s.delivered).length;
+
   const totalActions =
-    (outcomes.emailsSent || 0) +
+    realSent +
     (outcomes.leadsQualified || 0) +
     (outcomes.tasksAuto || 0);
 
   const hoursSaved = totalActions * hoursPerAction;
   const moneySaved = hoursSaved * hourlyRate;
   const headcountEquiv = hoursSaved / 160;
-
-  const sent = db.sent || [];
-  const realSent = sent.filter((s) => s.delivered).length;
-  const loggedSent = sent.filter((s) => !s.delivered).length;
 
   const workflows = db.workflows || [];
   const activeWf = workflows.filter((w) => w.status === "active").length;

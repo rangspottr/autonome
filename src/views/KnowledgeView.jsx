@@ -126,7 +126,7 @@ export default function KnowledgeView({ db, onUpdate }) {
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <Button size="sm" variant="secondary" onClick={() => openEdit(article)}>Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => deleteArticle(article.id)}>🗑</Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteArticle(article.id)}>Del</Button>
               </div>
             </div>
           </Card>

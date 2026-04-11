@@ -48,13 +48,13 @@ export default function ApprovalView({ db, onUpdate }) {
       {pendingApprovals.length === 0 ? (
         <Card>
           <div style={{ textAlign: "center", padding: 32 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.gn, marginBottom: 8 }}>[OK]</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: T.gn }}>No pending approvals</div>
           </div>
         </Card>
       ) : (
         pendingApprovals.map((decision) => {
-          const meta = AgentMeta[decision.agent] || { icon: "🤖", label: decision.agent, color: T.dm, bg: T.bg };
+          const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: T.dm, bg: T.bg };
           return (
             <Card key={`${decision.agent}-${decision.action}-${decision.target}`}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
@@ -67,7 +67,10 @@ export default function ApprovalView({ db, onUpdate }) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 22,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: meta.color,
+                    letterSpacing: 0.5,
                     flexShrink: 0,
                   }}
                 >

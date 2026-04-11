@@ -149,7 +149,7 @@ export default function SettingsView({ db, onUpdate }) {
         </div>
         {checks.map((c) => (
           <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
-            <span style={{ fontSize: 16 }}>{c.done ? "✅" : "⬜"}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: c.done ? T.gn : T.mt }}>{c.done ? "[x]" : "[ ]"}</span>
             <span style={{ fontSize: 13, color: c.done ? T.tx : T.mt, textDecoration: c.done ? "none" : "none" }}>
               {c.label}
             </span>
@@ -159,11 +159,17 @@ export default function SettingsView({ db, onUpdate }) {
 
       {/* Integration Keys */}
       <Card style={{ marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 700, color: T.tx }}>Integration Keys</h3>
+        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: T.tx }}>Integration Keys</h3>
+        <div style={{ background: T.rdL, border: `1px solid ${T.rd}30`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: T.rd, marginBottom: 16 }}>
+          [DEV MODE] API keys are stored in your browser and sent directly from the client. In production, keys should be proxied through a backend server. Do not use production API keys here.
+        </div>
         {KEY_CONFIGS.map((cfg) => (
           <div key={cfg.key} style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: T.dm }}>{cfg.label}</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: T.dm }}>
+                {cfg.label}{" "}
+                <span style={{ background: T.am, color: "#fff", borderRadius: 4, padding: "1px 5px", fontSize: 10, fontWeight: 700 }}>DEV</span>
+              </label>
               <Pill
                 label={keys[cfg.key] ? "Connected" : "Not configured"}
                 variant={keys[cfg.key] ? "green" : "muted"}
@@ -191,7 +197,7 @@ export default function SettingsView({ db, onUpdate }) {
         ))}
         {!db.cfg.keys?.llm && (
           <div style={{ background: T.amL, border: `1px solid ${T.am}30`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: T.am, marginTop: 8 }}>
-            ⚠️ Add your Anthropic LLM key to enable AI-powered features (Process View, AI query, smart extraction).
+            WARNING: Add your Anthropic LLM key to enable AI-powered features (Process View, AI query, smart extraction).
           </div>
         )}
       </Card>
@@ -232,7 +238,7 @@ export default function SettingsView({ db, onUpdate }) {
           style={{ display: "none" }}
         />
         <Button variant="secondary" onClick={() => csvInputRef.current?.click()}>
-          📂 Import CSV / TSV
+          Import CSV / TSV
         </Button>
         {csvStatus && (
           <div style={{ marginTop: 10, fontSize: 12, color: csvStatus.startsWith("✓") ? T.gn : T.rd }}>

@@ -11,6 +11,7 @@ export default function ProcessView({ db, onUpdate }) {
   const [result, setResult] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [imported, setImported] = useState(false);
+  const [selected, setSelected] = useState({ contacts: {}, intents: {} });
 
   async function processText() {
     if (!text.trim()) return;
@@ -27,25 +28,49 @@ export default function ProcessView({ db, onUpdate }) {
       }
 
       setResult(parsed);
+      // Default all items to selected
+      const defaultContacts = {};
+      const defaultIntents = {};
+      (parsed.contacts || []).forEach((c) => { defaultContacts[c.id] = true; });
+      (parsed.intents || []).forEach((intent, i) => { defaultIntents[i] = true; });
+      setSelected({ contacts: defaultContacts, intents: defaultIntents });
     } finally {
       setProcessing(false);
     }
   }
 
+  function toggleSelectAll() {
+    const allContactsSelected = (result?.contacts || []).every((c) => selected.contacts[c.id]);
+    const allIntentsSelected = (result?.intents || []).every((_, i) => selected.intents[i]);
+    const allSelected = allContactsSelected && allIntentsSelected;
+    const newContacts = {};
+    const newIntents = {};
+    (result?.contacts || []).forEach((c) => { newContacts[c.id] = !allSelected; });
+    (result?.intents || []).forEach((_, i) => { newIntents[i] = !allSelected; });
+    setSelected({ contacts: newContacts, intents: newIntents });
+  }
+
+  const selectedContactCount = (result?.contacts || []).filter((c) => selected.contacts[c.id]).length;
+  const selectedIntentCount = (result?.intents || []).filter((_, i) => selected.intents[i]).length;
+
   function importResults() {
     if (!result) return;
     const updated = JSON.parse(JSON.stringify(db));
 
-    // Import contacts
-    result.contacts.forEach((c) => {
-      if (!updated.contacts.some((x) => x.email === c.email && c.email)) {
-        updated.contacts.push({ id: uid(), ...c, createdAt: iso(), tags: [] });
-      }
-    });
+    // Import selected contacts only
+    result.contacts
+      .filter((c) => selected.contacts[c.id])
+      .forEach((c) => {
+        if (!updated.contacts.some((x) => x.email === c.email && c.email)) {
+          updated.contacts.push({ id: uid(), ...c, createdAt: iso(), tags: [] });
+        }
+      });
 
-    // Create tasks from intents
-    result.intents.forEach((intent) => {
-      if (intent.type === "schedule_meeting") {
+    // Create tasks from selected intents
+    result.intents
+      .filter((_, i) => selected.intents[i])
+      .forEach((intent) => {
+        if (intent.type === "schedule_meeting") {
         updated.tasks.push({
           id: uid(),
           title: intent.description,
@@ -56,21 +81,24 @@ export default function ProcessView({ db, onUpdate }) {
       }
     });
 
-    // Create invoices from collection intents
-    result.intents.forEach((intent) => {
-      if (intent.type === "invoice_collection" && intent.amount > 0) {
-        const client = result.contacts[0];
-        updated.txns.push({
-          id: uid(),
-          desc: intent.description,
-          amt: intent.amount,
-          type: "inv",
-          st: "pending",
-          at: iso(),
-          email: client?.email || null,
-        });
-      }
-    });
+    // Create invoices from selected collection intents
+    result.intents
+      .filter((_, i) => selected.intents[i])
+      .forEach((intent) => {
+        if (intent.type === "invoice_collection" && intent.amount > 0) {
+          const client = result.contacts.find((c) => selected.contacts[c.id]) || result.contacts[0];
+          updated.txns.push({
+            id: uid(),
+            desc: intent.description,
+            amt: intent.amount,
+            type: "inv",
+            st: "pending",
+            at: iso(),
+            email: client?.email || null,
+            contactId: client?.id || null,
+          });
+        }
+      });
 
     // Memory entry
     if (result.contacts.length > 0) {
@@ -100,7 +128,7 @@ export default function ProcessView({ db, onUpdate }) {
       at: iso(),
       agent: "Process",
       action: "import",
-      desc: `Processed text: extracted ${result.contacts.length} contacts, ${result.intents.length} intents`,
+      desc: `Processed text: imported ${selectedContactCount} of ${result.contacts.length} contacts, ${selectedIntentCount} of ${result.intents.length} intents`,
       auto: false,
     });
 
@@ -165,9 +193,17 @@ export default function ProcessView({ db, onUpdate }) {
               </h3>
               {result.contacts.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No contacts detected.</p>}
               {result.contacts.map((c) => (
-                <div key={c.id} style={{ padding: "6px 0", borderBottom: `1px solid ${T.bd}` }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: T.mt }}>{c.email || c.phone || "no contact info"}</div>
+                <div key={c.id} style={{ padding: "6px 0", borderBottom: `1px solid ${T.bd}`, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!selected.contacts[c.id]}
+                    onChange={(e) => setSelected((s) => ({ ...s, contacts: { ...s.contacts, [c.id]: e.target.checked } }))}
+                    style={{ marginTop: 2, cursor: "pointer" }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: T.mt }}>{c.email || c.phone || "no contact info"}</div>
+                  </div>
                 </div>
               ))}
             </Card>
@@ -179,10 +215,18 @@ export default function ProcessView({ db, onUpdate }) {
               </h3>
               {result.intents.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No intents detected.</p>}
               {result.intents.map((intent, i) => (
-                <div key={i} style={{ padding: "6px 0", borderBottom: `1px solid ${T.bd}` }}>
-                  <Pill label={intent.type.replace(/_/g, " ")} variant="blue" />
-                  <div style={{ fontSize: 12, color: T.dm, marginTop: 4 }}>{intent.description}</div>
-                  {intent.amount && <div style={{ fontSize: 12, color: T.gn }}>${intent.amount.toLocaleString()}</div>}
+                <div key={i} style={{ padding: "6px 0", borderBottom: `1px solid ${T.bd}`, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!selected.intents[i]}
+                    onChange={(e) => setSelected((s) => ({ ...s, intents: { ...s.intents, [i]: e.target.checked } }))}
+                    style={{ marginTop: 2, cursor: "pointer" }}
+                  />
+                  <div>
+                    <Pill label={intent.type.replace(/_/g, " ")} variant="blue" />
+                    <div style={{ fontSize: 12, color: T.dm, marginTop: 4 }}>{intent.description}</div>
+                    {intent.amount && <div style={{ fontSize: 12, color: T.gn }}>${intent.amount.toLocaleString()}</div>}
+                  </div>
                 </div>
               ))}
             </Card>
@@ -198,10 +242,15 @@ export default function ProcessView({ db, onUpdate }) {
             </div>
           )}
 
-          {/* Import button */}
-          <Button onClick={importResults} disabled={imported}>
-            {imported ? "✓ Imported!" : `Import ${result.contacts.length} contacts & ${result.intents.length} intents`}
-          </Button>
+          {/* Import controls */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Button onClick={importResults} disabled={imported || (selectedContactCount === 0 && selectedIntentCount === 0)}>
+              {imported ? "Imported!" : `Import ${selectedContactCount} of ${result.contacts.length} contact${result.contacts.length !== 1 ? "s" : ""} & ${selectedIntentCount} of ${result.intents.length} intent${result.intents.length !== 1 ? "s" : ""}`}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={toggleSelectAll}>
+              {(result.contacts.every((c) => selected.contacts[c.id]) && result.intents.every((_, i) => selected.intents[i])) ? "Deselect All" : "Select All"}
+            </Button>
+          </div>
         </div>
       )}
     </div>

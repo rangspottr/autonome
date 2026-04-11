@@ -67,7 +67,7 @@ export default function InventoryView({ db, onUpdate }) {
       {/* Low stock alert */}
       {lowStock.length > 0 && (
         <div style={{ background: T.rdL, border: `1px solid ${T.rd}30`, borderRadius: 10, padding: "10px 16px", marginBottom: 16 }}>
-          <strong style={{ fontSize: 12, color: T.rd }}>⚠️ {lowStock.length} item{lowStock.length > 1 ? "s" : ""} below reorder point</strong>
+          <strong style={{ fontSize: 12, color: T.rd }}>WARNING: {lowStock.length} item{lowStock.length > 1 ? "s" : ""} below reorder point</strong>
         </div>
       )}
 

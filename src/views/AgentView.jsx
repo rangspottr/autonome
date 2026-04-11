@@ -72,7 +72,10 @@ export default function AgentView({ db, onUpdate }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 20,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: meta.color,
+                  letterSpacing: 0.5,
                 }}
               >
                 {meta.icon}
@@ -108,7 +111,7 @@ export default function AgentView({ db, onUpdate }) {
           <p style={{ color: T.mt, fontSize: 13 }}>No active workflows.</p>
         ) : (
           activeWf.map((wf) => {
-            const meta = AgentMeta[wf.agent] || { icon: "🤖", label: wf.agent };
+            const meta = AgentMeta[wf.agent] || { icon: "CMD", label: wf.agent };
             const progress = Math.round((wf.currentStep / wf.steps.length) * 100);
             return (
               <div

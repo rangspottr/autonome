@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { T } from "./lib/theme.js";
-import { dbLoad, dbSave } from "./lib/storage.js";
+import { dbLoad, dbSave, getStorageWarning } from "./lib/storage.js";
 import { calcHealth } from "./lib/engine/health.js";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -20,18 +20,18 @@ import ProcessView from "./views/ProcessView.jsx";
 import KnowledgeView from "./views/KnowledgeView.jsx";
 
 const NAV_ITEMS = [
-  { id: "cmd", icon: "⚡", label: "Command Center" },
-  { id: "agents", icon: "🤖", label: "Agents" },
-  { id: "approvals", icon: "🔔", label: "Approvals" },
-  { id: "finance", icon: "💰", label: "Finance" },
-  { id: "sales", icon: "📈", label: "Sales" },
-  { id: "ops", icon: "⚙️", label: "Operations" },
-  { id: "inventory", icon: "📦", label: "Inventory" },
-  { id: "roi", icon: "📊", label: "ROI" },
-  { id: "process", icon: "🔍", label: "Process" },
-  { id: "knowledge", icon: "📚", label: "Knowledge" },
-  { id: "audit", icon: "📋", label: "Audit Log" },
-  { id: "settings", icon: "⚙", label: "Settings" },
+  { id: "cmd", icon: "CMD", label: "Command Center" },
+  { id: "agents", icon: "AGT", label: "Agents" },
+  { id: "approvals", icon: "APR", label: "Approvals" },
+  { id: "finance", icon: "FIN", label: "Finance" },
+  { id: "sales", icon: "REV", label: "Sales" },
+  { id: "ops", icon: "OPS", label: "Operations" },
+  { id: "inventory", icon: "INV", label: "Inventory" },
+  { id: "roi", icon: "ROI", label: "ROI" },
+  { id: "process", icon: "PRC", label: "Process" },
+  { id: "knowledge", icon: "KNW", label: "Knowledge" },
+  { id: "audit", icon: "LOG", label: "Audit Log" },
+  { id: "settings", icon: "SET", label: "Settings" },
 ];
 
 const GLOBAL_STYLES = `
@@ -77,7 +77,7 @@ export default function App() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⚡</div>
+          <div style={{ fontSize: 32, marginBottom: 12, fontWeight: 800, letterSpacing: -1 }}>A</div>
           <div style={{ fontSize: 14, color: T.dm }}>Loading Autonome…</div>
         </div>
       </div>
@@ -141,7 +141,7 @@ export default function App() {
               borderBottom: "1px solid rgba(255,255,255,0.1)",
             }}
           >
-            <span style={{ fontSize: 22 }}>⚡</span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>A</span>
             {sidebarOpen && (
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>Autonome</div>
@@ -181,7 +181,7 @@ export default function App() {
                     transition: "background 0.15s, color 0.15s",
                   }}
                 >
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, flexShrink: 0, letterSpacing: 0.5, minWidth: 32, textAlign: "center" }}>{item.icon}</span>
                   {sidebarOpen && <span style={{ flex: 1 }}>{item.label}</span>}
                   {badge !== null && sidebarOpen && (
                     <span
@@ -298,6 +298,11 @@ export default function App() {
 
           {/* View content */}
           <div style={{ padding: "24px" }}>
+            {getStorageWarning() && (
+              <div style={{ background: "#FFF3CD", border: "1px solid #FFC107", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#856404", marginBottom: 16 }}>
+                WARNING: {getStorageWarning()}
+              </div>
+            )}
             <ErrorBoundary key={view}>
               {VIEWS[view] || <div style={{ color: T.mt }}>View not found.</div>}
             </ErrorBoundary>
