@@ -18,6 +18,38 @@ export async function executeAction(db, decision, options = {}) {
   let delivered = false;
   let workflowStarted = null;
 
+  // Daily email limit enforcement
+  const todayPrefix = now.slice(0, 10); // "YYYY-MM-DD"
+  const dailyEmailLimit = limits.dailyEmailLimit || 50;
+
+  function addEmail(subject, to) {
+    const currentCount = (newDb.sent || []).filter(
+      (s) => s.type === "email" && s.at && s.at.startsWith(todayPrefix)
+    ).length;
+    if (currentCount >= dailyEmailLimit) {
+      newDb.audit = [
+        ...(newDb.audit || []),
+        {
+          id: uid(),
+          at: now,
+          agent: AGENT_LABELS[agent] || agent,
+          action: "email_skipped",
+          target,
+          desc: `Daily email limit reached (${currentCount}/${dailyEmailLimit}). Email skipped: ${subject}`,
+          auto: true,
+          delivered: false,
+        },
+      ];
+      return false;
+    }
+    newDb.sent = [
+      ...(newDb.sent || []),
+      { id: uid(), type: "email", subject, to, at: now, delivered: false, simulated: true },
+    ];
+    newDb.outcomes.emailsSent = (newDb.outcomes.emailsSent || 0) + 1;
+    return true;
+  }
+
   // Finance actions
   if (agent === "finance") {
     const inv = (newDb.txns || []).find((t) => t.id === target);
@@ -25,13 +57,15 @@ export async function executeAction(db, decision, options = {}) {
       if (action === "remind" || action === "pre") {
         const wf = startWorkflow(newDb, "invoice_collection", inv.id, null);
         if (wf) { newDb.workflows = [...(newDb.workflows || []), wf]; workflowStarted = wf.id; }
-        newDb.outcomes.emailsSent = (newDb.outcomes.emailsSent || 0) + 1;
-        newDb.sent = [...(newDb.sent || []), { id: uid(), type: "email", subject: description, to: inv.email || "client", at: now, delivered: false, simulated: true }];
-        description = `Sent ${action === "pre" ? "pre-due" : "overdue"} reminder for invoice: ${inv.desc}`;
+        const sent = addEmail(description, inv.email || "client");
+        description = sent
+          ? `Sent ${action === "pre" ? "pre-due" : "overdue"} reminder for invoice: ${inv.desc}`
+          : `Email skipped (daily limit): ${inv.desc}`;
       } else if (action === "urgent") {
-        newDb.outcomes.emailsSent = (newDb.outcomes.emailsSent || 0) + 1;
-        newDb.sent = [...(newDb.sent || []), { id: uid(), type: "email", subject: `URGENT: ${inv.desc}`, to: inv.email || "client", at: now, delivered: false, simulated: true }];
-        description = `Sent urgent payment notice for: ${inv.desc}`;
+        const sent = addEmail(`URGENT: ${inv.desc}`, inv.email || "client");
+        description = sent
+          ? `Sent urgent payment notice for: ${inv.desc}`
+          : `Email skipped (daily limit): ${inv.desc}`;
       } else if (action === "escalate") {
         description = `Escalated to collections: ${inv.desc} (${inv.amt})`;
         inv.st = "escalated";
@@ -65,12 +99,16 @@ export async function executeAction(db, decision, options = {}) {
       if (wf) { newDb.workflows = [...(newDb.workflows || []), wf]; workflowStarted = wf.id; }
       deal.at = now;
       newDb.outcomes.dealsProgressed = (newDb.outcomes.dealsProgressed || 0) + 1;
-      newDb.outcomes.emailsSent = (newDb.outcomes.emailsSent || 0) + 1;
-      description = `Sent follow-up for deal with ${contact?.name || "contact"}`;
+      const fSent = addEmail(`Follow-up: ${contact?.name || "contact"}`, contact?.email || "contact");
+      description = fSent
+        ? `Sent follow-up for deal with ${contact?.name || "contact"}`
+        : `Follow-up skipped (daily limit): ${contact?.name || "contact"}`;
     } else if (action === "reengage" && deal) {
       deal.at = now;
-      newDb.outcomes.emailsSent = (newDb.outcomes.emailsSent || 0) + 1;
-      description = `Re-engaged ${contact?.name || "contact"}`;
+      const rSent = addEmail(`Re-engagement: ${contact?.name || "contact"}`, contact?.email || "contact");
+      description = rSent
+        ? `Re-engaged ${contact?.name || "contact"}`
+        : `Re-engage skipped (daily limit): ${contact?.name || "contact"}`;
     } else if (action === "close" && deal) {
       deal.stage = "closed";
       deal.closedAt = now;

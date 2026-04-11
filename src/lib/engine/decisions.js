@@ -5,6 +5,11 @@ export function executiveDecisions(db) {
   const now = Date.now();
   const limits = db.cfg.riskLimits || {};
 
+  // Deduplication guard: skip if (agent, action, target) already in the generated list
+  // This prevents duplicate entries when conditions overlap across cycles.
+  const has = (agent, action, target) =>
+    decisions.some((d) => d.agent === agent && d.action === action && d.target === target);
+
   // Finance: invoice collection
   (db.txns || [])
     .filter((t) => t.type === "inv" && t.st === "pending")
@@ -14,6 +19,7 @@ export function executiveDecisions(db) {
       const impact = inv.amt || 0;
 
       if (overdue && daysPast <= 3) {
+        if (has("finance", "remind", inv.id)) return;
         decisions.push({
           agent: "finance",
           action: "remind",
@@ -26,6 +32,7 @@ export function executiveDecisions(db) {
           needsApproval: false,
         });
       } else if (overdue && daysPast > 3 && daysPast <= 7) {
+        if (has("finance", "urgent", inv.id)) return;
         decisions.push({
           agent: "finance",
           action: "urgent",
@@ -38,6 +45,7 @@ export function executiveDecisions(db) {
           needsApproval: false,
         });
       } else if (overdue && daysPast > 7) {
+        if (has("finance", "escalate", inv.id)) return;
         decisions.push({
           agent: "finance",
           action: "escalate",
@@ -50,6 +58,7 @@ export function executiveDecisions(db) {
           needsApproval: true,
         });
       } else if (!overdue) {
+        if (has("finance", "pre", inv.id)) return;
         decisions.push({
           agent: "finance",
           action: "pre",
@@ -73,6 +82,7 @@ export function executiveDecisions(db) {
       const expectedValue = (deal.val || 0) * (deal.prob || 0) / 100;
 
       if (stale >= 5) {
+        if (has("revenue", "reengage", deal.id)) return;
         decisions.push({
           agent: "revenue",
           action: "reengage",
@@ -86,6 +96,7 @@ export function executiveDecisions(db) {
           cid: deal.cid,
         });
       } else if (stale >= 3) {
+        if (has("revenue", "followup", deal.id)) return;
         decisions.push({
           agent: "revenue",
           action: "followup",
@@ -101,6 +112,7 @@ export function executiveDecisions(db) {
       }
 
       if (deal.prob >= 70 && deal.stage === "negotiation") {
+        if (has("revenue", "close", deal.id)) return;
         decisions.push({
           agent: "revenue",
           action: "close",
@@ -120,6 +132,7 @@ export function executiveDecisions(db) {
   (db.contacts || [])
     .filter((c) => c.type === "lead" && !(db.deals || []).some((d) => d.cid === c.id))
     .forEach((c) => {
+      if (has("revenue", "qualify", c.id)) return;
       decisions.push({
         agent: "revenue",
         action: "qualify",
@@ -138,6 +151,7 @@ export function executiveDecisions(db) {
   (db.tasks || [])
     .filter((t) => t.st !== "done" && t.due && new Date(t.due) < new Date())
     .forEach((t) => {
+      if (has("operations", "escalate", t.id)) return;
       decisions.push({
         agent: "operations",
         action: "escalate",
@@ -163,17 +177,19 @@ export function executiveDecisions(db) {
       bestCampaign.conv > 0 &&
       (bestCampaign.spent || 0) < (bestCampaign.budget || 0) * 0.8
     ) {
-      decisions.push({
-        agent: "growth",
-        action: "scale",
-        target: bestCampaign.id,
-        targetName: bestCampaign.name,
-        priority: 55,
-        impact: 0,
-        desc: `Scale ${bestCampaign.name} — best CAC, budget available`,
-        auto: false,
-        needsApproval: true,
-      });
+      if (!has("growth", "scale", bestCampaign.id)) {
+        decisions.push({
+          agent: "growth",
+          action: "scale",
+          target: bestCampaign.id,
+          targetName: bestCampaign.name,
+          priority: 55,
+          impact: 0,
+          desc: `Scale ${bestCampaign.name} — best CAC, budget available`,
+          auto: false,
+          needsApproval: true,
+        });
+      }
     }
   }
 
@@ -181,6 +197,7 @@ export function executiveDecisions(db) {
   (db.assets || [])
     .filter((a) => a.rp > 0 && a.qty < a.rp)
     .forEach((a) => {
+      if (has("operations", "reorder", a.id)) return;
       decisions.push({
         agent: "operations",
         action: "reorder",

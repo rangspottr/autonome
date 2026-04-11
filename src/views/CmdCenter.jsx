@@ -27,6 +27,10 @@ export default function CmdCenter({ db, onUpdate }) {
   const [executing, setExecuting] = useState(null);
   const [showMissedCall, setShowMissedCall] = useState(false);
   const [callForm, setCallForm] = useState({ phone: "", name: "", time: "", note: "" });
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResponse, setAiResponse] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
 
   const decisions = executiveDecisions(db);
   const briefing = computeBriefing(db);
@@ -107,6 +111,91 @@ export default function CmdCenter({ db, onUpdate }) {
     setShowMissedCall(false);
     setCallForm({ phone: "", name: "", time: "", note: "" });
   }
+
+  async function handleAiQuery() {
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    setAiResponse(null);
+
+    // Build business context for the query
+    const overdueInvoices = (db.txns || []).filter(
+      (t) => t.type === "inv" && t.st === "pending" && t.due && new Date(t.due) < new Date()
+    );
+    const totalRevenue = (db.txns || [])
+      .filter((t) => t.type === "inc" && t.st === "paid")
+      .reduce((s, t) => s + (t.amt || 0), 0);
+    const totalExpenses = (db.txns || [])
+      .filter((t) => t.type === "exp")
+      .reduce((s, t) => s + (t.amt || 0), 0);
+    const openDeals = (db.deals || []).filter((d) => d.stage !== "closed");
+    const pipelineValue = openDeals.reduce((s, d) => s + (d.val || 0), 0);
+
+    const context = `Business: ${db.cfg.name} (${db.cfg.type})
+Revenue: $${Math.round(totalRevenue).toLocaleString()} | Expenses: $${Math.round(totalExpenses).toLocaleString()} | Net: $${Math.round(totalRevenue - totalExpenses).toLocaleString()}
+Overdue invoices: ${overdueInvoices.length} totaling $${Math.round(overdueInvoices.reduce((s, t) => s + (t.amt || 0), 0)).toLocaleString()}
+Open pipeline: ${openDeals.length} deals worth $${Math.round(pipelineValue).toLocaleString()}
+Contacts: ${(db.contacts || []).length} | Tasks pending: ${(db.tasks || []).filter((t) => t.st !== "done").length}
+Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")}`;
+
+    const localSummary = `Business Snapshot for ${db.cfg.name}:
+• Revenue collected: $${Math.round(totalRevenue).toLocaleString()}
+• Expenses: $${Math.round(totalExpenses).toLocaleString()}
+• Net cash position: $${Math.round(totalRevenue - totalExpenses).toLocaleString()}
+• Overdue invoices: ${overdueInvoices.length} ($${Math.round(overdueInvoices.reduce((s, t) => s + (t.amt || 0), 0)).toLocaleString()} at risk)
+• Open deals: ${openDeals.length} ($${Math.round(pipelineValue).toLocaleString()} pipeline)
+• Pending tasks: ${(db.tasks || []).filter((t) => t.st !== "done").length}`;
+
+    const llmKey = db.cfg.keys?.llm;
+    if (!llmKey) {
+      setAiResponse(localSummary);
+      setAiLoading(false);
+      return;
+    }
+
+    try {
+      const model = db.cfg.llmModel || "claude-sonnet-4-20250514";
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": llmKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: `You are Autonome, an AI business operator assistant. Here is the current business context:\n\n${context}\n\nUser question: ${aiQuery}\n\nProvide a concise, actionable answer.`,
+            },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiResponse(data.content?.[0]?.text || localSummary);
+      } else {
+        setAiResponse(localSummary);
+      }
+    } catch {
+      setAiResponse(localSummary);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  // Activation checklist items
+  const checklist = [
+    { label: "Add your first real contact", done: (db.contacts || []).some((c) => !c.tags?.includes("sample")) },
+    { label: "Create an invoice", done: (db.txns || []).some((t) => t.type === "inv") },
+    { label: "Set up a deal in the pipeline", done: (db.deals || []).length > 0 },
+    { label: "Configure API keys (Settings)", done: !!(db.cfg.keys?.llm || db.cfg.keys?.gmail || db.cfg.keys?.stripe) },
+    { label: "Review your first agent recommendation", done: (db.audit || []).length > 0 },
+  ];
+  const checklistAllDone = checklist.every((c) => c.done);
 
   // Group decisions by tier
   const tiers = TIER_CONFIG.map((tier) => ({
@@ -208,6 +297,111 @@ export default function CmdCenter({ db, onUpdate }) {
                 <strong style={{ fontSize: 12, color: T.tx }}>{item.val}</strong>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Activation Checklist (shown until all done and dismissed) */}
+      {!checklistDismissed && (
+        <div
+          style={{
+            background: T.wh,
+            border: `1px solid ${T.bd}`,
+            borderRadius: 12,
+            marginBottom: 20,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 16px",
+              borderBottom: `1px solid ${T.bd}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span>🚀</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.tx }}>Getting Started</span>
+              <span style={{ fontSize: 12, color: T.mt }}>
+                {checklist.filter((c) => c.done).length}/{checklist.length} complete
+              </span>
+            </div>
+            {checklistAllDone && (
+              <Button variant="secondary" size="sm" onClick={() => setChecklistDismissed(true)}>
+                Dismiss
+              </Button>
+            )}
+          </div>
+          <div style={{ padding: "10px 16px" }}>
+            {checklist.map((item) => (
+              <div
+                key={item.label}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}
+              >
+                <span style={{ fontSize: 14 }}>{item.done ? "✅" : "⬜"}</span>
+                <span style={{ fontSize: 13, color: item.done ? T.dm : T.tx }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI Business Query */}
+      <div
+        style={{
+          background: T.wh,
+          border: `1px solid ${T.bd}`,
+          borderRadius: 12,
+          marginBottom: 20,
+          padding: 16,
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.tx, marginBottom: 10 }}>
+          🤖 Ask Autonome
+          {!db.cfg.keys?.llm && (
+            <span style={{ fontSize: 11, fontWeight: 400, color: T.mt, marginLeft: 8 }}>
+              (Add LLM key in Settings for AI answers)
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAiQuery()}
+            placeholder="e.g. Which invoices are most at risk? What should I focus on today?"
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              border: `1px solid ${T.bd}`,
+              borderRadius: 8,
+              fontSize: 13,
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              color: T.tx,
+              background: T.bg,
+              outline: "none",
+            }}
+          />
+          <Button size="sm" onClick={handleAiQuery} disabled={aiLoading || !aiQuery.trim()}>
+            {aiLoading ? "…" : "Ask"}
+          </Button>
+        </div>
+        {aiResponse && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "10px 12px",
+              background: T.blL,
+              borderRadius: 8,
+              fontSize: 13,
+              color: T.tx,
+              lineHeight: 1.6,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {aiResponse}
           </div>
         )}
       </div>

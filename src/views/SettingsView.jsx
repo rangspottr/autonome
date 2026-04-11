@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { T } from "../lib/theme.js";
-import { iso } from "../lib/utils.js";
+import { uid, iso } from "../lib/utils.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
@@ -21,6 +21,71 @@ export default function SettingsView({ db, onUpdate }) {
     dailyEmailLimit: db.cfg.riskLimits?.dailyEmailLimit || 50,
   });
   const [saved, setSaved] = useState(false);
+  const [csvStatus, setCsvStatus] = useState(null);
+  const csvInputRef = useRef(null);
+
+  function parseCSVText(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const sep = lines[0].includes("\t") ? "\t" : ",";
+    const headers = lines[0].split(sep).map((h) => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+    return lines.slice(1).map((line) => {
+      const vals = line.split(sep);
+      const row = {};
+      headers.forEach((h, i) => { row[h] = (vals[i] || "").trim(); });
+      return row;
+    }).filter((r) => Object.values(r).some((v) => v));
+  }
+
+  function handleCsvImport(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const rows = parseCSVText(ev.target.result);
+        if (rows.length === 0) { setCsvStatus("No data rows found."); return; }
+
+        const updated = JSON.parse(JSON.stringify(db));
+        let imported = 0;
+
+        rows.forEach((row) => {
+          // Detect contact row
+          const name = row.name || row.fullname || row.contactname || row.company;
+          const email = row.email || row.emailaddress;
+          const phone = row.phone || row.phonenumber || row.mobile;
+          if (name) {
+            const exists = (updated.contacts || []).some((c) => {
+              if (email && c.email) return c.email === email;
+              if (phone && c.phone) return c.phone === phone;
+              return c.name === name;
+            });
+            if (!exists) {
+              updated.contacts = [...(updated.contacts || []), {
+                id: uid(), name, email: email || null,
+                phone: phone || null,
+                type: "lead", createdAt: iso(), tags: [],
+              }];
+              imported++;
+            }
+          }
+        });
+
+        updated.audit = [...(updated.audit || []), {
+          id: uid(), at: iso(), agent: "Settings", action: "csv_import",
+          desc: `CSV import: ${imported} records imported from ${file.name}`, auto: false,
+        }];
+
+        onUpdate(updated);
+        setCsvStatus(`✓ Imported ${imported} contacts from ${file.name}`);
+      } catch (err) {
+        setCsvStatus(`Error: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-imported if needed
+    e.target.value = "";
+  }
 
   function saveSettings() {
     const updated = JSON.parse(JSON.stringify(db));
@@ -151,6 +216,29 @@ export default function SettingsView({ db, onUpdate }) {
             />
           ))}
         </div>
+      </Card>
+
+      {/* Data Import */}
+      <Card style={{ marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: T.tx }}>Data Import</h3>
+        <p style={{ fontSize: 12, color: T.dm, marginBottom: 12 }}>
+          Import contacts from a CSV, TSV, or TXT file. Columns should include: name, email, phone.
+        </p>
+        <input
+          ref={csvInputRef}
+          type="file"
+          accept=".csv,.tsv,.txt"
+          onChange={handleCsvImport}
+          style={{ display: "none" }}
+        />
+        <Button variant="secondary" onClick={() => csvInputRef.current?.click()}>
+          📂 Import CSV / TSV
+        </Button>
+        {csvStatus && (
+          <div style={{ marginTop: 10, fontSize: 12, color: csvStatus.startsWith("✓") ? T.gn : T.rd }}>
+            {csvStatus}
+          </div>
+        )}
       </Card>
 
       {/* Actions */}
