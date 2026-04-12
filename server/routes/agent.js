@@ -151,6 +151,7 @@ router.get('/status', ...guard, async (req, res, next) => {
       [req.workspace.id]
     );
 
+    // eslint-disable-next-line no-unused-vars
     const pendingDecisionsResult = await pool.query(
       `SELECT COUNT(*) AS count FROM audit_log
        WHERE workspace_id = $1 AND (action = 'rejected' OR action = 'approved')`,

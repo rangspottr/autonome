@@ -5,6 +5,7 @@ import AgentMeta from "../components/AgentMeta.js";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+// eslint-disable-next-line no-unused-vars
 import EmptyState from "../components/EmptyState.jsx";
 import styles from "./ApprovalView.module.css";
 

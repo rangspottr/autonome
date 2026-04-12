@@ -56,6 +56,7 @@ router.post('/webhook', async (req, res, next) => {
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, config.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
+      console.error('[Stripe Webhook] Signature verification failed:', err.message);
       return res.status(400).json({ message: `Webhook error: ${err.message}` });
     }
 
@@ -116,6 +117,7 @@ router.post('/webhook', async (req, res, next) => {
 
     res.json({ received: true });
   } catch (err) {
+    console.error('[Stripe Webhook] Processing error:', { type: event?.type, error: err.message });
     next(err);
   }
 });
