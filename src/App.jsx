@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { T } from "./lib/theme.js";
 import { dbLoad, dbSave, getStorageWarning } from "./lib/storage.js";
 import { calcHealth } from "./lib/engine/health.js";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 
 import { executiveDecisions } from "./lib/engine/decisions.js";
 import Setup from "./views/Setup.jsx";
@@ -18,6 +20,13 @@ import AuditView from "./views/AuditView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
 import ProcessView from "./views/ProcessView.jsx";
 import KnowledgeView from "./views/KnowledgeView.jsx";
+
+import LoginPage from "./pages/LoginPage.jsx";
+import SignupPage from "./pages/SignupPage.jsx";
+import CreateWorkspacePage from "./pages/CreateWorkspacePage.jsx";
+import OnboardingPage from "./pages/OnboardingPage.jsx";
+import CheckoutPage from "./pages/CheckoutPage.jsx";
+import CheckoutSuccessPage from "./pages/CheckoutSuccessPage.jsx";
 
 const NAV_ITEMS = [
   { id: "cmd", icon: "CMD", label: "Command Center" },
@@ -43,7 +52,34 @@ const GLOBAL_STYLES = `
   ::-webkit-scrollbar-thumb { background: ${T.bd2}; border-radius: 3px; }
 `;
 
-export default function App() {
+function RequireAuth({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function RequireWorkspace({ children }) {
+  const { isAuthenticated, workspace, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!workspace) return <Navigate to="/create-workspace" replace />;
+  return children;
+}
+
+function RequireSubscription({ children }) {
+  const { isAuthenticated, workspace, subscription, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!workspace) return <Navigate to="/create-workspace" replace />;
+  if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trialing')) {
+    return <Navigate to="/checkout" replace />;
+  }
+  return children;
+}
+
+function MainApp() {
+  const { user, workspace, logout } = useAuth();
   const [db, setDb] = useState(null);
   const [view, setView] = useState("cmd");
   const [loading, setLoading] = useState(true);
@@ -66,16 +102,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-          background: T.bg,
-        }}
-      >
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif", background: T.bg }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 12, fontWeight: 800, letterSpacing: -1 }}>A</div>
           <div style={{ fontSize: 14, color: T.dm }}>Loading Autonome…</div>
@@ -84,7 +111,6 @@ export default function App() {
     );
   }
 
-  // Show setup if not configured
   if (!db.cfg.ok) {
     return (
       <>
@@ -119,33 +145,14 @@ export default function App() {
       <style>{GLOBAL_STYLES}</style>
       <div style={{ display: "flex", minHeight: "100vh" }}>
         {/* Sidebar */}
-        <div
-          style={{
-            width: sidebarOpen ? 220 : 60,
-            background: T.tx,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            transition: "width 0.25s",
-            overflow: "hidden",
-          }}
-        >
+        <div style={{ width: sidebarOpen ? 220 : 60, background: T.tx, flexShrink: 0, display: "flex", flexDirection: "column", transition: "width 0.25s", overflow: "hidden" }}>
           {/* Logo */}
-          <div
-            style={{
-              padding: sidebarOpen ? "20px 16px 16px" : "20px 0 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              justifyContent: sidebarOpen ? "flex-start" : "center",
-              borderBottom: "1px solid rgba(255,255,255,0.1)",
-            }}
-          >
+          <div style={{ padding: sidebarOpen ? "20px 16px 16px" : "20px 0 16px", display: "flex", alignItems: "center", gap: 10, justifyContent: sidebarOpen ? "flex-start" : "center", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>A</span>
             {sidebarOpen && (
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>Autonome</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{db.cfg.name || "v12"}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{workspace?.name || db.cfg.name || "v12"}</div>
               </div>
             )}
           </div>
@@ -156,68 +163,11 @@ export default function App() {
               const isActive = view === item.id;
               const badge = item.id === "approvals" && pendingApprovals > 0 ? pendingApprovals : null;
               return (
-                <button
-                  key={item.id}
-                  onClick={() => setView(item.id)}
-                  title={item.label}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    width: "100%",
-                    padding: sidebarOpen ? "8px 10px" : "10px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: isActive ? "rgba(255,255,255,0.15)" : "transparent",
-                    color: isActive ? "#fff" : "rgba(255,255,255,0.6)",
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    marginBottom: 2,
-                    textAlign: "left",
-                    justifyContent: sidebarOpen ? "flex-start" : "center",
-                    position: "relative",
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    transition: "background 0.15s, color 0.15s",
-                  }}
-                >
+                <button key={item.id} onClick={() => setView(item.id)} title={item.label} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: sidebarOpen ? "8px 10px" : "10px", borderRadius: 8, border: "none", background: isActive ? "rgba(255,255,255,0.15)" : "transparent", color: isActive ? "#fff" : "rgba(255,255,255,0.6)", fontWeight: isActive ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: 2, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center", position: "relative", fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "background 0.15s, color 0.15s" }}>
                   <span style={{ fontSize: 10, fontWeight: 700, flexShrink: 0, letterSpacing: 0.5, minWidth: 32, textAlign: "center" }}>{item.icon}</span>
                   {sidebarOpen && <span style={{ flex: 1 }}>{item.label}</span>}
-                  {badge !== null && sidebarOpen && (
-                    <span
-                      style={{
-                        background: T.rd,
-                        color: "#fff",
-                        borderRadius: 10,
-                        padding: "1px 6px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {badge}
-                    </span>
-                  )}
-                  {badge !== null && !sidebarOpen && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        background: T.rd,
-                        color: "#fff",
-                        borderRadius: 8,
-                        width: 14,
-                        height: 14,
-                        fontSize: 9,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {badge}
-                    </span>
-                  )}
+                  {badge !== null && sidebarOpen && <span style={{ background: T.rd, color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{badge}</span>}
+                  {badge !== null && !sidebarOpen && <span style={{ position: "absolute", top: 4, right: 4, background: T.rd, color: "#fff", borderRadius: 8, width: 14, height: 14, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{badge}</span>}
                 </button>
               );
             })}
@@ -228,49 +178,16 @@ export default function App() {
             <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>HEALTH SCORE</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div
-                  style={{
-                    flex: 1,
-                    height: 4,
-                    background: "rgba(255,255,255,0.15)",
-                    borderRadius: 2,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${health}%`,
-                      height: "100%",
-                      background: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd,
-                      borderRadius: 2,
-                    }}
-                  />
+                <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 2 }}>
+                  <div style={{ width: `${health}%`, height: "100%", background: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd, borderRadius: 2 }} />
                 </div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd,
-                  }}
-                >
-                  {health}
-                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd }}>{health}</span>
               </div>
             </div>
           )}
 
           {/* Toggle */}
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            style={{
-              padding: "12px",
-              background: "rgba(255,255,255,0.05)",
-              border: "none",
-              color: "rgba(255,255,255,0.5)",
-              cursor: "pointer",
-              fontSize: 16,
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-            }}
-          >
+          <button onClick={() => setSidebarOpen((v) => !v)} style={{ padding: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 16, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {sidebarOpen ? "◀" : "▶"}
           </button>
         </div>
@@ -278,21 +195,11 @@ export default function App() {
         {/* Main content */}
         <div style={{ flex: 1, overflow: "auto" }}>
           {/* Top bar */}
-          <div
-            style={{
-              padding: "16px 24px",
-              borderBottom: `1px solid ${T.bd}`,
-              background: T.wh,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.tx }}>
-              {NAV_ITEMS.find((n) => n.id === view)?.label || "Autonome"}
-            </h1>
-            <div style={{ fontSize: 12, color: T.mt }}>
-              {db.cfg.name} · {db.cfg.type}
+          <div style={{ padding: "16px 24px", borderBottom: `1px solid ${T.bd}`, background: T.wh, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.tx }}>{NAV_ITEMS.find((n) => n.id === view)?.label || "Autonome"}</h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ fontSize: 12, color: T.mt }}>{workspace?.name || db.cfg.name} · {db.cfg.type}</div>
+              {user && <button onClick={logout} style={{ fontSize: 12, color: T.mt, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sign out</button>}
             </div>
           </div>
 
@@ -310,5 +217,23 @@ export default function App() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <style>{GLOBAL_STYLES}</style>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/create-workspace" element={<RequireAuth><CreateWorkspacePage /></RequireAuth>} />
+        <Route path="/onboarding" element={<RequireWorkspace><OnboardingPage /></RequireWorkspace>} />
+        <Route path="/checkout" element={<RequireWorkspace><CheckoutPage /></RequireWorkspace>} />
+        <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+        <Route path="/" element={<RequireSubscription><MainApp /></RequireSubscription>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthProvider>
   );
 }

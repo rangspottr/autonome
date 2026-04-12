@@ -1,118 +1,128 @@
-# Autonome v12
+# Autonome
 
-**AI-powered business operating layer for small and mid-sized businesses.**
-
-Autonome acts as an autonomous operator — recovering revenue, following up leads, managing workflows, surfacing priorities, and reducing admin burden. It moves your business from passive information storage to active execution.
-
----
+The AI-powered autonomous operations platform for modern businesses.
 
 ## Tech Stack
 
-- **React 18** — UI framework
-- **Vite 5** — Build tool and dev server
-- **Plus Jakarta Sans** — Typography
-- **window.storage** — Pluggable persistence layer
-- **Anthropic Claude** (optional) — AI extraction and queries
+**Frontend**
+- React 18 + Vite 5
+- react-router-dom
+- Plus Jakarta Sans
+
+**Backend**
+- Node.js + Express
+- PostgreSQL (via pg)
+- JWT authentication
+- Stripe billing
+- bcrypt, helmet, cors, dotenv
 
 ---
 
-## Getting Started
+## Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+- A Stripe account
+
+---
+
+## Setup
+
+### 1. Clone the repo
 
 ```bash
+git clone <repo-url>
+cd autonome
+```
+
+### 2. Backend setup
+
+```bash
+cd server
+npm install
+```
+
+Create `server/.env` (copy from `.env.example`):
+
+```bash
+cp ../.env.example server/.env
+# Edit server/.env with your DATABASE_URL, JWT_SECRET, and Stripe keys
+```
+
+Run database migrations:
+
+```bash
+npm run migrate
+```
+
+Start the server:
+
+```bash
+npm run dev
+```
+
+The API will be running at `http://localhost:3001`.
+
+### 3. Frontend setup
+
+```bash
+cd ..   # back to repo root
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` to use the app.
+Open `http://localhost:5173` in your browser.
 
-For the landing page, open `http://localhost:5173/landing.html`.
+### 4. Stripe setup
 
----
+1. Create a product in Stripe Dashboard: **Autonome Pro** at **$1,279/month**
+2. Copy the **Price ID** (e.g. `price_xxx`) into `server/.env` as `STRIPE_PRICE_ID`
+3. Set up a webhook endpoint pointing to `https://your-domain.com/api/billing/webhook`
+4. Copy the **Webhook signing secret** into `server/.env` as `STRIPE_WEBHOOK_SECRET`
 
-## Architecture Overview
+For local development, use the [Stripe CLI](https://stripe.com/docs/stripe-cli):
 
-### Engine (`src/lib/engine/`)
-
-| File | Purpose |
-|------|---------|
-| `decisions.js` | `executiveDecisions()` — scores and ranks all pending business actions |
-| `workflows.js` | Multi-step automated workflow engine with 5 templates |
-| `execution.js` | `executeAction()` — shared execution function for all agents |
-| `roi.js` | `calcROI()` — tracks hours saved, money saved, headcount equivalent |
-| `health.js` | `calcHealth()` — 0–100 business health score |
-| `briefing.js` | `computeBriefing()` — daily summary computation |
-
-### Components (`src/components/`)
-
-Reusable UI primitives: `Card`, `Stat`, `Pill`, `Button`, `Bar`, `Input`, `Select`, `Row`, `Dialog`, `Section`, `ErrorBoundary`, `AgentMeta`.
-
-All components use the `T` theme object from `src/lib/theme.js`.
-
-### Views (`src/views/`)
-
-| View | Description |
-|------|-------------|
-| `Setup.jsx` | 6-step onboarding with industry defaults |
-| `CmdCenter.jsx` | Today's priorities, daily briefing, missed call capture |
-| `AgentView.jsx` | Agent status, cycle runner, active workflows |
-| `ApprovalView.jsx` | Pending high-value action approvals |
-| `FinanceView.jsx` | Invoices, income, expenses, mark-paid |
-| `SalesView.jsx` | Contacts, deals, pipeline kanban, contact timeline |
-| `OpsView.jsx` | Task management with priority and status |
-| `InventoryView.jsx` | Asset inventory with reorder alerts |
-| `ROIView.jsx` | ROI metrics, health score, workflow outcomes |
-| `ProcessView.jsx` | Text-to-action parser (AI + rule-based fallback) |
-| `KnowledgeView.jsx` | CRUD knowledge base with category filtering |
-| `AuditView.jsx` | Full audit trail of all agent actions |
-| `SettingsView.jsx` | API keys, risk limits, activation checklist |
-
----
-
-## Agents
-
-| Agent | Icon | Responsibilities |
-|-------|------|-----------------|
-| Finance | 💰 | Invoice collection, payment reminders, escalation to collections |
-| Revenue | 📈 | Lead qualification, deal follow-up, close high-probability deals |
-| Operations | ⚙️ | Task escalation, inventory reordering |
-| Growth | 🚀 | Campaign scaling based on CAC analysis |
-| Support | 🎧 | Issue acknowledgment and escalation |
-
----
-
-## Key Features
-
-- **Command Center** — Prioritized action list in 4 urgency tiers (Money at Risk, Revenue Opportunities, Operational Health, Optimization)
-- **Revenue Impact Header** — Live metrics: revenue at risk, pipeline requiring action, recovered, pending approvals
-- **Daily Briefing** — Collapsible summary of what happened since last session
-- **Missed Call Capture** — Log → creates lead + task + workflow + memory entry
-- **Multi-step Onboarding** — 6 steps with industry-specific defaults (roofing, HVAC, plumbing, solar, construction, agency, ecommerce, SaaS, services)
-- **Process View** — Paste any text, extract contacts/intents/sentiment via AI or rule-based parser
-- **Knowledge Base** — Articles included as AI query context; categories: Policies, Pricing, Objection Handling, Troubleshooting, SOPs, Product Info
-- **Enhanced Memory** — tags[], sentiment, source, linkedEntityId/Type; Contact Timeline view
-- **Workflow Engine** — 5 templates: invoice_collection, deal_followup, task_escalation, issue_resolution, campaign_optimization
-- **Activation Checklist** — Setup completion status in Settings
-- **ErrorBoundary** — Each view wrapped independently
-
----
-
-## Risk & Approval Controls
-
-All agent actions respect configurable limits:
-
-- `maxAutoSpend` — auto-execute below this threshold
-- `approvalAbove` — always require human approval above this amount
-- `refundThreshold` — flag refunds for review
-- `dailyEmailLimit` — cap automated outbound emails
-
----
-
-## Data Model
-
-All data stored in `BLANK` structure via `window.storage`:
-
+```bash
+stripe listen --forward-to localhost:3001/api/billing/webhook
 ```
-cfg, contacts[], txns[], tasks[], assets[], events[], deals[],
-campaigns[], agentQueue[], memory[], audit[], outcomes{},
-workflows[], knowledge[], log[], sent[]
-```
+
+---
+
+## User Flow
+
+1. Sign up at `/signup`
+2. Create workspace at `/create-workspace`
+3. Complete company details at `/onboarding`
+4. Subscribe at `/checkout` (redirects to Stripe)
+5. After payment, redirected to the app at `/`
+
+---
+
+## API
+
+All API endpoints are prefixed with `/api`.
+
+- `GET /api/health` — Health check
+- `POST /api/auth/signup` — Create account
+- `POST /api/auth/login` — Sign in
+- `GET /api/auth/me` — Get current user
+- `POST /api/workspaces` — Create workspace
+- `GET /api/workspaces/:id` — Get workspace
+- `PATCH /api/workspaces/:id` — Update workspace
+- `POST /api/workspaces/:id/complete-onboarding` — Complete onboarding
+- `POST /api/billing/create-checkout-session` — Start Stripe checkout
+- `POST /api/billing/webhook` — Stripe webhook handler
+- `GET /api/billing/status` — Get subscription status
+- `POST /api/billing/create-portal-session` — Open Stripe billing portal
+- `GET /api/contacts` — List contacts
+- `POST /api/contacts` — Create contact
+- `GET /api/deals` — List deals
+- `POST /api/deals` — Create deal
+- `GET /api/invoices` — List invoices
+- `POST /api/invoices` — Create invoice
+- `GET /api/tasks` — List tasks
+- `POST /api/tasks` — Create task
+- `GET /api/workflows` — List workflows
+- `GET /api/audit-log` — List audit entries
+- `GET /api/communications` — List communications
+- `GET /api/agent-runs` — List agent runs
