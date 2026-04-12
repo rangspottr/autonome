@@ -1,9 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso, $$, da } from "../lib/utils.js";
-import { executiveDecisions } from "../lib/engine/decisions.js";
-import { computeBriefing } from "../lib/engine/briefing.js";
-import { executeAction } from "../lib/engine/execution.js";
+import { $$ } from "../lib/utils.js";
 import { api } from "../lib/api.js";
 import Button from "../components/Button.jsx";
 import Card from "../components/Card.jsx";
@@ -19,11 +16,12 @@ const TIER_CONFIG = [
   { label: "Optimization", min: 0, color: T.mt, bg: "#F1F3F5", pillVariant: "muted" },
 ];
 
-function getTier(priority) {
-  return TIER_CONFIG.find((t) => priority >= t.min) || TIER_CONFIG[3];
-}
+export default function CmdCenter({ onRefreshMetrics }) {
+  const [decisions, setDecisions] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-export default function CmdCenter({ db, onUpdate }) {
   const [showBriefing, setShowBriefing] = useState(true);
   const [executing, setExecuting] = useState(null);
   const [showMissedCall, setShowMissedCall] = useState(false);
@@ -33,84 +31,79 @@ export default function CmdCenter({ db, onUpdate }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(false);
 
-  const decisions = executiveDecisions(db);
-  const briefing = computeBriefing(db);
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const [decisionsRes, summaryRes] = await Promise.all([
+        api.get("/agent/decisions"),
+        api.get("/metrics/summary"),
+      ]);
+      setDecisions(decisionsRes.pendingDecisions || []);
+      setSummary(summaryRes);
+    } catch (err) {
+      setError(err.message || "Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Revenue impact metrics
-  const revenueAtRisk = (db.txns || [])
-    .filter((t) => t.type === "inv" && t.st === "pending" && t.due && new Date(t.due) < new Date())
-    .reduce((sum, t) => sum + (t.amt || 0), 0);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const pipelineRequiringAction = (db.deals || [])
-    .filter((d) => d.stage !== "closed" && da(d.at) >= 3)
-    .reduce((sum, d) => sum + (d.val || 0), 0);
-
+  // Derived metrics from summary
+  const revenueAtRisk = summary?.invoices?.outstanding || 0;
+  const pipelineRequiringAction = summary?.deals?.pipelineValue || 0;
   const pendingApprovals = decisions.filter((d) => d.needsApproval && !d.auto).length;
 
   async function handleExecute(decision) {
-    setExecuting(decision.target);
+    setExecuting(decision.id);
     try {
-      const updated = await executeAction(db, decision);
-      onUpdate(updated);
+      const endpoint = decision.needsApproval
+        ? "/agent/approve/" + decision.id
+        : "/agent/execute/" + decision.id;
+      await api.post(endpoint, {
+        agent: decision.agent,
+        action: decision.action,
+        target: decision.target,
+        targetName: decision.targetName,
+        contactId: decision.contactId,
+        desc: decision.desc,
+        auto: decision.auto,
+        impact: decision.impact,
+      });
+      await fetchData();
+      onRefreshMetrics?.();
+    } catch (err) {
+      setError(err.message || "Action failed");
     } finally {
       setExecuting(null);
     }
   }
 
-  function handleMissedCall() {
-    const updated = JSON.parse(JSON.stringify(db));
-
-    // Create lead contact
-    const contact = {
-      id: uid(),
-      name: callForm.name || `Unknown (${callForm.phone})`,
-      phone: callForm.phone,
-      email: null,
-      type: "lead",
-      createdAt: iso(),
-      tags: ["missed-call"],
-    };
-    updated.contacts = [...(updated.contacts || []), contact];
-
-    // Create task
-    const task = {
-      id: uid(),
-      title: `Call back: ${contact.name}`,
-      desc: callForm.note,
-      st: "todo",
-      priority: "high",
-      due: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-      createdAt: iso(),
-    };
-    updated.tasks = [...(updated.tasks || []), task];
-
-    // Create memory entry
-    updated.memory = [
-      ...(updated.memory || []),
-      {
-        id: uid(),
-        at: iso(),
-        contactId: contact.id,
-        type: "missed_call",
-        text: `Missed call at ${callForm.time || "unknown time"}. Note: ${callForm.note || "none"}`,
-        agent: "operations",
-        tags: ["missed-call", "follow-up"],
-        sentiment: "neutral",
-        source: "manual",
-        linkedEntityId: task.id,
-        linkedEntityType: "task",
-      },
-    ];
-
-    // Audit
-    updated.audit = [
-      ...(updated.audit || []),
-      { id: uid(), at: iso(), agent: "Operations", action: "missed_call", target: contact.id, desc: `Missed call logged: ${contact.name}`, auto: false, delivered: false },
-    ];
-
-    onUpdate(updated);
-    setShowMissedCall(false);
-    setCallForm({ phone: "", name: "", time: "", note: "" });
+  async function handleMissedCall() {
+    try {
+      const contactName = callForm.name || `Unknown (${callForm.phone})`;
+      await api.post("/contacts", {
+        name: contactName,
+        phone: callForm.phone,
+        type: "lead",
+        tags: ["missed-call"],
+      });
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+      await api.post("/tasks", {
+        title: `Call back: ${contactName}`,
+        desc: callForm.note || "",
+        priority: "high",
+        due_date: tomorrow,
+      });
+      setShowMissedCall(false);
+      setCallForm({ phone: "", name: "", time: "", note: "" });
+      await fetchData();
+      onRefreshMetrics?.();
+    } catch (err) {
+      setError(err.message || "Failed to log missed call");
+    }
   }
 
   async function handleAiQuery() {
@@ -119,8 +112,8 @@ export default function CmdCenter({ db, onUpdate }) {
     setAiResponse(null);
 
     try {
-      const data = await api.post('/ai/query', { message: aiQuery.trim() });
-      setAiResponse(data.response || 'No response received.');
+      const data = await api.post("/ai/query", { message: aiQuery.trim() });
+      setAiResponse(data.response || "No response received.");
     } catch (err) {
       setAiResponse(`Error: ${err.message}`);
     } finally {
@@ -128,15 +121,17 @@ export default function CmdCenter({ db, onUpdate }) {
     }
   }
 
-  // Activation checklist items
-  const checklist = [
-    { label: "Add your first real contact", done: (db.contacts || []).some((c) => !c.tags?.includes("sample")) },
-    { label: "Create an invoice", done: (db.txns || []).some((t) => t.type === "inv") },
-    { label: "Set up a deal in the pipeline", done: (db.deals || []).length > 0 },
-    { label: "Configure API keys (Settings)", done: !!(db.cfg.keys?.llm || db.cfg.keys?.gmail || db.cfg.keys?.stripe) },
-    { label: "Review your first agent recommendation", done: (db.audit || []).length > 0 },
-  ];
-  const checklistAllDone = checklist.every((c) => c.done);
+  // Activation checklist from summary data
+  const checklist = summary
+    ? [
+        { label: "Add your first real contact", done: (summary.contacts?.total || 0) > 0 },
+        { label: "Create an invoice", done: (summary.invoices?.total || 0) > 0 },
+        { label: "Set up a deal in the pipeline", done: (summary.deals?.total || 0) > 0 },
+        { label: "Complete a task", done: (summary.tasks?.done || 0) > 0 },
+        { label: "Review your first agent recommendation", done: (summary.recentAgentRuns || []).length > 0 },
+      ]
+    : [];
+  const checklistAllDone = checklist.length > 0 && checklist.every((c) => c.done);
 
   // Group decisions by tier
   const tiers = TIER_CONFIG.map((tier) => ({
@@ -148,8 +143,57 @@ export default function CmdCenter({ db, onUpdate }) {
     }),
   })).filter((t) => t.items.length > 0);
 
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", padding: 48, color: T.mt, fontSize: 14 }}>
+        Loading dashboard…
+      </div>
+    );
+  }
+
+  if (error && !summary) {
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          padding: 48,
+          background: T.rdL,
+          borderRadius: 12,
+          border: `1px solid ${T.rd}30`,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 700, color: T.rd, marginBottom: 8 }}>Error</div>
+        <div style={{ fontSize: 13, color: T.tx, marginBottom: 12 }}>{error}</div>
+        <Button size="sm" onClick={() => { setLoading(true); fetchData(); }}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div>
+      {/* Inline error banner for non-fatal errors */}
+      {error && summary && (
+        <div
+          style={{
+            background: T.rdL,
+            border: `1px solid ${T.rd}30`,
+            borderRadius: 8,
+            padding: "8px 14px",
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span style={{ fontSize: 13, color: T.rd }}>{error}</span>
+          <Button size="sm" variant="secondary" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       {/* Revenue Impact Header */}
       <div
         style={{
@@ -161,8 +205,8 @@ export default function CmdCenter({ db, onUpdate }) {
       >
         {[
           { label: "Revenue at Risk", value: $$(revenueAtRisk), color: T.rd, sub: "overdue invoices" },
-          { label: "Pipeline Needs Action", value: $$(pipelineRequiringAction), color: T.am, sub: "stale ≥3 days" },
-          { label: "Revenue Recovered", value: $$(db.outcomes?.collected || 0), color: T.gn, sub: "collected" },
+          { label: "Pipeline Needs Action", value: $$(pipelineRequiringAction), color: T.am, sub: "pipeline value" },
+          { label: "Invoices Paid", value: $$(summary?.invoices?.paid || 0), color: T.gn, sub: "collected" },
           { label: "Pending Approvals", value: pendingApprovals, color: T.bl, sub: "awaiting review" },
         ].map((m) => (
           <div
@@ -204,16 +248,10 @@ export default function CmdCenter({ db, onUpdate }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: T.bl }}>BRIEF</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: T.bl }}>Daily Briefing</span>
-            {briefing.healthDelta !== 0 && (
-              <Pill
-                label={`Health ${briefing.healthDelta > 0 ? "+" : ""}${briefing.healthDelta}pts`}
-                variant={briefing.healthDelta > 0 ? "green" : "red"}
-              />
-            )}
           </div>
           <span style={{ color: T.bl, fontSize: 12 }}>{showBriefing ? "▲ Hide" : "▼ Show"}</span>
         </div>
-        {showBriefing && (
+        {showBriefing && summary && (
           <div
             style={{
               padding: "0 16px 14px",
@@ -223,14 +261,14 @@ export default function CmdCenter({ db, onUpdate }) {
             }}
           >
             {[
-              { icon: "$", label: "Collected Today", val: $$(briefing.collectedToday) },
-              { icon: "+", label: "New Leads", val: briefing.newLeads },
-              { icon: "!", label: "Newly Overdue", val: briefing.newlyOverdue },
-              { icon: "~", label: "Deals Advanced", val: briefing.dealsAdvanced },
-              { icon: "x", label: "Tasks Auto-Done", val: briefing.tasksAuto },
-              { icon: ">", label: "Workflows Done", val: briefing.workflowsCompleted },
-              { icon: "||", label: "Workflows Paused", val: briefing.workflowsPaused },
-              { icon: "!", label: "Need Approval", val: briefing.pendingApprovals },
+              { icon: "$", label: "Invoices Paid", val: $$(summary.invoices?.paid || 0) },
+              { icon: "+", label: "Total Contacts", val: summary.contacts?.total || 0 },
+              { icon: "!", label: "Invoices Pending", val: summary.invoices?.pending || 0 },
+              { icon: "~", label: "Open Deals", val: summary.deals?.open || 0 },
+              { icon: "x", label: "Tasks Done", val: summary.tasks?.done || 0 },
+              { icon: ">", label: "Workflows Done", val: summary.workflows?.completed || 0 },
+              { icon: "||", label: "Workflows Active", val: summary.workflows?.active || 0 },
+              { icon: "!", label: "Need Approval", val: pendingApprovals },
             ].map((item) => (
               <div key={item.label} style={{ background: T.wh, borderRadius: 8, padding: "8px 12px" }}>
                 <span style={{ fontSize: 12 }}>{item.icon} </span>
@@ -243,7 +281,7 @@ export default function CmdCenter({ db, onUpdate }) {
       </div>
 
       {/* Activation Checklist (shown until all done and dismissed) */}
-      {!checklistDismissed && (
+      {!checklistDismissed && checklist.length > 0 && (
         <div
           style={{
             background: T.wh,
@@ -400,10 +438,10 @@ export default function CmdCenter({ db, onUpdate }) {
             </div>
             {tier.items.map((decision) => {
               const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: T.dm, bg: T.bg };
-              const isRunning = executing === decision.target;
+              const isRunning = executing === decision.id;
               return (
                 <div
-                  key={`${decision.agent}-${decision.action}-${decision.target}`}
+                  key={decision.id}
                   style={{
                     background: T.wh,
                     border: `1px solid ${T.bd}`,

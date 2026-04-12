@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso } from "../lib/utils.js";
+import { api } from "../lib/api.js";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
@@ -195,21 +196,22 @@ const STEPS = [
   "Data Import",
 ];
 
-export default function Setup({ db, onSave }) {
+export default function Setup({ onComplete }) {
+  const { workspace, setWorkspace } = useAuth();
+  const settings = workspace?.settings || {};
+
   const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({
-    name: db.cfg.name || "",
-    type: db.cfg.type || "services",
-    autoExec: db.cfg.autoExec !== false,
-    dailyEmailLimit: db.cfg.riskLimits?.dailyEmailLimit || 50,
-    maxAutoSpend: db.cfg.riskLimits?.maxAutoSpend || 500,
-    refundThreshold: db.cfg.riskLimits?.refundThreshold || 100,
-    approvalAbove: db.cfg.riskLimits?.approvalAbove || 5000,
-    typicalDealSize: Math.round((db.cfg.riskLimits?.approvalAbove || 5000) / 2),
-    stripeKey: db.cfg.keys?.stripe || "",
-    gmailKey: db.cfg.keys?.gmail || "",
-    twilioKey: db.cfg.keys?.twilio || "",
-    llmKey: db.cfg.keys?.llm || "",
+    name: workspace?.name || "",
+    type: settings.industry || "services",
+    autoExec: settings.autoExec !== false,
+    dailyEmailLimit: settings.riskLimits?.dailyEmailLimit || 50,
+    maxAutoSpend: settings.riskLimits?.maxAutoSpend || 500,
+    refundThreshold: settings.riskLimits?.refundThreshold || 100,
+    approvalAbove: settings.riskLimits?.approvalAbove || 5000,
+    typicalDealSize: Math.round((settings.riskLimits?.approvalAbove || 5000) / 2),
     importText: "",
   });
 
@@ -226,60 +228,74 @@ export default function Setup({ db, onSave }) {
     }));
   }
 
-  function finish() {
-    const updated = JSON.parse(JSON.stringify(db));
-    updated.cfg.name = form.name;
-    updated.cfg.type = form.type;
-    updated.cfg.ok = true;
-    updated.cfg.at = iso();
-    updated.cfg.autoExec = form.autoExec;
-    updated.cfg.riskLimits = {
-      maxAutoSpend: Number(form.maxAutoSpend),
-      refundThreshold: Number(form.refundThreshold),
-      approvalAbove: Number(form.approvalAbove),
-      dailyEmailLimit: Number(form.dailyEmailLimit),
-    };
-    updated.cfg.keys = {
-      stripe: form.stripeKey || null,
-      gmail: form.gmailKey || null,
-      twilio: form.twilioKey || null,
-      llm: form.llmKey || null,
-    };
+  async function finish() {
+    setSaving(true);
+    setError(null);
 
-    // Seed industry-specific data if this is a fresh setup (no existing contacts/deals)
-    const isFirstTime = (updated.contacts || []).length === 0 && (updated.deals || []).length === 0;
-    if (isFirstTime) {
-      const defaults = INDUSTRY_DEFAULTS[form.type];
-      if (defaults) {
-        const seedContacts = (defaults.seedContacts || []).map((c) => ({
-          id: uid(), ...c, createdAt: iso(), tags: [...(c.tags || []), "sample"],
-        }));
-        updated.contacts = [...(updated.contacts || []), ...seedContacts];
+    try {
+      // Save workspace settings
+      const updatedWorkspace = await api.patch("/workspaces/" + workspace.id, {
+        name: form.name,
+        industry: form.type,
+        settings: {
+          setupCompleted: true,
+          autoExec: form.autoExec,
+          riskLimits: {
+            maxAutoSpend: Number(form.maxAutoSpend),
+            refundThreshold: Number(form.refundThreshold),
+            approvalAbove: Number(form.approvalAbove),
+            dailyEmailLimit: Number(form.dailyEmailLimit),
+          },
+        },
+      });
 
-        const seedDeals = (defaults.seedDeals || []).map((d, i) => ({
-          id: uid(),
-          desc: d.desc,
-          val: d.val,
-          stage: d.stage,
-          prob: d.prob,
-          at: iso(),
-          // Assign each deal to a different contact where available
-          cid: seedContacts[Math.min(i, seedContacts.length - 1)]?.id || null,
-        }));
-        updated.deals = [...(updated.deals || []), ...seedDeals];
+      // Seed industry data if workspace has no contacts yet
+      const existingContacts = await api.get("/contacts");
+      const isFirstTime = !existingContacts || existingContacts.length === 0;
 
-        const seedTasks = (defaults.seedTasks || []).map((t) => ({
-          id: uid(),
-          title: t.title,
-          priority: t.priority || "medium",
-          st: "todo",
-          createdAt: iso(),
-        }));
-        updated.tasks = [...(updated.tasks || []), ...seedTasks];
+      if (isFirstTime) {
+        const defaults = INDUSTRY_DEFAULTS[form.type];
+        if (defaults) {
+          const contactPromises = (defaults.seedContacts || []).map((c) =>
+            api.post("/contacts", {
+              name: c.name,
+              type: c.type,
+              phone: c.phone || null,
+              email: c.email || null,
+              tags: [...(c.tags || []), "sample"],
+            })
+          );
+          const createdContacts = await Promise.all(contactPromises);
+
+          const dealPromises = (defaults.seedDeals || []).map((d, i) =>
+            api.post("/deals", {
+              desc: d.desc,
+              val: d.val,
+              stage: d.stage,
+              prob: d.prob,
+              cid: createdContacts[Math.min(i, createdContacts.length - 1)]?.id || null,
+            })
+          );
+
+          const taskPromises = (defaults.seedTasks || []).map((t) =>
+            api.post("/tasks", {
+              title: t.title,
+              priority: t.priority || "medium",
+              st: "todo",
+            })
+          );
+
+          await Promise.all([...dealPromises, ...taskPromises]);
+        }
       }
-    }
 
-    onSave(updated);
+      setWorkspace(updatedWorkspace);
+      onComplete();
+    } catch (err) {
+      setError(err.message || "Setup failed. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const stepContent = [
@@ -431,11 +447,15 @@ export default function Setup({ db, onSave }) {
 
           {stepContent[step]}
 
+          {error && (
+            <p style={{ color: "#e53e3e", fontSize: 13, margin: "8px 0 0" }}>{error}</p>
+          )}
+
           <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 8 }}>
             <Button
               variant="secondary"
               onClick={() => (step > 0 ? setStep(step - 1) : null)}
-              disabled={step === 0}
+              disabled={step === 0 || saving}
             >
               Back
             </Button>
@@ -447,8 +467,8 @@ export default function Setup({ db, onSave }) {
                 Continue →
               </Button>
             ) : (
-              <Button onClick={finish} disabled={!form.name}>
-                Complete Setup
+              <Button onClick={finish} disabled={!form.name || saving}>
+                {saving ? "Saving…" : "Complete Setup"}
               </Button>
             )}
           </div>

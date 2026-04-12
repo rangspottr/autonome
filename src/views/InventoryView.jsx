@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso, $$ } from "../lib/utils.js";
+import { $$ } from "../lib/utils.js";
+import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
@@ -9,43 +10,88 @@ import Input from "../components/Input.jsx";
 import Row from "../components/Row.jsx";
 import Bar from "../components/Bar.jsx";
 
-export default function InventoryView({ db, onUpdate }) {
+export default function InventoryView() {
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", qty: "", rp: "", val: "", sku: "", location: "" });
 
-  const assets = db.assets || [];
+  async function fetchAssets() {
+    try {
+      setError(null);
+      const data = await api.get("/assets");
+      setAssets(data);
+    } catch (err) {
+      setError(err.message || "Failed to load inventory");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchAssets(); }, []);
+
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
-  function saveAsset() {
-    const updated = JSON.parse(JSON.stringify(db));
-    const asset = {
-      id: uid(),
-      name: form.name,
-      qty: Number(form.qty) || 0,
-      rp: Number(form.rp) || 0,
-      val: Number(form.val) || 0,
-      sku: form.sku,
-      location: form.location,
-      createdAt: iso(),
-    };
-    updated.assets = [...(updated.assets || []), asset];
-    onUpdate(updated);
-    setShowForm(false);
-    setForm({ name: "", qty: "", rp: "", val: "", sku: "", location: "" });
+  async function saveAsset() {
+    try {
+      await api.post("/assets", {
+        name: form.name,
+        quantity: Number(form.qty) || 0,
+        unit_cost: Number(form.val) || 0,
+        location: form.location,
+        metadata: {
+          reorder_point: Number(form.rp) || 0,
+          sku: form.sku,
+        },
+      });
+      setShowForm(false);
+      setForm({ name: "", qty: "", rp: "", val: "", sku: "", location: "" });
+      await fetchAssets();
+    } catch (err) {
+      setError(err.message || "Failed to add item");
+    }
   }
 
-  function adjustQty(id, delta) {
-    const updated = JSON.parse(JSON.stringify(db));
-    const asset = updated.assets.find((a) => a.id === id);
-    if (asset) asset.qty = Math.max(0, (asset.qty || 0) + delta);
-    onUpdate(updated);
+  async function adjustQty(id, delta) {
+    const asset = assets.find((a) => a.id === id);
+    if (!asset) return;
+    const newQty = Math.max(0, (asset.quantity || 0) + delta);
+    try {
+      await api.patch(`/assets/${id}`, { quantity: newQty });
+      await fetchAssets();
+    } catch (err) {
+      setError(err.message || "Failed to update quantity");
+    }
   }
 
-  const lowStock = assets.filter((a) => a.rp > 0 && a.qty < a.rp);
-  const totalValue = assets.reduce((s, a) => s + (a.qty || 0) * (a.val || 0), 0);
+  const rp = (a) => (a.metadata && a.metadata.reorder_point) || 0;
+  const sku = (a) => (a.metadata && a.metadata.sku) || "";
+
+  const lowStock = assets.filter((a) => rp(a) > 0 && (a.quantity || 0) < rp(a));
+  const totalValue = assets.reduce((s, a) => s + (a.quantity || 0) * (a.unit_cost || 0), 0);
+
+  if (loading) {
+    return <div style={{ padding: 32, textAlign: "center", color: T.mt, fontSize: 13 }}>Loading inventory…</div>;
+  }
+
+  if (error && assets.length === 0) {
+    return (
+      <div style={{ padding: 32, textAlign: "center" }}>
+        <div style={{ color: T.rd, fontSize: 13, marginBottom: 12 }}>{error}</div>
+        <Button size="sm" onClick={() => { setLoading(true); fetchAssets(); }}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div>
+      {error && (
+        <div style={{ background: T.rdL, border: `1px solid ${T.rd}30`, borderRadius: 10, padding: "10px 16px", marginBottom: 16 }}>
+          <strong style={{ fontSize: 12, color: T.rd }}>{error}</strong>
+        </div>
+      )}
+
       {/* Metrics */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
         {[
@@ -74,30 +120,31 @@ export default function InventoryView({ db, onUpdate }) {
       <Card>
         {assets.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No inventory items yet.</p>}
         {assets.map((a) => {
-          const stockPct = a.rp > 0 ? Math.round((a.qty / a.rp) * 100) : 100;
-          const isLow = a.rp > 0 && a.qty < a.rp;
+          const aRp = rp(a);
+          const aSku = sku(a);
+          const isLow = aRp > 0 && (a.quantity || 0) < aRp;
           return (
             <div key={a.id} style={{ padding: "12px 0", borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{a.name}</div>
                   <div style={{ fontSize: 11, color: T.mt }}>
-                    {a.sku && `SKU: ${a.sku} · `}Unit value: {$$(a.val)}
+                    {aSku && `SKU: ${aSku} · `}Unit value: {$$(a.unit_cost)}
                     {a.location && ` · ${a.location}`}
                   </div>
                 </div>
                 {isLow && <Pill label="Low Stock" variant="red" />}
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <button onClick={() => adjustQty(a.id, -1)} style={{ width: 24, height: 24, borderRadius: 4, border: `1px solid ${T.bd}`, background: T.wh, cursor: "pointer", fontSize: 12 }}>−</button>
-                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 36, textAlign: "center" }}>{a.qty}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 36, textAlign: "center" }}>{a.quantity}</span>
                   <button onClick={() => adjustQty(a.id, 1)} style={{ width: 24, height: 24, borderRadius: 4, border: `1px solid ${T.bd}`, background: T.wh, cursor: "pointer", fontSize: 12 }}>+</button>
                 </div>
                 <div style={{ fontSize: 12, color: T.mt, minWidth: 60, textAlign: "right" }}>
-                  {a.rp > 0 && `RP: ${a.rp}`}
+                  {aRp > 0 && `RP: ${aRp}`}
                 </div>
               </div>
-              {a.rp > 0 && (
-                <Bar value={a.qty} max={a.rp * 2} color={isLow ? T.rd : T.gn} />
+              {aRp > 0 && (
+                <Bar value={a.quantity} max={aRp * 2} color={isLow ? T.rd : T.gn} />
               )}
             </div>
           );
