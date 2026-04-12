@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { T } from "../lib/theme.js";
 import { uid, iso } from "../lib/utils.js";
+import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
@@ -23,6 +24,48 @@ export default function SettingsView({ db, onUpdate }) {
   const [saved, setSaved] = useState(false);
   const [csvStatus, setCsvStatus] = useState(null);
   const csvInputRef = useRef(null);
+
+  // Integration status from server
+  const [integrations, setIntegrations] = useState(null);
+  const [integrationsLoading, setIntegrationsLoading] = useState(true);
+
+  // Webhook key state
+  const [webhookKey, setWebhookKey] = useState(null);
+  const [webhookKeyLoading, setWebhookKeyLoading] = useState(true);
+  const [webhookKeyCopied, setWebhookKeyCopied] = useState(false);
+  const [webhookKeyGenerating, setWebhookKeyGenerating] = useState(false);
+
+  useEffect(() => {
+    api.get('/settings/integrations')
+      .then(setIntegrations)
+      .catch(() => setIntegrations(null))
+      .finally(() => setIntegrationsLoading(false));
+
+    api.get('/webhooks/key')
+      .then((data) => setWebhookKey(data.key))
+      .catch(() => setWebhookKey(null))
+      .finally(() => setWebhookKeyLoading(false));
+  }, []);
+
+  async function generateWebhookKey() {
+    setWebhookKeyGenerating(true);
+    try {
+      const data = await api.post('/webhooks/generate-key', {});
+      setWebhookKey(data.key);
+    } catch (err) {
+      // silently fail — key stays unchanged
+    } finally {
+      setWebhookKeyGenerating(false);
+    }
+  }
+
+  function copyWebhookKey() {
+    if (!webhookKey) return;
+    navigator.clipboard.writeText(webhookKey).then(() => {
+      setWebhookKeyCopied(true);
+      setTimeout(() => setWebhookKeyCopied(false), 2000);
+    });
+  }
 
   function parseCSVText(text) {
     const lines = text.trim().split(/\r?\n/);
@@ -77,7 +120,7 @@ export default function SettingsView({ db, onUpdate }) {
         }];
 
         onUpdate(updated);
-        setCsvStatus(`✓ Imported ${imported} contacts from ${file.name}`);
+        setCsvStatus(`Imported ${imported} contacts from ${file.name}`);
       } catch (err) {
         setCsvStatus(`Error: ${err.message}`);
       }
@@ -120,17 +163,12 @@ export default function SettingsView({ db, onUpdate }) {
     { label: "Contacts added", done: (db.contacts || []).length > 0 },
     { label: "Transactions added", done: (db.txns || []).length > 0 },
     { label: "Deals in pipeline", done: (db.deals || []).length > 0 },
-    { label: "LLM key configured", done: !!db.cfg.keys?.llm },
     { label: "First cycle completed", done: !!db.cfg.lastCycle },
   ];
   const checksDone = checks.filter((c) => c.done).length;
 
-  const KEY_CONFIGS = [
-    { key: "llm", label: "Anthropic LLM Key", placeholder: "sk-ant-..." },
-    { key: "gmail", label: "Gmail / Email Key", placeholder: "ya29..." },
-    { key: "twilio", label: "Twilio API Key", placeholder: "SK..." },
-    { key: "stripe", label: "Stripe Secret Key", placeholder: "sk_live_..." },
-  ];
+  const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:3001/api';
+  const webhookBase = apiBase.replace(/\/api$/, '');
 
   return (
     <div>
@@ -157,49 +195,98 @@ export default function SettingsView({ db, onUpdate }) {
         ))}
       </Card>
 
-      {/* Integration Keys */}
+      {/* Integration Status */}
       <Card style={{ marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: T.tx }}>Integration Keys</h3>
-        <div style={{ background: T.rdL, border: `1px solid ${T.rd}30`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: T.rd, marginBottom: 16 }}>
-          [DEV MODE] API keys are stored in your browser and sent directly from the client. In production, keys should be proxied through a backend server. Do not use production API keys here.
-        </div>
-        {KEY_CONFIGS.map((cfg) => (
-          <div key={cfg.key} style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: T.dm }}>
-                {cfg.label}{" "}
-                <span style={{ background: T.am, color: "#fff", borderRadius: 4, padding: "1px 5px", fontSize: 10, fontWeight: 700 }}>DEV</span>
-              </label>
-              <Pill
-                label={keys[cfg.key] ? "Connected" : "Not configured"}
-                variant={keys[cfg.key] ? "green" : "muted"}
-              />
-            </div>
-            <input
-              type="password"
-              value={keys[cfg.key]}
-              onChange={(e) => setKeys((k) => ({ ...k, [cfg.key]: e.target.value }))}
-              placeholder={cfg.placeholder}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                border: `1px solid ${T.bd}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                color: T.tx,
-                background: T.wh,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
+        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: T.tx }}>Integration Status</h3>
+        {integrationsLoading ? (
+          <div style={{ fontSize: 13, color: T.mt }}>Loading...</div>
+        ) : integrations ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {[
+              { label: "Email (SMTP)", key: "email", provider: integrations.email?.provider },
+              { label: "SMS (Twilio)", key: "sms", provider: integrations.sms?.provider },
+              { label: "AI (Anthropic)", key: "ai", provider: integrations.ai?.provider },
+              { label: "Stripe Billing", key: "stripe", provider: "stripe" },
+            ].map((item) => (
+              <div key={item.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: T.bg, borderRadius: 8 }}>
+                <span style={{ fontSize: 13, color: T.tx }}>{item.label}</span>
+                <Pill
+                  label={integrations[item.key]?.configured ? "Configured" : "Not configured"}
+                  variant={integrations[item.key]?.configured ? "green" : "muted"}
+                />
+              </div>
+            ))}
           </div>
-        ))}
-        {!db.cfg.keys?.llm && (
-          <div style={{ background: T.amL, border: `1px solid ${T.am}30`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: T.am, marginTop: 8 }}>
-            WARNING: Add your Anthropic LLM key to enable AI-powered features (Process View, AI query, smart extraction).
-          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: T.mt }}>Unable to load integration status.</div>
         )}
+      </Card>
+
+      {/* Webhook Integration */}
+      <Card style={{ marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: T.tx }}>Webhook Integration</h3>
+        <div style={{ fontSize: 12, color: T.dm, marginBottom: 14 }}>
+          Use these endpoints to ingest leads, payments, and events from external systems.
+        </div>
+
+        {/* Webhook URLs */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.dm, marginBottom: 8 }}>Endpoint URLs</div>
+          {[
+            { path: "/api/webhooks/lead", desc: "Ingest a new lead/contact" },
+            { path: "/api/webhooks/payment", desc: "Ingest a payment notification" },
+            { path: "/api/webhooks/event", desc: "Ingest a generic event" },
+          ].map((ep) => (
+            <div key={ep.path} style={{ marginBottom: 6 }}>
+              <code style={{ fontSize: 12, background: T.bg, padding: "3px 8px", borderRadius: 4, color: T.bl }}>
+                POST {webhookBase}{ep.path}
+              </code>
+              <span style={{ fontSize: 12, color: T.mt, marginLeft: 8 }}>{ep.desc}</span>
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: T.dm, marginTop: 8 }}>
+            Include <code style={{ background: T.bg, padding: "1px 4px", borderRadius: 3 }}>x-api-key: YOUR_KEY</code> header with each request.
+          </div>
+        </div>
+
+        {/* API Key */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.dm, marginBottom: 8 }}>Webhook API Key</div>
+          {webhookKeyLoading ? (
+            <div style={{ fontSize: 13, color: T.mt }}>Loading...</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <code style={{
+                flex: 1,
+                fontSize: 12,
+                background: T.bg,
+                padding: "8px 12px",
+                borderRadius: 8,
+                color: webhookKey ? T.tx : T.mt,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}>
+                {webhookKey
+                  ? `${webhookKey.slice(0, 8)}${'•'.repeat(Math.max(0, webhookKey.length - 12))}${webhookKey.slice(-4)}`
+                  : "No key generated yet"}
+              </code>
+              {webhookKey && (
+                <Button size="sm" variant="secondary" onClick={copyWebhookKey}>
+                  {webhookKeyCopied ? "Copied!" : "Copy"}
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" onClick={generateWebhookKey} disabled={webhookKeyGenerating}>
+                {webhookKeyGenerating ? "..." : webhookKey ? "Regenerate" : "Generate Key"}
+              </Button>
+            </div>
+          )}
+          {webhookKey && (
+            <div style={{ fontSize: 11, color: T.am, marginTop: 6 }}>
+              Keep this key secret. Regenerating will invalidate the previous key.
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Risk Limits */}
@@ -241,7 +328,7 @@ export default function SettingsView({ db, onUpdate }) {
           Import CSV / TSV
         </Button>
         {csvStatus && (
-          <div style={{ marginTop: 10, fontSize: 12, color: csvStatus.startsWith("✓") ? T.gn : T.rd }}>
+          <div style={{ marginTop: 10, fontSize: 12, color: csvStatus.startsWith("Error") ? T.rd : T.gn }}>
             {csvStatus}
           </div>
         )}
@@ -249,7 +336,7 @@ export default function SettingsView({ db, onUpdate }) {
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 8 }}>
-        <Button onClick={saveSettings}>{saved ? "✓ Saved!" : "Save Settings"}</Button>
+        <Button onClick={saveSettings}>{saved ? "Saved!" : "Save Settings"}</Button>
         <Button variant="secondary" onClick={resetSetup}>Reset Onboarding</Button>
       </div>
     </div>
