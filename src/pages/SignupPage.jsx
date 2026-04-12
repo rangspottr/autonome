@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -20,13 +21,41 @@ export default function SignupPage() {
     if (password.length < 8) return setError('Password must be at least 8 characters');
     setLoading(true);
     try {
-      await signup(email, password, fullName);
-      navigate('/create-workspace');
+      const data = await signup(email, password, fullName);
+      if (data.emailVerificationRequired) {
+        setVerificationRequired(true);
+      } else {
+        navigate('/create-workspace');
+      }
     } catch (err) {
       setError(err.message || 'Signup failed');
     } finally {
       setLoading(false);
     }
+  }
+
+  if (verificationRequired) {
+    return (
+      <div className={styles.authWrap}>
+        <div className={styles.brand}>
+          <div className={styles.brandLogo}>
+            <div className={styles.brandLogoMark}>A</div>
+            <span className={styles.brandLogoText}>Autonome</span>
+          </div>
+        </div>
+        <div className={styles.formSide}>
+          <div className={styles.formCard}>
+            <h1 className={styles.formTitle}>Check your email</h1>
+            <p className={styles.formSubtitle}>
+              We've sent a verification link to <strong>{email}</strong>. Please click the link in that email to activate your account before signing in.
+            </p>
+            <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>
+              Already verified? <Link to="/login">Sign in</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

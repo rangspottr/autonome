@@ -2,10 +2,12 @@ import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
+import { csrfMiddleware } from './middleware/csrf.js';
 
 import authRoutes from './routes/auth.js';
 import workspaceRoutes from './routes/workspaces.js';
@@ -29,16 +31,46 @@ import { startScheduler } from './engine/cycle.js';
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", config.CLIENT_URL],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+    },
+  },
+}));
 app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
+app.use(cookieParser());
 
-// Rate limiting for auth routes (strict)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+// Rate limiting — auth endpoints (strict, per spec)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Too many requests, please try again later.' },
+  message: { message: 'Too many login attempts, please try again later.' },
+});
+
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many signup attempts, please try again later.' },
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many password reset requests, please try again later.' },
 });
 
 // General rate limiter for authenticated API routes
@@ -50,21 +82,10 @@ const apiLimiter = rateLimit({
   message: { message: 'Too many requests, please try again later.' },
 });
 
-// CSRF protection — require custom header on all state-changing requests
-// except webhook ingestion endpoints (which use API-key auth instead)
-app.use((req, res, next) => {
-  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path.startsWith('/api/webhooks/lead') ||
-      req.path.startsWith('/api/webhooks/payment') ||
-      req.path.startsWith('/api/webhooks/event') ||
-      req.path.startsWith('/api/billing/webhook')) {
-    return next();
-  }
-  if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
-    return res.status(403).json({ message: 'Forbidden: missing required header' });
-  }
-  next();
-});
+// CSRF double-submit cookie protection (mounted after cookie-parser)
+app.use(csrfMiddleware);
+
+// Remove old custom CSRF x-requested-with check — replaced by csrfMiddleware above
 
 // Raw body for Stripe webhooks (must be before express.json())
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
@@ -77,8 +98,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes
-app.use('/api/auth', authLimiter, authRoutes);
+// Routes — per-endpoint auth rate limiters must come before the route handler
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/signup', signupLimiter);
+app.use('/api/auth/forgot-password', forgotPasswordLimiter);
+app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', apiLimiter, workspaceRoutes);
 app.use('/api/billing', apiLimiter, billingRoutes);
 app.use('/api/contacts', apiLimiter, contactRoutes);

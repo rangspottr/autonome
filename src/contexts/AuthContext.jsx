@@ -35,6 +35,7 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const data = await api.post('/auth/login', { email, password });
     localStorage.setItem('autonome_token', data.token);
+    if (data.refreshToken) localStorage.setItem('autonome_refresh_token', data.refreshToken);
     setUser(data.user);
     if (data.workspace) {
       setWorkspaceState(data.workspace);
@@ -46,17 +47,24 @@ export function AuthProvider({ children }) {
   async function signup(email, password, full_name) {
     const data = await api.post('/auth/signup', { email, password, full_name });
     localStorage.setItem('autonome_token', data.token);
+    if (data.refreshToken) localStorage.setItem('autonome_refresh_token', data.refreshToken);
     setUser(data.user);
     return data;
   }
 
-  function logout() {
-    localStorage.removeItem('autonome_token');
-    localStorage.removeItem('autonome_workspace_id');
-    setUser(null);
-    setWorkspaceState(null);
-    setSubscription(null);
-    window.location.href = '/login';
+  async function logout() {
+    try {
+      const refreshToken = localStorage.getItem('autonome_refresh_token');
+      await api.post('/auth/logout', { refreshToken }).catch(() => {});
+    } finally {
+      localStorage.removeItem('autonome_token');
+      localStorage.removeItem('autonome_refresh_token');
+      localStorage.removeItem('autonome_workspace_id');
+      setUser(null);
+      setWorkspaceState(null);
+      setSubscription(null);
+      window.location.href = '/login';
+    }
   }
 
   function setWorkspace(ws) {

@@ -9,7 +9,8 @@ vi.mock('../services/email.js', () => ({ sendEmail: vi.fn().mockResolvedValue({ 
 
 const mockConfig = {
   JWT_SECRET: 'test-secret',
-  JWT_EXPIRES_IN: '7d',
+  JWT_EXPIRES_IN: '15m',
+  REFRESH_TOKEN_EXPIRES_DAYS: 7,
   CLIENT_URL: 'http://localhost:3001',
   SMTP_HOST: null,
   SMTP_USER: null,
@@ -36,8 +37,9 @@ describe('POST /api/auth/signup', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] }); // no existing user
     const userId = 'uuid-1';
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: userId, email: 'user@test.com', full_name: 'Test User', created_at: new Date() }],
+      rows: [{ id: userId, email: 'user@test.com', full_name: 'Test User', email_verified: true, created_at: new Date() }],
     });
+    // refresh_token insert and audit_log insert use mockQuery but results are not checked
     const res = await request(buildApp())
       .post('/api/auth/signup')
       .send({ email: 'user@test.com', password: 'password123', full_name: 'Test User' });
@@ -75,8 +77,9 @@ describe('POST /api/auth/login', () => {
   it('returns token for correct credentials', async () => {
     const hash = await bcrypt.hash('password123', 10);
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: 'uuid-1', email: 'user@test.com', full_name: 'Test', created_at: new Date(), password_hash: hash, workspace_id: null }],
+      rows: [{ id: 'uuid-1', email: 'user@test.com', full_name: 'Test', created_at: new Date(), password_hash: hash, workspace_id: null, email_verified: true, failed_login_attempts: 0, locked_until: null }],
     });
+    // UPDATE users (reset attempts), INSERT refresh_token, audit_log — results unused
     const res = await request(buildApp())
       .post('/api/auth/login')
       .send({ email: 'user@test.com', password: 'password123' });
@@ -87,8 +90,9 @@ describe('POST /api/auth/login', () => {
   it('returns 401 for wrong password', async () => {
     const hash = await bcrypt.hash('password123', 10);
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: 'uuid-1', email: 'user@test.com', full_name: 'Test', created_at: new Date(), password_hash: hash, workspace_id: null }],
+      rows: [{ id: 'uuid-1', email: 'user@test.com', full_name: 'Test', created_at: new Date(), password_hash: hash, workspace_id: null, email_verified: true, failed_login_attempts: 0, locked_until: null }],
     });
+    // UPDATE users (increment attempts), audit_log — results unused
     const res = await request(buildApp())
       .post('/api/auth/login')
       .send({ email: 'user@test.com', password: 'wrongpassword' });

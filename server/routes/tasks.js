@@ -1,9 +1,28 @@
 import { Router } from 'express';
+import { body } from 'express-validator';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
+
+const TASK_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const TASK_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'];
+
+const taskCreateRules = [
+  body('title').trim().notEmpty().isLength({ max: 255 }),
+  body('priority').optional().isIn(TASK_PRIORITIES),
+  body('status').optional().isIn(TASK_STATUSES),
+  validate,
+];
+
+const taskUpdateRules = [
+  body('title').optional().trim().notEmpty().isLength({ max: 255 }),
+  body('priority').optional().isIn(TASK_PRIORITIES),
+  body('status').optional().isIn(TASK_STATUSES),
+  validate,
+];
 
 router.get('/', ...guard, async (req, res, next) => {
   try {
@@ -26,7 +45,7 @@ router.get('/', ...guard, async (req, res, next) => {
   }
 });
 
-router.post('/', ...guard, async (req, res, next) => {
+router.post('/', ...guard, ...taskCreateRules, async (req, res, next) => {
   try {
     const { title, description, status, priority, assigned_to, due_date, related_entity_type, related_entity_id, metadata } = req.body;
     if (!title) return res.status(400).json({ message: 'title is required' });
@@ -51,7 +70,7 @@ router.get('/:id', ...guard, async (req, res, next) => {
   }
 });
 
-router.patch('/:id', ...guard, async (req, res, next) => {
+router.patch('/:id', ...guard, ...taskUpdateRules, async (req, res, next) => {
   try {
     const { title, description, status, priority, assigned_to, due_date, related_entity_type, related_entity_id, metadata } = req.body;
     const result = await pool.query(

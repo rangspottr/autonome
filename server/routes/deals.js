@@ -1,9 +1,27 @@
 import { Router } from 'express';
+import { body } from 'express-validator';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
+
+const DEAL_STAGES = ['new', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
+
+const dealCreateRules = [
+  body('title').trim().notEmpty().isLength({ max: 255 }),
+  body('value').optional({ nullable: true }).isFloat({ min: 0 }),
+  body('stage').optional().isIn(DEAL_STAGES),
+  validate,
+];
+
+const dealUpdateRules = [
+  body('title').optional().trim().notEmpty().isLength({ max: 255 }),
+  body('value').optional({ nullable: true }).isFloat({ min: 0 }),
+  body('stage').optional().isIn(DEAL_STAGES),
+  validate,
+];
 
 router.get('/', ...guard, async (req, res, next) => {
   try {
@@ -22,7 +40,7 @@ router.get('/', ...guard, async (req, res, next) => {
   }
 });
 
-router.post('/', ...guard, async (req, res, next) => {
+router.post('/', ...guard, ...dealCreateRules, async (req, res, next) => {
   try {
     const { contact_id, title, value, stage, probability, expected_close_date, metadata } = req.body;
     if (!title) return res.status(400).json({ message: 'title is required' });
@@ -47,7 +65,7 @@ router.get('/:id', ...guard, async (req, res, next) => {
   }
 });
 
-router.patch('/:id', ...guard, async (req, res, next) => {
+router.patch('/:id', ...guard, ...dealUpdateRules, async (req, res, next) => {
   try {
     const { contact_id, title, value, stage, probability, expected_close_date, metadata } = req.body;
     const result = await pool.query(
