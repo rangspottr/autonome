@@ -1,14 +1,48 @@
+import { useEffect, useState } from "react";
 import { T } from "../lib/theme.js";
 import { $$ } from "../lib/utils.js";
-import { calcROI } from "../lib/engine/roi.js";
-import { calcHealth } from "../lib/engine/health.js";
+import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
-import Stat from "../components/Stat.jsx";
 import Bar from "../components/Bar.jsx";
 
-export default function ROIView({ db }) {
-  const roi = calcROI(db);
-  const health = calcHealth(db);
+export default function ROIView() {
+  const [roi, setRoi] = useState(null);
+  const [health, setHealth] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([api.get("/metrics/roi"), api.get("/metrics/health")])
+      .then(([roiData, healthData]) => {
+        if (cancelled) return;
+        setRoi(roiData);
+        setHealth(healthData.score);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || "Failed to load metrics");
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: T.rd }}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Failed to load ROI data</div>
+        <div style={{ fontSize: 13, color: T.mt }}>{error}</div>
+      </div>
+    );
+  }
+
+  if (!roi || health === null) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: T.mt }}>
+        <div style={{ fontSize: 14 }}>Loading metrics…</div>
+      </div>
+    );
+  }
 
   const metrics = [
     { label: "Revenue Collected", value: $$(roi.collected), color: T.gn, sub: "via agent actions" },
