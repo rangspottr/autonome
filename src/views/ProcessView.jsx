@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso } from "../lib/utils.js";
-import { parseText, parseTextWithAI } from "../lib/parser.js";
+import { parseText } from "../lib/parser.js";
+import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 
-export default function ProcessView({ db, onUpdate }) {
+export default function ProcessView() {
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
   const [selected, setSelected] = useState({ contacts: {}, intents: {} });
 
@@ -17,22 +18,12 @@ export default function ProcessView({ db, onUpdate }) {
     if (!text.trim()) return;
     setProcessing(true);
     try {
-      let parsed = null;
-
-      if (db.cfg.keys?.llm) {
-        parsed = await parseTextWithAI(text, db.cfg.keys.llm);
-      }
-
-      if (!parsed) {
-        parsed = parseText(text);
-      }
-
+      const parsed = parseText(text);
       setResult(parsed);
-      // Default all items to selected
       const defaultContacts = {};
       const defaultIntents = {};
       (parsed.contacts || []).forEach((c) => { defaultContacts[c.id] = true; });
-      (parsed.intents || []).forEach((intent, i) => { defaultIntents[i] = true; });
+      (parsed.intents || []).forEach((_, i) => { defaultIntents[i] = true; });
       setSelected({ contacts: defaultContacts, intents: defaultIntents });
     } finally {
       setProcessing(false);
@@ -53,88 +44,62 @@ export default function ProcessView({ db, onUpdate }) {
   const selectedContactCount = (result?.contacts || []).filter((c) => selected.contacts[c.id]).length;
   const selectedIntentCount = (result?.intents || []).filter((_, i) => selected.intents[i]).length;
 
-  function importResults() {
+  async function importResults() {
     if (!result) return;
-    const updated = JSON.parse(JSON.stringify(db));
+    setImporting(true);
+    try {
+      const selectedContacts = result.contacts.filter((c) => selected.contacts[c.id]);
+      const selectedIntents = result.intents.filter((_, i) => selected.intents[i]);
 
-    // Import selected contacts only
-    result.contacts
-      .filter((c) => selected.contacts[c.id])
-      .forEach((c) => {
-        if (!updated.contacts.some((x) => x.email === c.email && c.email)) {
-          updated.contacts.push({ id: uid(), ...c, createdAt: iso(), tags: [] });
-        }
-      });
+      const promises = [];
 
-    // Create tasks from selected intents
-    result.intents
-      .filter((_, i) => selected.intents[i])
-      .forEach((intent) => {
-        if (intent.type === "schedule_meeting") {
-        updated.tasks.push({
-          id: uid(),
-          title: intent.description,
-          st: "todo",
-          priority: result.isUrgent ? "high" : "medium",
-          createdAt: iso(),
-        });
+      if (selectedContacts.length > 0) {
+        promises.push(
+          api.post("/contacts", {
+            contacts: selectedContacts.map((c) => ({
+              name: c.name,
+              email: c.email || null,
+              phone: c.phone || null,
+              type: c.type || "lead",
+            })),
+          })
+        );
       }
-    });
 
-    // Create invoices from selected collection intents
-    result.intents
-      .filter((_, i) => selected.intents[i])
-      .forEach((intent) => {
-        if (intent.type === "invoice_collection" && intent.amount > 0) {
-          const client = result.contacts.find((c) => selected.contacts[c.id]) || result.contacts[0];
-          updated.txns.push({
-            id: uid(),
-            desc: intent.description,
-            amt: intent.amount,
-            type: "inv",
-            st: "pending",
-            at: iso(),
-            email: client?.email || null,
-            contactId: client?.id || null,
-          });
-        }
-      });
+      const tasks = selectedIntents.filter((i) => i.type === "schedule_meeting");
+      if (tasks.length > 0) {
+        promises.push(
+          api.post("/tasks", {
+            tasks: tasks.map((t) => ({
+              title: t.description,
+              priority: result.isUrgent ? "high" : "medium",
+            })),
+          })
+        );
+      }
 
-    // Memory entry
-    if (result.contacts.length > 0) {
-      result.contacts.forEach((c) => {
-        const existing = updated.contacts.find((x) => x.email === c.email && c.email);
-        const cid = existing?.id || null;
-        if (cid) {
-          updated.memory.push({
-            id: uid(),
-            at: iso(),
-            contactId: cid,
-            type: "note",
-            text: `Processed: ${text.slice(0, 200)}`,
-            agent: "process",
-            tags: result.actions,
-            sentiment: result.sentiment,
-            source: "process_view",
-            linkedEntityId: null,
-            linkedEntityType: null,
-          });
-        }
-      });
+      const invoices = selectedIntents.filter((i) => i.type === "invoice_collection" && i.amount > 0);
+      if (invoices.length > 0) {
+        const client = selectedContacts[0] || result.contacts[0];
+        promises.push(
+          api.post("/invoices", {
+            invoices: invoices.map((inv) => ({
+              description: inv.description,
+              amount: inv.amount,
+              email: client?.email || null,
+            })),
+          })
+        );
+      }
+
+      await Promise.all(promises);
+      setImported(true);
+      setTimeout(() => setImported(false), 2000);
+    } catch (err) {
+      console.error("Import failed:", err);
+    } finally {
+      setImporting(false);
     }
-
-    updated.audit.push({
-      id: uid(),
-      at: iso(),
-      agent: "Process",
-      action: "import",
-      desc: `Processed text: imported ${selectedContactCount} of ${result.contacts.length} contacts, ${selectedIntentCount} of ${result.intents.length} intents`,
-      auto: false,
-    });
-
-    onUpdate(updated);
-    setImported(true);
-    setTimeout(() => setImported(false), 2000);
   }
 
   return (
@@ -143,7 +108,6 @@ export default function ProcessView({ db, onUpdate }) {
         <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Process View</h2>
         <div style={{ fontSize: 13, color: T.dm }}>
           Paste any text — notes, emails, messages — and Autonome will extract contacts, intents, and actions.
-          {db.cfg.keys?.llm ? " AI extraction enabled." : " Using rule-based parser (add LLM key in Settings for AI extraction)."}
         </div>
       </div>
 
@@ -244,8 +208,8 @@ export default function ProcessView({ db, onUpdate }) {
 
           {/* Import controls */}
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <Button onClick={importResults} disabled={imported || (selectedContactCount === 0 && selectedIntentCount === 0)}>
-              {imported ? "Imported!" : `Import ${selectedContactCount} of ${result.contacts.length} contact${result.contacts.length !== 1 ? "s" : ""} & ${selectedIntentCount} of ${result.intents.length} intent${result.intents.length !== 1 ? "s" : ""}`}
+            <Button onClick={importResults} disabled={importing || imported || (selectedContactCount === 0 && selectedIntentCount === 0)}>
+              {importing ? "Importing…" : imported ? "Imported!" : `Import ${selectedContactCount} of ${result.contacts.length} contact${result.contacts.length !== 1 ? "s" : ""} & ${selectedIntentCount} of ${result.intents.length} intent${result.intents.length !== 1 ? "s" : ""}`}
             </Button>
             <Button variant="secondary" size="sm" onClick={toggleSelectAll}>
               {(result.contacts.every((c) => selected.contacts[c.id]) && result.intents.every((_, i) => selected.intents[i])) ? "Deselect All" : "Select All"}
