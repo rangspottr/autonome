@@ -1,58 +1,111 @@
+import { useState, useEffect, useCallback } from "react";
 import { T } from "../lib/theme.js";
-import { da, iso } from "../lib/utils.js";
-import { executiveDecisions } from "../lib/engine/decisions.js";
-import { executeAction } from "../lib/engine/execution.js";
-import { advanceWorkflows } from "../lib/engine/workflows.js";
+import { api } from "../lib/api.js";
 import AgentMeta from "../components/AgentMeta.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 
-export default function AgentView({ db, onUpdate }) {
-  const decisions = executiveDecisions(db);
-  const workflows = db.workflows || [];
+export default function AgentView({ onRefreshMetrics }) {
+  const [status, setStatus] = useState(null);
+  const [decisions, setDecisions] = useState([]);
+  const [workflows, setWorkflows] = useState([]);
+  const [auditCounts, setAuditCounts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [running, setRunning] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const [statusRes, decisionsRes, workflowsRes, auditRes] = await Promise.all([
+        api.get("/agent/status"),
+        api.get("/agent/decisions"),
+        api.get("/workflows"),
+        api.get("/audit-log"),
+      ]);
+      setStatus(statusRes);
+      setDecisions(decisionsRes.pendingDecisions || []);
+      setWorkflows(workflowsRes || []);
+
+      const counts = {};
+      (auditRes || []).forEach((entry) => {
+        const key = (entry.agent || "").toLowerCase();
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      setAuditCounts(counts);
+    } catch (err) {
+      setError(err.message || "Failed to load agent data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const activeWf = workflows.filter((w) => w.status === "active");
-  const completedWf = workflows.filter((w) => w.status === "completed");
 
   const agentStats = Object.keys(AgentMeta).map((agent) => {
     const agentDecisions = decisions.filter((d) => d.agent === agent);
-    const agentAudit = (db.audit || []).filter((a) => a.agent.toLowerCase() === agent);
-    const agentWf = workflows.filter((w) => w.agent === agent && w.status === "active");
-    return { agent, meta: AgentMeta[agent], decisions: agentDecisions, executions: agentAudit.length, activeWorkflows: agentWf.length };
+    const agentActiveWf = workflows.filter((w) => w.agent === agent && w.status === "active");
+    return {
+      agent,
+      meta: AgentMeta[agent],
+      decisions: agentDecisions,
+      executions: auditCounts[agent] || 0,
+      activeWorkflows: agentActiveWf.length,
+    };
   });
 
   async function runCycle() {
-    let updated = JSON.parse(JSON.stringify(db));
-
-    // Advance workflows
-    const { workflows: newWfs, actions } = advanceWorkflows(updated);
-    updated.workflows = newWfs;
-
-    // Auto-execute safe decisions
-    const autoDecs = executiveDecisions(updated).filter((d) => d.auto && !d.needsApproval);
-    for (const dec of autoDecs.slice(0, 5)) {
-      updated = await executeAction(updated, dec, { approvedBy: "auto" });
+    try {
+      setRunning(true);
+      setError(null);
+      await api.post("/agent/run-cycle");
+      await fetchData();
+      onRefreshMetrics?.();
+    } catch (err) {
+      setError(err.message || "Cycle failed");
+    } finally {
+      setRunning(false);
     }
+  }
 
-    updated.cfg.lastCycle = iso();
-    onUpdate(updated);
+  function parseSteps(wf) {
+    if (Array.isArray(wf.steps)) return wf.steps;
+    if (typeof wf.steps === "string") {
+      try { return JSON.parse(wf.steps); } catch { return []; }
+    }
+    return [];
+  }
+
+  if (loading) {
+    return <p style={{ color: T.mt, fontSize: 13, padding: 20 }}>Loading agent data…</p>;
   }
 
   return (
     <div>
+      {error && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#DC2626", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
           <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Agent Dashboard</h2>
           <div style={{ fontSize: 13, color: T.dm }}>
-            Last cycle: {db.cfg.lastCycle ? new Date(db.cfg.lastCycle).toLocaleTimeString() : "Never"}
+            Last cycle: {status?.lastRunAt ? new Date(status.lastRunAt).toLocaleTimeString() : "Never"}
           </div>
         </div>
-        <Button onClick={runCycle}>▶ Run Cycle</Button>
+        <Button onClick={runCycle} disabled={running}>{running ? "⏳ Running…" : "▶ Run Cycle"}</Button>
       </div>
 
       {/* Agent cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginBottom: 24 }}>
-        {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows }) => (
+        {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows: awf }) => (
           <div
             key={agent}
             style={{
@@ -94,7 +147,7 @@ export default function AgentView({ db, onUpdate }) {
                 <div style={{ fontSize: 10, color: T.mt }}>Executions</div>
               </div>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: T.bl }}>{activeWorkflows}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: T.bl }}>{awf}</div>
                 <div style={{ fontSize: 10, color: T.mt }}>Active WFs</div>
               </div>
             </div>
@@ -112,7 +165,10 @@ export default function AgentView({ db, onUpdate }) {
         ) : (
           activeWf.map((wf) => {
             const meta = AgentMeta[wf.agent] || { icon: "CMD", label: wf.agent };
-            const progress = Math.round((wf.currentStep / wf.steps.length) * 100);
+            const steps = parseSteps(wf);
+            const currentStep = wf.current_step ?? 0;
+            const totalSteps = steps.length || 1;
+            const progress = Math.round((currentStep / totalSteps) * 100);
             return (
               <div
                 key={wf.id}
@@ -124,7 +180,7 @@ export default function AgentView({ db, onUpdate }) {
                       {meta.icon} {wf.type.replace(/_/g, " ")}
                     </span>
                     <span style={{ fontSize: 11, color: T.mt, marginLeft: 8 }}>
-                      Step {wf.currentStep}/{wf.steps.length}
+                      Step {currentStep}/{totalSteps}
                     </span>
                   </div>
                   <Pill label={`${progress}%`} variant="blue" />
