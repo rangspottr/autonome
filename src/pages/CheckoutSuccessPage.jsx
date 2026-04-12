@@ -33,7 +33,7 @@ export default function CheckoutSuccessPage() {
     }
     checkStatus();
     return () => clearTimeout(timer);
-  }, [attempts]);
+  }, [attempts, navigate]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.bg, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>

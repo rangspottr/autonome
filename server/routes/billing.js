@@ -80,7 +80,7 @@ router.post('/webhook', async (req, res, next) => {
       case 'invoice.paid': {
         const invoice = event.data.object;
         const sub = await pool.query('SELECT id FROM subscriptions WHERE stripe_subscription_id = $1', [invoice.subscription]);
-        if (sub.rows.length > 0 && invoice.period_start != null && invoice.period_end != null) {
+        if (sub.rows.length > 0 && invoice.period_start !== null && invoice.period_start !== undefined && invoice.period_end !== null && invoice.period_end !== undefined) {
           await pool.query(
             `UPDATE subscriptions SET current_period_start = to_timestamp($1), current_period_end = to_timestamp($2), updated_at = NOW() WHERE stripe_subscription_id = $3`,
             [invoice.period_start, invoice.period_end, invoice.subscription]
