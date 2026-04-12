@@ -152,7 +152,7 @@ export default function SalesView() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <Button size="sm" disabled={saving} onClick={() => (tab === "contacts" ? setShowContactForm(true) : setShowDealForm(true))}>
+        <Button size="sm" onClick={() => (tab === "contacts" ? setShowContactForm(true) : setShowDealForm(true))}>
           + Add {tab === "contacts" ? "Contact" : "Deal"}
         </Button>
       </div>
