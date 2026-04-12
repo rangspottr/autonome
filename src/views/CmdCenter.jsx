@@ -9,6 +9,7 @@ import Input from "../components/Input.jsx";
 import Stat from "../components/Stat.jsx";
 import Skeleton from "../components/Skeleton.jsx";
 import styles from "./CmdCenter.module.css";
+import { T } from "../lib/theme.js";
 
 const TIER_CONFIG = [
   { label: "Money at Risk", min: 90, color: T.rd, bg: T.rdL, pillVariant: "red" },
