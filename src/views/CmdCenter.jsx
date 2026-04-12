@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { T } from "../lib/theme.js";
 import { $$ } from "../lib/utils.js";
 import { api } from "../lib/api.js";
 import Button from "../components/Button.jsx";
-import Card from "../components/Card.jsx";
 import Pill from "../components/Pill.jsx";
 import Dialog from "../components/Dialog.jsx";
 import AgentMeta from "../components/AgentMeta.js";
 import Input from "../components/Input.jsx";
+import Stat from "../components/Stat.jsx";
+import Skeleton from "../components/Skeleton.jsx";
+import styles from "./CmdCenter.module.css";
 
 const TIER_CONFIG = [
   { label: "Money at Risk", min: 90, color: T.rd, bg: T.rdL, pillVariant: "red" },
@@ -145,121 +146,57 @@ export default function CmdCenter({ onRefreshMetrics }) {
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: 48, color: T.mt, fontSize: 14 }}>
-        Loading dashboard…
+      <div className={styles.page}>
+        <div className={styles.metricsGrid}>
+          {[1,2,3,4].map(i => <Skeleton key={i} variant="card" height={96} />)}
+        </div>
+        <Skeleton variant="rect" height={140} style={{ marginBottom: 'var(--space-6)' }} />
+        <Skeleton variant="rect" height={200} />
       </div>
     );
   }
 
   if (error && !summary) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: 48,
-          background: T.rdL,
-          borderRadius: 12,
-          border: `1px solid ${T.rd}30`,
-        }}
-      >
-        <div style={{ fontSize: 15, fontWeight: 700, color: T.rd, marginBottom: 8 }}>Error</div>
-        <div style={{ fontSize: 13, color: T.tx, marginBottom: 12 }}>{error}</div>
-        <Button size="sm" onClick={() => { setLoading(true); fetchData(); }}>
-          Retry
-        </Button>
+      <div className={styles.emptyActions}>
+        <div className={styles.emptyActionsIcon}>Error</div>
+        <div className={styles.emptyActionsTitle} style={{ color: 'var(--color-danger)' }}>{error}</div>
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <Button size="sm" onClick={() => { setLoading(true); fetchData(); }}>Retry</Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className={styles.page}>
       {/* Inline error banner for non-fatal errors */}
       {error && summary && (
-        <div
-          style={{
-            background: T.rdL,
-            border: `1px solid ${T.rd}30`,
-            borderRadius: 8,
-            padding: "8px 14px",
-            marginBottom: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={{ fontSize: 13, color: T.rd }}>{error}</span>
-          <Button size="sm" variant="secondary" onClick={() => setError(null)}>
-            Dismiss
-          </Button>
+        <div className={styles.errorBanner}>
+          <span>{error}</span>
+          <Button size="sm" variant="secondary" onClick={() => setError(null)}>Dismiss</Button>
         </div>
       )}
 
       {/* Revenue Impact Header */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
-        {[
-          { label: "Revenue at Risk", value: $$(revenueAtRisk), color: T.rd, sub: "overdue invoices" },
-          { label: "Pipeline Needs Action", value: $$(pipelineRequiringAction), color: T.am, sub: "pipeline value" },
-          { label: "Invoices Paid", value: $$(summary?.invoices?.paid || 0), color: T.gn, sub: "collected" },
-          { label: "Pending Approvals", value: pendingApprovals, color: T.bl, sub: "awaiting review" },
-        ].map((m) => (
-          <div
-            key={m.label}
-            style={{
-              background: T.wh,
-              border: `1px solid ${T.bd}`,
-              borderRadius: 12,
-              padding: "14px 16px",
-            }}
-          >
-            <div style={{ fontSize: 22, fontWeight: 800, color: m.color }}>{m.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.tx, marginTop: 2 }}>{m.label}</div>
-            <div style={{ fontSize: 11, color: T.mt }}>{m.sub}</div>
-          </div>
-        ))}
+      <div className={styles.metricsGrid}>
+        <Stat label="Revenue at Risk" value={$$(revenueAtRisk)} sub="overdue invoices" color="red" />
+        <Stat label="Pipeline Needs Action" value={$$(pipelineRequiringAction)} sub="pipeline value" color="amber" />
+        <Stat label="Invoices Paid" value={$$(summary?.invoices?.paid || 0)} sub="collected" color="green" />
+        <Stat label="Pending Approvals" value={pendingApprovals} sub="awaiting review" color="blue" />
       </div>
 
       {/* Daily Briefing */}
-      <div
-        style={{
-          background: T.blL,
-          border: `1px solid ${T.bl}30`,
-          borderRadius: 12,
-          marginBottom: 20,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 16px",
-            cursor: "pointer",
-          }}
-          onClick={() => setShowBriefing((v) => !v)}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: T.bl }}>BRIEF</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: T.bl }}>Daily Briefing</span>
+      <div className={styles.briefingCard}>
+        <div className={styles.briefingHeader} onClick={() => setShowBriefing((v) => !v)}>
+          <div className={styles.briefingHeaderLeft}>
+            <span className={styles.briefingTag}>BRIEF</span>
+            <span className={styles.briefingTitle}>Daily Briefing</span>
           </div>
-          <span style={{ color: T.bl, fontSize: 12 }}>{showBriefing ? "▲ Hide" : "▼ Show"}</span>
+          <span className={styles.briefingToggle}>{showBriefing ? "▲ Hide" : "▼ Show"}</span>
         </div>
         {showBriefing && summary && (
-          <div
-            style={{
-              padding: "0 16px 14px",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              gap: 8,
-            }}
-          >
+          <div className={styles.briefingGrid}>
             {[
               { icon: "$", label: "Invoices Paid", val: $$(summary.invoices?.paid || 0) },
               { icon: "+", label: "Total Contacts", val: summary.contacts?.total || 0 },
@@ -270,10 +207,10 @@ export default function CmdCenter({ onRefreshMetrics }) {
               { icon: "||", label: "Workflows Active", val: summary.workflows?.active || 0 },
               { icon: "!", label: "Need Approval", val: pendingApprovals },
             ].map((item) => (
-              <div key={item.label} style={{ background: T.wh, borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ fontSize: 12 }}>{item.icon} </span>
-                <span style={{ fontSize: 12, color: T.dm }}>{item.label}: </span>
-                <strong style={{ fontSize: 12, color: T.tx }}>{item.val}</strong>
+              <div key={item.label} className={styles.briefingItem}>
+                <span>{item.icon} </span>
+                <span className={styles.briefingItemLabel}>{item.label}: </span>
+                <strong className={styles.briefingItemVal}>{item.val}</strong>
               </div>
             ))}
           </div>
@@ -282,28 +219,12 @@ export default function CmdCenter({ onRefreshMetrics }) {
 
       {/* Activation Checklist (shown until all done and dismissed) */}
       {!checklistDismissed && checklist.length > 0 && (
-        <div
-          style={{
-            background: T.wh,
-            border: `1px solid ${T.bd}`,
-            borderRadius: 12,
-            marginBottom: 20,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 16px",
-              borderBottom: `1px solid ${T.bd}`,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: T.tx }}>START</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.tx }}>Getting Started</span>
-              <span style={{ fontSize: 12, color: T.mt }}>
+        <div className={styles.checklistCard}>
+          <div className={styles.checklistHeader}>
+            <div className={styles.checklistHeaderLeft}>
+              <span className={styles.checklistTag}>START</span>
+              <span className={styles.checklistTitle}>Getting Started</span>
+              <span className={styles.checklistCount}>
                 {checklist.filter((c) => c.done).length}/{checklist.length} complete
               </span>
             </div>
@@ -313,14 +234,21 @@ export default function CmdCenter({ onRefreshMetrics }) {
               </Button>
             )}
           </div>
-          <div style={{ padding: "10px 16px" }}>
+          <div className={styles.checklistBody}>
             {checklist.map((item) => (
-              <div
-                key={item.label}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}
-              >
-                <span style={{ fontSize: 12, fontWeight: 700, color: item.done ? T.gn : T.mt, minWidth: 20 }}>{item.done ? "[x]" : "[ ]"}</span>
-                <span style={{ fontSize: 13, color: item.done ? T.dm : T.tx }}>{item.label}</span>
+              <div key={item.label} className={styles.checklistItem}>
+                <span
+                  className={styles.checklistIcon}
+                  style={{ color: item.done ? 'var(--color-success)' : 'var(--color-text-muted)' }}
+                >
+                  {item.done ? "[x]" : "[ ]"}
+                </span>
+                <span
+                  className={styles.checklistItemLabel}
+                  style={{ color: item.done ? 'var(--color-text-secondary)' : 'var(--color-text-primary)' }}
+                >
+                  {item.label}
+                </span>
               </div>
             ))}
           </div>
@@ -328,64 +256,31 @@ export default function CmdCenter({ onRefreshMetrics }) {
       )}
 
       {/* AI Business Query */}
-      <div
-        style={{
-          background: T.wh,
-          border: `1px solid ${T.bd}`,
-          borderRadius: 12,
-          marginBottom: 20,
-          padding: 16,
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 700, color: T.tx, marginBottom: 10 }}>
-          AI Ask Autonome
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div className={styles.aiCard}>
+        <div className={styles.aiTitle}>AI Ask Autonome</div>
+        <div className={styles.aiRow}>
           <input
+            className={styles.aiInput}
             value={aiQuery}
             onChange={(e) => setAiQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAiQuery()}
             placeholder="e.g. Which invoices are most at risk? What should I focus on today?"
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              border: `1px solid ${T.bd}`,
-              borderRadius: 8,
-              fontSize: 13,
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              color: T.tx,
-              background: T.bg,
-              outline: "none",
-            }}
           />
           <Button size="sm" onClick={handleAiQuery} disabled={aiLoading || !aiQuery.trim()}>
             {aiLoading ? "…" : "Ask"}
           </Button>
         </div>
         {aiResponse && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: "10px 12px",
-              background: T.blL,
-              borderRadius: 8,
-              fontSize: 13,
-              color: T.tx,
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {aiResponse}
-          </div>
+          <div className={styles.aiResponse}>{aiResponse}</div>
         )}
       </div>
 
       {/* Actions header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.tx }}>
+      <div className={styles.actionsHeader}>
+        <h2 className={styles.actionsTitle}>
           Today's Priorities
           {decisions.length > 0 && (
-            <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 500, color: T.mt }}>
+            <span className={styles.actionsTitleCount}>
               {decisions.length} action{decisions.length !== 1 ? "s" : ""}
             </span>
           )}
@@ -396,88 +291,40 @@ export default function CmdCenter({ onRefreshMetrics }) {
       </div>
 
       {decisions.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: 48,
-            background: T.gnL,
-            borderRadius: 12,
-            border: `1px solid ${T.gn}30`,
-          }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.gn, marginBottom: 8 }}>[OK]</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.gn }}>All clear</div>
-          <div style={{ fontSize: 13, color: T.dm, marginTop: 4 }}>No priority actions right now.</div>
+        <div className={styles.emptyActions}>
+          <div className={styles.emptyActionsIcon}>[OK]</div>
+          <div className={styles.emptyActionsTitle}>All clear</div>
+          <div className={styles.emptyActionsDesc}>No priority actions right now.</div>
         </div>
       ) : (
         tiers.map((tier) => (
-          <div key={tier.label} style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: tier.color,
-                textTransform: "uppercase",
-                letterSpacing: 1,
-                marginBottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: tier.color,
-                }}
-              />
+          <div key={tier.label} className={styles.tierSection}>
+            <div className={styles.tierLabel} style={{ color: tier.color }}>
+              <span className={styles.tierDot} style={{ background: tier.color }} />
               {tier.label}
             </div>
             {tier.items.map((decision) => {
-              const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: T.dm, bg: T.bg };
+              const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: 'var(--color-text-muted)', bg: 'var(--color-bg)' };
               const isRunning = executing === decision.id;
               return (
-                <div
-                  key={decision.id}
-                  style={{
-                    background: T.wh,
-                    border: `1px solid ${T.bd}`,
-                    borderRadius: 10,
-                    padding: "12px 16px",
-                    marginBottom: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  {/* Agent icon */}
+                <div key={decision.id} className={styles.actionCard}>
                   <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      background: meta.bg,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: meta.color,
-                      letterSpacing: 0.5,
-                      flexShrink: 0,
-                    }}
+                    className={styles.actionAgent}
+                    style={{ background: meta.bg, color: meta.color }}
                   >
                     {meta.icon}
                   </div>
-
-                  {/* Description */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{decision.desc}</div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                      <Pill label={meta.label} variant={decision.agent === "finance" ? "green" : decision.agent === "revenue" ? "blue" : decision.agent === "operations" ? "amber" : "purple"} />
+                  <div className={styles.actionContent}>
+                    <div className={styles.actionDesc}>{decision.desc}</div>
+                    <div className={styles.actionPills}>
+                      <Pill
+                        label={meta.label}
+                        variant={
+                          decision.agent === "finance" ? "green" :
+                          decision.agent === "revenue" ? "blue" :
+                          decision.agent === "operations" ? "amber" : "purple"
+                        }
+                      />
                       {decision.impact > 0 && (
                         <Pill label={`${$$(decision.impact)} impact`} variant="muted" />
                       )}
@@ -486,8 +333,6 @@ export default function CmdCenter({ onRefreshMetrics }) {
                       )}
                     </div>
                   </div>
-
-                  {/* Execute button */}
                   <Button
                     size="sm"
                     variant={decision.needsApproval ? "secondary" : "primary"}

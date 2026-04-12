@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { T } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import AgentMeta from "../components/AgentMeta.js";
-import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
+import Skeleton from "../components/Skeleton.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import Table from "../components/Table.jsx";
+import styles from "./AgentView.module.css";
 
 export default function AgentView({ onRefreshMetrics }) {
   const [status, setStatus] = useState(null);
@@ -82,21 +84,75 @@ export default function AgentView({ onRefreshMetrics }) {
   }
 
   if (loading) {
-    return <p style={{ color: T.mt, fontSize: 13, padding: 20 }}>Loading agent data…</p>;
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <Skeleton variant="text" height={28} width={200} />
+          <Skeleton variant="rect" height={36} width={120} />
+        </div>
+        <div className={styles.agentsGrid}>
+          {[1,2,3,4].map(i => <Skeleton key={i} variant="card" height={140} />)}
+        </div>
+        <Skeleton variant="rect" height={300} />
+      </div>
+    );
   }
 
+  const workflowColumns = [
+    {
+      key: "type",
+      label: "Workflow",
+      render: (val, row) => {
+        const meta = AgentMeta[row.agent] || { icon: "CMD", label: row.agent };
+        const steps = parseSteps(row);
+        const currentStep = row.current_step ?? 0;
+        const totalSteps = steps.length || 1;
+        return (
+          <span>
+            <span className={styles.workflowType}>
+              {meta.icon} {val.replace(/_/g, " ")}
+            </span>
+            <span className={styles.workflowStep}>
+              Step {currentStep}/{totalSteps}
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "agent",
+      label: "Agent",
+      render: (val) => {
+        const meta = AgentMeta[val] || { label: val };
+        return <Pill label={meta.label} variant="blue" />;
+      },
+    },
+    {
+      key: "current_step",
+      label: "Progress",
+      align: "right",
+      render: (val, row) => {
+        const steps = parseSteps(row);
+        const currentStep = row.current_step ?? 0;
+        const totalSteps = steps.length || 1;
+        const progress = Math.round((currentStep / totalSteps) * 100);
+        return <Pill label={`${progress}%`} variant="blue" />;
+      },
+    },
+  ];
+
   return (
-    <div>
+    <div className={styles.page}>
       {error && (
-        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#DC2626", fontSize: 13 }}>
+        <div className={styles.errorBanner}>
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div className={styles.header}>
         <div>
-          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Agent Dashboard</h2>
-          <div style={{ fontSize: 13, color: T.dm }}>
+          <h2 className={styles.title}>Agent Dashboard</h2>
+          <div className={styles.headerSubtitle}>
             Last cycle: {status?.lastRunAt ? new Date(status.lastRunAt).toLocaleTimeString() : "Never"}
           </div>
         </div>
@@ -104,95 +160,59 @@ export default function AgentView({ onRefreshMetrics }) {
       </div>
 
       {/* Agent cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginBottom: 24 }}>
-        {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows: awf }) => (
-          <div
-            key={agent}
-            style={{
-              background: T.wh,
-              border: `1px solid ${T.bd}`,
-              borderRadius: 12,
-              padding: "16px 18px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: meta.bg,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: meta.color,
-                  letterSpacing: 0.5,
-                }}
-              >
-                {meta.icon}
+      {agentStats.length === 0 ? (
+        <EmptyState icon="○" title="No agents configured" description="Agent metadata is not available." />
+      ) : (
+        <div className={styles.agentsGrid}>
+          {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows: awf }) => (
+            <div key={agent} className={styles.agentCard}>
+              <div className={styles.agentCardHeader}>
+                <div
+                  className={styles.agentIcon}
+                  style={{ background: meta.bg, color: meta.color }}
+                >
+                  {meta.icon}
+                </div>
+                <div className={styles.agentInfo}>
+                  <div className={styles.agentName}>{meta.label}</div>
+                  <div className={styles.agentDesc}>
+                    <Pill
+                      label={decs.length > 0 ? `${decs.length} pending` : "Idle"}
+                      variant={decs.length > 0 ? "blue" : "muted"}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: T.tx }}>{meta.label}</div>
-                <Pill
-                  label={decs.length > 0 ? `${decs.length} pending` : "Idle"}
-                  variant={decs.length > 0 ? "blue" : "muted"}
-                />
+              <div className={styles.agentMetrics}>
+                <div className={styles.agentMetric}>
+                  <div className={styles.agentMetricLabel}>Executions</div>
+                  <div className={styles.agentMetricVal} style={{ color: meta.color }}>{executions}</div>
+                </div>
+                <div className={styles.agentMetric}>
+                  <div className={styles.agentMetricLabel}>Active WFs</div>
+                  <div className={styles.agentMetricVal} style={{ color: 'var(--color-brand)' }}>{awf}</div>
+                </div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: meta.color }}>{executions}</div>
-                <div style={{ fontSize: 10, color: T.mt }}>Executions</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: T.bl }}>{awf}</div>
-                <div style={{ fontSize: 10, color: T.mt }}>Active WFs</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Active Workflows */}
-      <Card>
-        <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 700, color: T.tx }}>
-          Active Workflows ({activeWf.length})
-        </h3>
-        {activeWf.length === 0 ? (
-          <p style={{ color: T.mt, fontSize: 13 }}>No active workflows.</p>
-        ) : (
-          activeWf.map((wf) => {
-            const meta = AgentMeta[wf.agent] || { icon: "CMD", label: wf.agent };
-            const steps = parseSteps(wf);
-            const currentStep = wf.current_step ?? 0;
-            const totalSteps = steps.length || 1;
-            const progress = Math.round((currentStep / totalSteps) * 100);
-            return (
-              <div
-                key={wf.id}
-                style={{ padding: "10px 0", borderBottom: `1px solid ${T.bd}` }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>
-                      {meta.icon} {wf.type.replace(/_/g, " ")}
-                    </span>
-                    <span style={{ fontSize: 11, color: T.mt, marginLeft: 8 }}>
-                      Step {currentStep}/{totalSteps}
-                    </span>
-                  </div>
-                  <Pill label={`${progress}%`} variant="blue" />
-                </div>
-                <div style={{ background: T.bd, borderRadius: 4, height: 4, marginTop: 6 }}>
-                  <div style={{ width: `${progress}%`, height: "100%", background: T.bl, borderRadius: 4 }} />
-                </div>
-              </div>
-            );
-          })
-        )}
-      </Card>
+      <div className={styles.workflowSection}>
+        <div className={styles.workflowHeader}>
+          <span className={styles.workflowTitle}>Active Workflows</span>
+          <span className={styles.workflowCount}>{activeWf.length} active</span>
+        </div>
+        <Table
+          columns={workflowColumns}
+          data={activeWf}
+          loading={false}
+          emptyIcon="○"
+          emptyTitle="No active workflows"
+          emptyDescription="Workflows will appear here when agents are running tasks."
+        />
+      </div>
     </div>
   );
 }
