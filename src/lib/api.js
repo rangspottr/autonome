@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 function getCsrfToken() {
   const match = document.cookie.split(';').find((c) => c.trim().startsWith('__csrf='));
@@ -10,6 +10,7 @@ function getHeaders(method) {
   const workspaceId = localStorage.getItem('autonome_workspace_id');
   const headers = {
     'Content-Type': 'application/json',
+    'x-requested-with': 'XMLHttpRequest',
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (workspaceId) headers['x-workspace-id'] = workspaceId;
@@ -29,6 +30,7 @@ async function refreshAccessToken() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-requested-with': 'XMLHttpRequest',
         ...(() => {
           const csrf = getCsrfToken();
           return csrf ? { 'x-csrf-token': csrf } : {};
@@ -96,4 +98,3 @@ export const api = {
   patch: (endpoint, data) => request(endpoint, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
 };
-
