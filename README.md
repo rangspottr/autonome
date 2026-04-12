@@ -60,6 +60,27 @@ npm run dev
 Frontend: `http://localhost:5173`
 API: `http://localhost:3001`
 
+### Development Mode (No Stripe Required)
+
+To access the full dashboard without configuring Stripe:
+
+1. Add to `server/.env`:
+   ```
+   BYPASS_SUBSCRIPTION=true
+   ```
+
+2. Seed the database with a dev account:
+   ```bash
+   cd server
+   npm run seed
+   ```
+
+3. Log in with:
+   - **Email:** `admin@autonome.local`
+   - **Password:** `autonome123!`
+
+> **Warning:** Never enable `BYPASS_SUBSCRIPTION` in production.
+
 ### Docker
 
 ```bash
@@ -102,6 +123,7 @@ App will be available at `http://localhost:3001`.
 | `TWILIO_PHONE_NUMBER` | No | Twilio outbound phone number |
 | `ANTHROPIC_API_KEY` | No | Anthropic API key for Claude AI assistant |
 | `AI_MODEL` | No | Claude model (default: `claude-sonnet-4-20250514`) |
+| `BYPASS_SUBSCRIPTION` | No | Set to `true` to skip Stripe subscription checks (dev only) |
 
 ## API Reference
 
