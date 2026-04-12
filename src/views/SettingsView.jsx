@@ -1,28 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso } from "../lib/utils.js";
 import { api } from "../lib/api.js";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
-import Section from "../components/Section.jsx";
 import Pill from "../components/Pill.jsx";
 
-export default function SettingsView({ db, onUpdate }) {
-  const [keys, setKeys] = useState({
-    stripe: db.cfg.keys?.stripe || "",
-    gmail: db.cfg.keys?.gmail || "",
-    twilio: db.cfg.keys?.twilio || "",
-    llm: db.cfg.keys?.llm || "",
-  });
+export default function SettingsView() {
+  const { workspace } = useAuth();
+
   const [limits, setLimits] = useState({
-    maxAutoSpend: db.cfg.riskLimits?.maxAutoSpend || 500,
-    refundThreshold: db.cfg.riskLimits?.refundThreshold || 100,
-    approvalAbove: db.cfg.riskLimits?.approvalAbove || 5000,
-    dailyEmailLimit: db.cfg.riskLimits?.dailyEmailLimit || 50,
+    maxAutoSpend: 500,
+    refundThreshold: 100,
+    approvalAbove: 5000,
+    dailyEmailLimit: 50,
   });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [csvStatus, setCsvStatus] = useState(null);
+  const [csvImporting, setCsvImporting] = useState(false);
   const csvInputRef = useRef(null);
 
   // Integration status from server
@@ -35,6 +32,26 @@ export default function SettingsView({ db, onUpdate }) {
   const [webhookKeyCopied, setWebhookKeyCopied] = useState(false);
   const [webhookKeyGenerating, setWebhookKeyGenerating] = useState(false);
 
+  // Activation checklist from metrics
+  const [metrics, setMetrics] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+
+  const [error, setError] = useState(null);
+
+  // Initialize risk limits from workspace settings
+  useEffect(() => {
+    if (workspace?.settings?.riskLimits) {
+      const rl = workspace.settings.riskLimits;
+      setLimits({
+        maxAutoSpend: rl.maxAutoSpend ?? 500,
+        refundThreshold: rl.refundThreshold ?? 100,
+        approvalAbove: rl.approvalAbove ?? 5000,
+        dailyEmailLimit: rl.dailyEmailLimit ?? 50,
+      });
+    }
+  }, [workspace]);
+
+  // Fetch integrations, webhook key, and metrics in parallel
   useEffect(() => {
     api.get('/settings/integrations')
       .then(setIntegrations)
@@ -45,6 +62,11 @@ export default function SettingsView({ db, onUpdate }) {
       .then((data) => setWebhookKey(data.key))
       .catch(() => setWebhookKey(null))
       .finally(() => setWebhookKeyLoading(false));
+
+    api.get('/metrics/summary')
+      .then(setMetrics)
+      .catch(() => setMetrics(null))
+      .finally(() => setMetricsLoading(false));
   }, []);
 
   async function generateWebhookKey() {
@@ -52,7 +74,7 @@ export default function SettingsView({ db, onUpdate }) {
     try {
       const data = await api.post('/webhooks/generate-key', {});
       setWebhookKey(data.key);
-    } catch (err) {
+    } catch {
       // silently fail — key stays unchanged
     } finally {
       setWebhookKeyGenerating(false);
@@ -80,91 +102,105 @@ export default function SettingsView({ db, onUpdate }) {
     }).filter((r) => Object.values(r).some((v) => v));
   }
 
-  function handleCsvImport(e) {
+  async function handleCsvImport(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const rows = parseCSVText(ev.target.result);
-        if (rows.length === 0) { setCsvStatus("No data rows found."); return; }
+    setCsvImporting(true);
+    setCsvStatus(null);
 
-        const updated = JSON.parse(JSON.stringify(db));
-        let imported = 0;
-
-        rows.forEach((row) => {
-          // Detect contact row
-          const name = row.name || row.fullname || row.contactname || row.company;
-          const email = row.email || row.emailaddress;
-          const phone = row.phone || row.phonenumber || row.mobile;
-          if (name) {
-            const exists = (updated.contacts || []).some((c) => {
-              if (email && c.email) return c.email === email;
-              if (phone && c.phone) return c.phone === phone;
-              return c.name === name;
-            });
-            if (!exists) {
-              updated.contacts = [...(updated.contacts || []), {
-                id: uid(), name, email: email || null,
-                phone: phone || null,
-                type: "lead", createdAt: iso(), tags: [],
-              }];
-              imported++;
-            }
-          }
-        });
-
-        updated.audit = [...(updated.audit || []), {
-          id: uid(), at: iso(), agent: "Settings", action: "csv_import",
-          desc: `CSV import: ${imported} records imported from ${file.name}`, auto: false,
-        }];
-
-        onUpdate(updated);
-        setCsvStatus(`Imported ${imported} contacts from ${file.name}`);
-      } catch (err) {
-        setCsvStatus(`Error: ${err.message}`);
+    try {
+      const text = await file.text();
+      const rows = parseCSVText(text);
+      if (rows.length === 0) {
+        setCsvStatus("No data rows found.");
+        setCsvImporting(false);
+        return;
       }
-    };
-    reader.readAsText(file);
-    // Reset input so the same file can be re-imported if needed
+
+      let imported = 0;
+      let failed = 0;
+
+      for (const row of rows) {
+        const name = row.name || row.fullname || row.contactname || row.company;
+        const email = row.email || row.emailaddress;
+        const phone = row.phone || row.phonenumber || row.mobile;
+        if (name) {
+          try {
+            await api.post('/contacts', {
+              name,
+              email: email || null,
+              phone: phone || null,
+              type: "lead",
+            });
+            imported++;
+          } catch {
+            failed++;
+          }
+        }
+      }
+
+      const parts = [`Imported ${imported} contacts from ${file.name}`];
+      if (failed > 0) parts.push(`(${failed} failed)`);
+      setCsvStatus(parts.join(" "));
+    } catch (err) {
+      setCsvStatus(`Error: ${err.message}`);
+    } finally {
+      setCsvImporting(false);
+    }
     e.target.value = "";
   }
 
-  function saveSettings() {
-    const updated = JSON.parse(JSON.stringify(db));
-    updated.cfg.keys = {
-      stripe: keys.stripe || null,
-      gmail: keys.gmail || null,
-      twilio: keys.twilio || null,
-      llm: keys.llm || null,
-    };
-    updated.cfg.riskLimits = {
-      maxAutoSpend: Number(limits.maxAutoSpend),
-      refundThreshold: Number(limits.refundThreshold),
-      approvalAbove: Number(limits.approvalAbove),
-      dailyEmailLimit: Number(limits.dailyEmailLimit),
-    };
-    onUpdate(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  function resetSetup() {
-    if (window.confirm("Reset onboarding? Your data will be preserved.")) {
-      const updated = JSON.parse(JSON.stringify(db));
-      updated.cfg.ok = false;
-      onUpdate(updated);
+  async function saveSettings() {
+    if (!workspace) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.patch('/workspaces/' + workspace.id, {
+        settings: {
+          ...workspace.settings,
+          riskLimits: {
+            maxAutoSpend: Number(limits.maxAutoSpend),
+            refundThreshold: Number(limits.refundThreshold),
+            approvalAbove: Number(limits.approvalAbove),
+            dailyEmailLimit: Number(limits.dailyEmailLimit),
+          },
+        },
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err.message || "Failed to save settings.");
+    } finally {
+      setSaving(false);
     }
   }
 
-  // Activation checklist
-  const checks = [
-    { label: "Business configured", done: !!db.cfg.name && !!db.cfg.type },
-    { label: "Contacts added", done: (db.contacts || []).length > 0 },
-    { label: "Transactions added", done: (db.txns || []).length > 0 },
-    { label: "Deals in pipeline", done: (db.deals || []).length > 0 },
-    { label: "First cycle completed", done: !!db.cfg.lastCycle },
-  ];
+  async function resetSetup() {
+    if (!workspace) return;
+    if (!window.confirm("Reset onboarding? Your data will be preserved.")) return;
+    try {
+      await api.patch('/workspaces/' + workspace.id, {
+        settings: {
+          ...workspace.settings,
+          setupCompleted: false,
+        },
+      });
+      window.location.reload();
+    } catch (err) {
+      setError(err.message || "Failed to reset onboarding.");
+    }
+  }
+
+  // Activation checklist derived from metrics
+  const checks = metrics
+    ? [
+        { label: "Business configured", done: !!metrics.businessConfigured },
+        { label: "Contacts added", done: (metrics.contactCount ?? 0) > 0 },
+        { label: "Transactions added", done: (metrics.transactionCount ?? 0) > 0 },
+        { label: "Deals in pipeline", done: (metrics.dealCount ?? 0) > 0 },
+        { label: "First cycle completed", done: !!metrics.firstCycleCompleted },
+      ]
+    : [];
   const checksDone = checks.filter((c) => c.done).length;
 
   const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:3001/api';
@@ -177,22 +213,36 @@ export default function SettingsView({ db, onUpdate }) {
         <div style={{ fontSize: 13, color: T.dm }}>Configure integrations, risk limits, and platform preferences.</div>
       </div>
 
+      {error && (
+        <Card style={{ marginBottom: 20, background: "#fef2f2", border: "1px solid #fecaca" }}>
+          <div style={{ fontSize: 13, color: T.rd }}>{error}</div>
+        </Card>
+      )}
+
       {/* Activation Checklist */}
       <Card style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: T.tx }}>Activation Checklist</h3>
-          <span style={{ fontSize: 13, fontWeight: 600, color: checksDone === checks.length ? T.gn : T.am }}>
-            {checksDone}/{checks.length} complete
-          </span>
-        </div>
-        {checks.map((c) => (
-          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: c.done ? T.gn : T.mt }}>{c.done ? "[x]" : "[ ]"}</span>
-            <span style={{ fontSize: 13, color: c.done ? T.tx : T.mt, textDecoration: c.done ? "none" : "none" }}>
-              {c.label}
+          {!metricsLoading && metrics && (
+            <span style={{ fontSize: 13, fontWeight: 600, color: checksDone === checks.length ? T.gn : T.am }}>
+              {checksDone}/{checks.length} complete
             </span>
-          </div>
-        ))}
+          )}
+        </div>
+        {metricsLoading ? (
+          <div style={{ fontSize: 13, color: T.mt }}>Loading...</div>
+        ) : metrics ? (
+          checks.map((c) => (
+            <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: c.done ? T.gn : T.mt }}>{c.done ? "[x]" : "[ ]"}</span>
+              <span style={{ fontSize: 13, color: c.done ? T.tx : T.mt }}>
+                {c.label}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div style={{ fontSize: 13, color: T.mt }}>Unable to load checklist data.</div>
+        )}
       </Card>
 
       {/* Integration Status */}
@@ -324,8 +374,8 @@ export default function SettingsView({ db, onUpdate }) {
           onChange={handleCsvImport}
           style={{ display: "none" }}
         />
-        <Button variant="secondary" onClick={() => csvInputRef.current?.click()}>
-          Import CSV / TSV
+        <Button variant="secondary" onClick={() => csvInputRef.current?.click()} disabled={csvImporting}>
+          {csvImporting ? "Importing..." : "Import CSV / TSV"}
         </Button>
         {csvStatus && (
           <div style={{ marginTop: 10, fontSize: 12, color: csvStatus.startsWith("Error") ? T.rd : T.gn }}>
@@ -336,7 +386,7 @@ export default function SettingsView({ db, onUpdate }) {
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 8 }}>
-        <Button onClick={saveSettings}>{saved ? "Saved!" : "Save Settings"}</Button>
+        <Button onClick={saveSettings} disabled={saving}>{saving ? "Saving..." : saved ? "Saved!" : "Save Settings"}</Button>
         <Button variant="secondary" onClick={resetSetup}>Reset Onboarding</Button>
       </div>
     </div>
