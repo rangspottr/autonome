@@ -24,7 +24,10 @@ test('GET /api/health returns 200 with required fields', async () => {
   const res = await fetch(`${baseUrl}/api/health`);
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.equal(body.status === 'ok' || body.status === 'degraded', true);
+  assert.ok(
+    body.status === 'ok' || body.status === 'degraded',
+    `expected status to be 'ok' or 'degraded', got '${body.status}'`
+  );
   assert.ok('db' in body, 'response should include db field');
   assert.ok('uptime' in body, 'response should include uptime field');
   assert.ok('node' in body, 'response should include node field');

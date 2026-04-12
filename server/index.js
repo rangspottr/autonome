@@ -113,8 +113,14 @@ export function createApp() {
   // JSON body for everything else
   app.use(express.json());
 
-  // Health check
-  app.get('/api/health', async (req, res) => {
+  // Health check (light rate limit to protect DB ping)
+  const healthLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.get('/api/health', healthLimiter, async (req, res) => {
     let dbStatus = 'ok';
     try {
       await pool.query('SELECT 1');
@@ -176,7 +182,7 @@ export function createApp() {
 }
 
 // Only start the server when run directly
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const app = createApp();
   app.listen(config.PORT, async () => {
     console.log(`Autonome server running on port ${config.PORT}`);

@@ -40,4 +40,17 @@ export default [
       ],
     },
   },
+  {
+    files: ['**/*.test.js', '**/tests/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        test: 'readonly',
+        before: 'readonly',
+        after: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+      },
+    },
+  },
 ];

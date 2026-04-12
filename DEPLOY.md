@@ -119,7 +119,7 @@
 | `TWILIO_PHONE_NUMBER` | Optional | Twilio outgoing phone number |
 | `ANTHROPIC_API_KEY` | **Required** | Anthropic API key for AI features |
 | `AI_MODEL` | Optional | Claude model ID (default: `claude-sonnet-4-20250514`) |
-| `BYPASS_SUBSCRIPTION` | Optional | ⚠️ **Dev only** — never `true` in production (see warning below) |
+| `BYPASS_SUBSCRIPTION` | **Must be `false`** | ⚠️ **Dev only** — never `true` in production (see warning below) |
 | `CLEANUP_INTERVAL_HOURS` | Optional | Token cleanup interval in hours (default: `6`) |
 
 ---
