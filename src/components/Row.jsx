@@ -1,18 +1,8 @@
-import { T } from "../lib/theme.js";
+import styles from "./Row.module.css";
 
 export default function Row({ children, style }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 0",
-        borderBottom: `1px solid ${T.bd}`,
-        gap: 8,
-        ...style,
-      }}
-    >
+    <div className={styles.row} style={style}>
       {children}
     </div>
   );

@@ -1,0 +1,23 @@
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.skeleton {
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  animation: pulse 1.5s ease-in-out infinite;
+  display: block;
+}
+
+.text { height: 14px; border-radius: var(--radius-sm); }
+.text + .text { margin-top: var(--space-2); }
+
+.circle { border-radius: 50%; }
+
+.rect { border-radius: var(--radius-md); }
+
+.card {
+  height: 80px;
+  border-radius: var(--radius-lg);
+}

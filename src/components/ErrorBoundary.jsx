@@ -1,5 +1,4 @@
 import { Component } from "react";
-import { T } from "../lib/theme.js";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -18,48 +17,21 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          style={{
-            padding: 32,
-            textAlign: "center",
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 700, color: T.am, marginBottom: 12 }}>ERROR</div>
-          <h3 style={{ color: T.tx, marginBottom: 8 }}>Something went wrong</h3>
-          <p style={{ color: T.dm, fontSize: 14, marginBottom: 20 }}>
+        <div style={{ padding: "var(--space-8)", textAlign: "center" }}>
+          <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--color-warning)", marginBottom: "var(--space-3)" }}>Something went wrong</div>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: "var(--text-sm)", marginBottom: "var(--space-5)" }}>
             {this.state.error?.message || "An unexpected error occurred."}
           </p>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "center", flexWrap: "wrap" }}>
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
-              style={{
-                padding: "8px 20px",
-                background: T.bl,
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}
+              style={{ padding: "8px 20px", background: "var(--color-brand)", color: "#fff", border: "none", borderRadius: "var(--radius-md)", fontSize: "var(--text-sm)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-family)" }}
             >
               Try Again
             </button>
             <button
               onClick={() => window.location.reload()}
-              style={{
-                padding: "8px 20px",
-                background: "transparent",
-                color: T.rd,
-                border: `1px solid ${T.rd}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}
+              style={{ padding: "8px 20px", background: "transparent", color: "var(--color-danger)", border: "1px solid var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "var(--text-sm)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-family)" }}
             >
               Reload Page
             </button>
