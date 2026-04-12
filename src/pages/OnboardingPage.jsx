@@ -11,7 +11,7 @@ const labelStyle = { display: 'block', fontSize: 12, fontWeight: 600, color: 'va
 const btnStyle = (loading) => ({ width: '100%', padding: '12px', background: 'var(--color-brand)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, fontFamily: 'var(--font-family)' });
 
 export default function OnboardingPage() {
-  const { workspace, setWorkspace } = useAuth();
+  const { workspace, subscription, setWorkspace } = useAuth();
   const navigate = useNavigate();
   const [companySize, setCompanySize] = useState('');
   const [phone, setPhone] = useState('');
@@ -26,13 +26,17 @@ export default function OnboardingPage() {
     try {
       const updated = await api.post(`/workspaces/${workspace.id}/complete-onboarding`, { company_size: companySize, phone, address });
       setWorkspace(updated);
-      navigate('/checkout');
+      // If the subscription is already active (e.g. BYPASS_SUBSCRIPTION), go straight to the dashboard.
+      navigate(isActive ? '/' : '/checkout');
     } catch (err) {
       setError(err.message || 'Failed to save company details');
     } finally {
       setLoading(false);
     }
   }
+
+  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+  const btnLabel = isActive ? 'Go to Dashboard' : 'Continue to Payment';
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
@@ -63,7 +67,7 @@ export default function OnboardingPage() {
             <textarea value={address} onChange={e => setAddress(e.target.value)} rows={3} placeholder="123 Main St, City, State 00000" style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
           <button type="submit" disabled={loading} style={btnStyle(loading)}>
-            {loading ? 'Saving…' : 'Continue to Payment'}
+            {loading ? 'Saving…' : btnLabel}
           </button>
         </form>
       </div>

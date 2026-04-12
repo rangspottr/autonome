@@ -30,4 +30,20 @@ router.get('/integrations', requireAuth, requireWorkspace, async (req, res, next
   }
 });
 
+// GET /api/settings/status
+// Returns boolean flags for system configuration status — never exposes actual secrets.
+router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
+  try {
+    res.json({
+      smtp: !!(config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS),
+      sms: !!(config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN && config.TWILIO_PHONE_NUMBER),
+      stripe: !!config.STRIPE_SECRET_KEY,
+      ai: !!config.ANTHROPIC_API_KEY,
+      bypass_subscription: !!config.BYPASS_SUBSCRIPTION,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

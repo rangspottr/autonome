@@ -45,6 +45,24 @@ export default function ROIView() {
     );
   }
 
+  if (roi.totalActions === 0 && roi.realSent === 0 && roi.loggedSent === 0) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.pageHeader}>
+          <div>
+            <h2 className={styles.pageTitle}>ROI Dashboard</h2>
+            <div className={styles.pageSubtitle}>Track the value Autonome is generating for your business.</div>
+          </div>
+        </div>
+        <div style={{ textAlign: "center", padding: "var(--space-16) var(--space-8)", color: "var(--color-text-muted)" }}>
+          <div style={{ fontSize: 40, marginBottom: "var(--space-4)" }}>ROI</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>No agent activity yet</div>
+          <div style={{ fontSize: 14 }}>Trigger an agent run or add data to see ROI metrics.</div>
+        </div>
+      </div>
+    );
+  }
+
   const healthColor = health >= 70 ? "success" : health >= 40 ? "warning" : "danger";
 
   const metrics = [

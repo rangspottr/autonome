@@ -41,6 +41,20 @@ export function AuthProvider({ children }) {
       setWorkspaceState(data.workspace);
       localStorage.setItem('autonome_workspace_id', data.workspace.id);
     }
+    // Fetch full profile to populate subscription status immediately so
+    // RequireSubscription does not redirect to /checkout after login.
+    try {
+      const meData = await api.get('/auth/me');
+      if (meData.user) setUser(meData.user);
+      if (meData.workspaces && meData.workspaces.length > 0) {
+        const ws = meData.workspaces[0];
+        setWorkspaceState(ws);
+        localStorage.setItem('autonome_workspace_id', ws.id);
+        setSubscription({ status: ws.subscription_status });
+      }
+    } catch {
+      // Non-fatal — subscription stays null; RequireSubscription will handle it.
+    }
     return data;
   }
 

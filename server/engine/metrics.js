@@ -8,19 +8,19 @@ const HOURS_PER_ACTION = 0.25;
  * communications, audit_log, and agent_runs tables.
  */
 export async function calculateROI(workspaceId) {
-  // Count delivered (sent) communications
+  // Count delivered vs simulated communications across all channels (email + sms).
+  // realSent = successfully delivered via SMTP/Twilio; loggedSent = simulated (no credentials configured).
   const commResult = await pool.query(
     `SELECT
        COUNT(*) FILTER (WHERE status = 'sent') AS sent_count,
-       COUNT(*) FILTER (WHERE status = 'queued') AS queued_count,
-       COUNT(*) AS total_count
+       COUNT(*) FILTER (WHERE status = 'simulated') AS simulated_count
      FROM communications
-     WHERE workspace_id = $1 AND channel = 'email'`,
+     WHERE workspace_id = $1 AND channel IN ('email', 'sms')`,
     [workspaceId]
   );
   const commStats = commResult.rows[0];
   const realSent = parseInt(commStats.sent_count, 10) || 0;
-  const queuedSent = parseInt(commStats.queued_count, 10) || 0;
+  const loggedSent = parseInt(commStats.simulated_count, 10) || 0;
 
   // Count qualifying actions from audit_log
   const auditResult = await pool.query(
@@ -94,7 +94,7 @@ export async function calculateROI(workspaceId) {
     dealsClosed,
     dealsValue,
     realSent,
-    queuedSent,
+    loggedSent,
     totalAuditActions,
     activeWf,
     completedWf,

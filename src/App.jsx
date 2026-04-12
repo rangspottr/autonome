@@ -101,16 +101,19 @@ function MainApp() {
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [healthScore, setHealthScore] = useState(50);
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [devStatus, setDevStatus] = useState(null);
 
   useEffect(() => {
     async function init() {
       try {
-        const [healthData, agentStatus] = await Promise.all([
+        const [healthData, agentStatus, statusData] = await Promise.all([
           api.get("/metrics/health").catch(() => ({ score: 50 })),
           api.get("/agent/status").catch(() => ({ pendingDecisions: 0 })),
+          api.get("/settings/status").catch(() => null),
         ]);
         setHealthScore(healthData.score || 50);
         setPendingApprovals(agentStatus.pendingDecisions || 0);
+        if (statusData) setDevStatus(statusData);
         const wsSettings = workspace?.settings || {};
         if (!wsSettings.setupCompleted) setSetupNeeded(true);
       } catch {
@@ -263,6 +266,15 @@ function MainApp() {
                 {healthScore}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Dev-mode indicator */}
+        {sidebarOpen && devStatus && (devStatus.bypass_subscription || !devStatus.smtp) && (
+          <div style={{ margin: "0 var(--space-3) var(--space-3)", padding: "6px 10px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "var(--radius-md)", fontSize: 11, color: "var(--color-warning)", lineHeight: 1.4 }}>
+            <strong>Dev Mode</strong>
+            {!devStatus.smtp && <div>SMTP not configured</div>}
+            {devStatus.bypass_subscription && <div>Subscription bypassed</div>}
           </div>
         )}
 
