@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import bcrypt from 'bcrypt';
+// eslint-disable-next-line no-unused-vars
 import jwt from 'jsonwebtoken';
 
 // Mock dependencies

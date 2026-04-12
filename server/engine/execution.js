@@ -144,6 +144,7 @@ export async function executeAction(workspaceId, decision, options = {}) {
         let contactName = 'contact';
         if (resolvedContactId) {
           const cResult = await pool.query('SELECT name, email FROM contacts WHERE id = $1', [resolvedContactId]);
+          // eslint-disable-next-line no-unused-vars
           contactEmail = cResult.rows[0]?.email || null;
           contactName = cResult.rows[0]?.name || 'contact';
         }

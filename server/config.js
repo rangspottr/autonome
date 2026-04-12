@@ -24,4 +24,6 @@ export const config = {
   AI_MODEL: process.env.AI_MODEL || 'claude-sonnet-4-20250514',
   // Development
   BYPASS_SUBSCRIPTION: process.env.BYPASS_SUBSCRIPTION === 'true',
+  // Cleanup scheduler
+  CLEANUP_INTERVAL_HOURS: parseInt(process.env.CLEANUP_INTERVAL_HOURS) || 6,
 };

@@ -12,6 +12,7 @@ const FEATURES = [
 ];
 
 export default function CheckoutPage() {
+  // eslint-disable-next-line no-unused-vars
   const { workspace } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
