@@ -69,10 +69,10 @@ export async function processEmailQueue(workspaceId) {
 
     const newStatus = result.simulated ? 'simulated' : result.success ? 'sent' : 'failed';
     const metadata = result.simulated
-      ? { simulated: true }
+      ? { simulated: true, delivery_method: 'simulated' }
       : result.success
-      ? { messageId: result.messageId }
-      : { error: result.error };
+      ? { messageId: result.messageId, delivery_method: 'real' }
+      : { error: result.error, delivery_method: 'failed' };
 
     await pool.query(
       `UPDATE communications

@@ -24,6 +24,8 @@ export default function CmdCenter({ onRefreshMetrics }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [triggering, setTriggering] = useState(false);
+  const [triggerResult, setTriggerResult] = useState(null);
   const [showBriefing, setShowBriefing] = useState(true);
   const [executing, setExecuting] = useState(null);
   const [showMissedCall, setShowMissedCall] = useState(false);
@@ -123,6 +125,21 @@ export default function CmdCenter({ onRefreshMetrics }) {
     }
   }
 
+  async function handleTrigger() {
+    setTriggering(true);
+    setTriggerResult(null);
+    try {
+      const result = await api.post("/agent-runs/trigger");
+      setTriggerResult(result);
+      await fetchData();
+      onRefreshMetrics?.();
+    } catch (err) {
+      setError(err.message || "Agent trigger failed");
+    } finally {
+      setTriggering(false);
+    }
+  }
+
   // Activation checklist from summary data
   const checklist = summary
     ? [
@@ -186,6 +203,15 @@ export default function CmdCenter({ onRefreshMetrics }) {
         <Stat label="Invoices Paid" value={$$(summary?.invoices?.paid || 0)} sub="collected" color="green" />
         <Stat label="Pending Approvals" value={pendingApprovals} sub="awaiting review" color="blue" />
       </div>
+
+      {/* Welcome empty state when workspace has no data yet */}
+      {summary && (summary.contacts?.total || 0) === 0 && (summary.invoices?.total || 0) === 0 && (summary.deals?.total || 0) === 0 && (
+        <div className={styles.emptyActions} style={{ marginBottom: "var(--space-4)" }}>
+          <div className={styles.emptyActionsIcon}>A</div>
+          <div className={styles.emptyActionsTitle}>Welcome to Autonome</div>
+          <div className={styles.emptyActionsDesc}>Create your first contact or deal to get started.</div>
+        </div>
+      )}
 
       {/* Daily Briefing */}
       <div className={styles.briefingCard}>
@@ -286,10 +312,37 @@ export default function CmdCenter({ onRefreshMetrics }) {
             </span>
           )}
         </h2>
-        <Button variant="secondary" size="sm" onClick={() => setShowMissedCall(true)}>
-          TEL Log Missed Call
-        </Button>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <Button size="sm" onClick={handleTrigger} disabled={triggering}>
+            {triggering ? "Running…" : "Run Agents Now"}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowMissedCall(true)}>
+            TEL Log Missed Call
+          </Button>
+        </div>
       </div>
+
+      {/* Trigger result summary */}
+      {triggerResult && (
+        <div className={styles.briefingCard} style={{ marginBottom: "var(--space-4)" }}>
+          <div className={styles.briefingGrid}>
+            {[
+              { icon: "+", label: "Decisions Generated", val: triggerResult.decisionsGenerated },
+              { icon: ">", label: "Auto-Executed", val: triggerResult.decisionsAutoExecuted },
+              { icon: "!", label: "Pending Approval", val: triggerResult.decisionsPending },
+              { icon: "~", label: "Workflows Advanced", val: triggerResult.workflowsAdvanced },
+              { icon: "@", label: "Emails Sent", val: triggerResult.emailsSent },
+              { icon: "T", label: "SMS Sent", val: triggerResult.smsSent },
+            ].map((item) => (
+              <div key={item.label} className={styles.briefingItem}>
+                <span>{item.icon} </span>
+                <span className={styles.briefingItemLabel}>{item.label}: </span>
+                <strong className={styles.briefingItemVal}>{item.val}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {decisions.length === 0 ? (
         <div className={styles.emptyActions}>

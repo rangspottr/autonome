@@ -51,10 +51,10 @@ export async function processSMSQueue(workspaceId) {
 
     const newStatus = result.simulated ? 'simulated' : result.success ? 'sent' : 'failed';
     const metadata = result.simulated
-      ? { simulated: true }
+      ? { simulated: true, delivery_method: 'simulated' }
       : result.success
-      ? { sid: result.sid }
-      : { error: result.error };
+      ? { sid: result.sid, delivery_method: 'real' }
+      : { error: result.error, delivery_method: 'failed' };
 
     await pool.query(
       `UPDATE communications
