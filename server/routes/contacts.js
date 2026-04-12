@@ -11,7 +11,7 @@ const CONTACT_TYPES = ['lead', 'prospect', 'customer', 'partner', 'vendor', 'oth
 
 const contactCreateRules = [
   body('name').trim().notEmpty().isLength({ max: 255 }),
-  body('email').optional({ nullable: true }).isEmail().normalizeEmail(),
+  body('email').optional({ nullable: true }).isEmail(),
   body('phone').optional({ nullable: true }).isLength({ max: 50 }),
   body('type').optional().isIn(CONTACT_TYPES),
   validate,
@@ -19,7 +19,7 @@ const contactCreateRules = [
 
 const contactUpdateRules = [
   body('name').optional().trim().notEmpty().isLength({ max: 255 }),
-  body('email').optional({ nullable: true }).isEmail().normalizeEmail(),
+  body('email').optional({ nullable: true }).isEmail(),
   body('phone').optional({ nullable: true }).isLength({ max: 50 }),
   body('type').optional().isIn(CONTACT_TYPES),
   validate,

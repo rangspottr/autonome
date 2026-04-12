@@ -14,11 +14,19 @@ async function resolveWorkspaceByApiKey(apiKey) {
     `SELECT * FROM workspaces WHERE settings->>'webhook_api_key' IS NOT NULL`
   );
   for (const row of result.rows) {
+    const stored = row.settings?.webhook_api_key;
+    if (!stored) continue;
     try {
-      const decrypted = decrypt(row.settings.webhook_api_key);
-      if (decrypted === apiKey) return row;
+      // Encrypted keys contain two colons (iv:authTag:ciphertext)
+      if (stored.includes(':')) {
+        const decrypted = decrypt(stored);
+        if (decrypted === apiKey) return row;
+      } else if (stored === apiKey) {
+        // Legacy plaintext key comparison
+        return row;
+      }
     } catch {
-      // Skip rows with un-decryptable keys (e.g. legacy plaintext keys)
+      // Skip rows that fail decryption
     }
   }
   return null;
@@ -147,10 +155,15 @@ router.get('/key', requireAuth, requireWorkspace, async (req, res, next) => {
     const stored = result.rows[0]?.webhook_api_key || null;
     let key = null;
     if (stored) {
-      try {
-        key = decrypt(stored);
-      } catch {
-        // Legacy plaintext key — return as-is
+      // Encrypted keys contain two colons (iv:authTag:ciphertext)
+      if (stored.includes(':')) {
+        try {
+          key = decrypt(stored);
+        } catch {
+          key = null; // Decryption failed; do not expose corrupted data
+        }
+      } else {
+        // Legacy plaintext key — return as-is (will be re-encrypted on next generate-key call)
         key = stored;
       }
     }

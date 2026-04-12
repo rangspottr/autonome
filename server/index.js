@@ -73,6 +73,22 @@ const forgotPasswordLimiter = rateLimit({
   message: { message: 'Too many password reset requests, please try again later.' },
 });
 
+const verifyEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many verification attempts, please try again later.' },
+});
+
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many refresh attempts, please try again later.' },
+});
+
 // General rate limiter for authenticated API routes
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -102,6 +118,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/signup', signupLimiter);
 app.use('/api/auth/forgot-password', forgotPasswordLimiter);
+app.use('/api/auth/verify-email', verifyEmailLimiter);
+app.use('/api/auth/refresh', refreshLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', apiLimiter, workspaceRoutes);
 app.use('/api/billing', apiLimiter, billingRoutes);
