@@ -296,7 +296,11 @@ router.get('/me', requireAuth, async (req, res, next) => {
        ORDER BY w.created_at DESC`,
       [req.user.id]
     );
-    res.json({ user, workspaces: workspacesResult.rows });
+    let workspaces = workspacesResult.rows;
+    if (config.BYPASS_SUBSCRIPTION) {
+      workspaces = workspaces.map(ws => ({ ...ws, subscription_status: 'active' }));
+    }
+    res.json({ user, workspaces });
   } catch (err) {
     next(err);
   }

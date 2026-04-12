@@ -122,6 +122,9 @@ router.post('/webhook', async (req, res, next) => {
 
 router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
+    if (config.BYPASS_SUBSCRIPTION) {
+      return res.json({ status: 'active', plan: 'dev-bypass' });
+    }
     const result = await pool.query(
       'SELECT * FROM subscriptions WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT 1',
       [req.workspace.id]
