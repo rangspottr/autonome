@@ -109,35 +109,4 @@ export function parseText(text) {
   return { contacts, intents, actions, sentiment, amounts, isUrgent };
 }
 
-export async function parseTextWithAI(text, llmKey) {
-  if (!llmKey) return null;
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": llmKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: `Extract business information from this text. Return JSON with: contacts (array of {name, email, phone, type}), intents (array of {type, description, amount?}), sentiment (positive/negative/neutral/urgent), actions (array of strings), isUrgent (boolean).\n\nText: ${text}`,
-          },
-        ],
-      }),
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    const content = data.content?.[0]?.text || "";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-  } catch (e) {
-    console.error("AI parse error:", e);
-  }
-  return null;
-}
+
