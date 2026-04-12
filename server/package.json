@@ -6,6 +6,7 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "migrate": "node db/migrate.js",
+    "seed": "node db/seed.js",
     "test": "vitest run"
   },
   "dependencies": {

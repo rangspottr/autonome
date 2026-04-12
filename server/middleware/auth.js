@@ -40,6 +40,11 @@ export async function requireWorkspace(req, res, next) {
 }
 
 export async function requireActiveSubscription(req, res, next) {
+  if (config.BYPASS_SUBSCRIPTION) {
+    console.warn('[DEV] Subscription check bypassed — BYPASS_SUBSCRIPTION is enabled');
+    req.subscription = { id: 'dev-bypass', status: 'active', plan: 'dev' };
+    return next();
+  }
   try {
     const result = await pool.query(
       `SELECT * FROM subscriptions WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT 1`,

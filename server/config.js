@@ -22,4 +22,6 @@ export const config = {
   // AI
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   AI_MODEL: process.env.AI_MODEL || 'claude-sonnet-4-20250514',
+  // Development
+  BYPASS_SUBSCRIPTION: process.env.BYPASS_SUBSCRIPTION === 'true',
 };
