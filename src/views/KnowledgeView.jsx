@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso } from "../lib/utils.js";
+import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
@@ -18,15 +18,33 @@ const CAT_COLORS = {
   "Product Info": "blue",
 };
 
-export default function KnowledgeView({ db, onUpdate }) {
+export default function KnowledgeView() {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ title: "", category: "Policies", content: "" });
 
-  const articles = db.knowledge || [];
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  async function fetchArticles() {
+    try {
+      setError(null);
+      const data = await api.get("/knowledge");
+      setArticles(data);
+    } catch (err) {
+      setError(err.message || "Failed to load articles");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchArticles();
+  }, []);
 
   const filtered = articles
     .filter((a) => filterCat === "All" || a.category === filterCat)
@@ -48,28 +66,46 @@ export default function KnowledgeView({ db, onUpdate }) {
     setShowForm(true);
   }
 
-  function saveArticle() {
-    const updated = JSON.parse(JSON.stringify(db));
-    if (editId) {
-      const idx = updated.knowledge.findIndex((a) => a.id === editId);
-      if (idx !== -1) {
-        updated.knowledge[idx] = { ...updated.knowledge[idx], ...form, updatedAt: iso() };
+  async function saveArticle() {
+    try {
+      setError(null);
+      if (editId) {
+        await api.patch(`/knowledge/${editId}`, { title: form.title, content: form.content, category: form.category });
+      } else {
+        await api.post("/knowledge", { title: form.title, content: form.content, category: form.category });
       }
-    } else {
-      updated.knowledge = [
-        ...(updated.knowledge || []),
-        { id: uid(), ...form, createdAt: iso(), updatedAt: iso() },
-      ];
+      setShowForm(false);
+      await fetchArticles();
+    } catch (err) {
+      setError(err.message || "Failed to save article");
     }
-    onUpdate(updated);
-    setShowForm(false);
   }
 
-  function deleteArticle(id) {
+  async function deleteArticle(id) {
     if (!window.confirm("Delete this article?")) return;
-    const updated = JSON.parse(JSON.stringify(db));
-    updated.knowledge = updated.knowledge.filter((a) => a.id !== id);
-    onUpdate(updated);
+    try {
+      setError(null);
+      await api.delete(`/knowledge/${id}`);
+      await fetchArticles();
+    } catch (err) {
+      setError(err.message || "Failed to delete article");
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Knowledge Base</h2>
+          <div style={{ fontSize: 13, color: T.dm }}>
+            Articles here are included as context in AI queries. Keep them accurate and up-to-date.
+          </div>
+        </div>
+        <Card>
+          <p style={{ color: T.mt, fontSize: 13, textAlign: "center", padding: 24 }}>Loading articles…</p>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -80,6 +116,12 @@ export default function KnowledgeView({ db, onUpdate }) {
           Articles here are included as context in AI queries. Keep them accurate and up-to-date.
         </div>
       </div>
+
+      {error && (
+        <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, fontSize: 13, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca" }}>
+          {error}
+        </div>
+      )}
 
       {/* Search + Filter */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "flex-end" }}>
@@ -121,7 +163,7 @@ export default function KnowledgeView({ db, onUpdate }) {
                   {article.content.length > 200 ? article.content.slice(0, 200) + "…" : article.content}
                 </div>
                 <div style={{ fontSize: 11, color: T.mt }}>
-                  Updated {new Date(article.updatedAt || article.createdAt).toLocaleDateString()}
+                  Updated {new Date(article.updated_at || article.created_at).toLocaleDateString()}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
