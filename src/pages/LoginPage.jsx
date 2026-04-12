@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { T } from '../lib/theme.js';
+import styles from './AuthLayout.module.css';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -26,31 +26,46 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.bg, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div style={{ width: 400, padding: 40, background: T.wh, borderRadius: 12, border: `1px solid ${T.bd}` }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: T.tx, letterSpacing: -1 }}>A</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, marginTop: 8 }}>Sign in to Autonome</div>
+    <div className={styles.authWrap}>
+      <div className={styles.brand}>
+        <div className={styles.brandLogo}>
+          <div className={styles.brandLogoMark}>A</div>
+          <span className={styles.brandLogoText}>Autonome</span>
         </div>
-        {error && <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#DC2626', marginBottom: 16 }}>{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 6 }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width: '100%', padding: '10px 12px', border: `1px solid ${T.bd}`, borderRadius: 8, fontSize: 14, color: T.tx, background: T.bg, boxSizing: 'border-box' }} />
+        <div style={{ marginTop: 'auto' }}>
+          <div className={styles.brandTagline}>Your AI-powered business operator</div>
+          <div className={styles.brandTaglineSub}>Autonomously manage finance, sales, operations, and growth — so you can focus on what matters.</div>
+          <div className={styles.brandFeatures}>
+            <div className={styles.brandFeature}><span className={styles.brandFeatureDot} />Automated agent decisions</div>
+            <div className={styles.brandFeature}><span className={styles.brandFeatureDot} />Real-time business intelligence</div>
+            <div className={styles.brandFeature}><span className={styles.brandFeatureDot} />Integrated finance &amp; CRM</div>
           </div>
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Password</label>
-              <Link to="/forgot-password" style={{ fontSize: 12, color: T.mt }}>Forgot password?</Link>
+        </div>
+      </div>
+      <div className={styles.formSide}>
+        <div className={styles.formCard}>
+          <h1 className={styles.formTitle}>Welcome back</h1>
+          <p className={styles.formSubtitle}>Sign in to your Autonome account</p>
+          {error && <div className={styles.errorBanner}>{error}</div>}
+          <form onSubmit={handleSubmit}>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="email">Email</label>
+              <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required className={styles.formInput} placeholder="you@company.com" autoComplete="email" />
             </div>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', padding: '10px 12px', border: `1px solid ${T.bd}`, borderRadius: 8, fontSize: 14, color: T.tx, background: T.bg, boxSizing: 'border-box' }} />
+            <div className={styles.formGroup}>
+              <div className={styles.formLabelRow}>
+                <label className={styles.formLabel} htmlFor="password">Password</label>
+                <Link to="/forgot-password" className={styles.forgotLink}>Forgot password?</Link>
+              </div>
+              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required className={styles.formInput} autoComplete="current-password" />
+            </div>
+            <button type="submit" disabled={loading} className={styles.formSubmit}>
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
+          <div className={styles.formFooter}>
+            Don&apos;t have an account? <Link to="/signup">Sign up</Link>
           </div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', background: T.tx, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: T.mt }}>
-          Don't have an account? <Link to="/signup" style={{ color: T.tx, fontWeight: 600 }}>Sign up</Link>
         </div>
       </div>
     </div>

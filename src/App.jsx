@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { T } from "./lib/theme.js";
 import { api } from "./lib/api.js";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+import { ToastProvider } from "./components/Toast.jsx";
+import Avatar from "./components/Avatar.jsx";
+import styles from "./App.module.css";
 
 import Setup from "./views/Setup.jsx";
 import CmdCenter from "./views/CmdCenter.jsx";
@@ -28,29 +30,40 @@ import CheckoutSuccessPage from "./pages/CheckoutSuccessPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 
-const NAV_ITEMS = [
-  { id: "cmd", icon: "CMD", label: "Command Center" },
-  { id: "agents", icon: "AGT", label: "Agents" },
-  { id: "approvals", icon: "APR", label: "Approvals" },
-  { id: "finance", icon: "FIN", label: "Finance" },
-  { id: "sales", icon: "REV", label: "Sales" },
-  { id: "ops", icon: "OPS", label: "Operations" },
-  { id: "inventory", icon: "INV", label: "Inventory" },
-  { id: "roi", icon: "ROI", label: "ROI" },
-  { id: "process", icon: "PRC", label: "Process" },
-  { id: "knowledge", icon: "KNW", label: "Knowledge" },
-  { id: "audit", icon: "LOG", label: "Audit Log" },
-  { id: "settings", icon: "SET", label: "Settings" },
+const NAV_GROUPS = [
+  {
+    label: "Main",
+    items: [
+      { id: "cmd", icon: "CMD", label: "Command Center" },
+      { id: "agents", icon: "AGT", label: "Agents" },
+      { id: "approvals", icon: "APR", label: "Approvals" },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { id: "finance", icon: "FIN", label: "Finance" },
+      { id: "sales", icon: "REV", label: "Sales" },
+      { id: "ops", icon: "OPS", label: "Operations" },
+      { id: "inventory", icon: "INV", label: "Inventory" },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { id: "roi", icon: "ROI", label: "ROI" },
+      { id: "process", icon: "PRC", label: "Process" },
+      { id: "knowledge", icon: "KNW", label: "Knowledge" },
+      { id: "audit", icon: "LOG", label: "Audit Log" },
+    ],
+  },
+  {
+    label: "System",
+    items: [{ id: "settings", icon: "SET", label: "Settings" }],
+  },
 ];
 
-const GLOBAL_STYLES = `
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; background: ${T.bg}; color: ${T.tx}; }
-  input, select, textarea, button { font-family: 'Plus Jakarta Sans', sans-serif; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: ${T.bd2}; border-radius: 3px; }
-`;
+const ALL_NAV = NAV_GROUPS.flatMap((g) => g.items);
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -72,7 +85,7 @@ function RequireSubscription({ children }) {
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!workspace) return <Navigate to="/create-workspace" replace />;
-  if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trialing')) {
+  if (!subscription || (subscription.status !== "active" && subscription.status !== "trialing")) {
     return <Navigate to="/checkout" replace />;
   }
   return children;
@@ -82,6 +95,7 @@ function MainApp() {
   const { user, workspace, logout } = useAuth();
   const [view, setView] = useState("cmd");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [healthScore, setHealthScore] = useState(50);
@@ -91,16 +105,13 @@ function MainApp() {
     async function init() {
       try {
         const [healthData, agentStatus] = await Promise.all([
-          api.get('/metrics/health').catch(() => ({ score: 50 })),
-          api.get('/agent/status').catch(() => ({ pendingDecisions: 0 })),
+          api.get("/metrics/health").catch(() => ({ score: 50 })),
+          api.get("/agent/status").catch(() => ({ pendingDecisions: 0 })),
         ]);
         setHealthScore(healthData.score || 50);
         setPendingApprovals(agentStatus.pendingDecisions || 0);
-
         const wsSettings = workspace?.settings || {};
-        if (!wsSettings.setupCompleted) {
-          setSetupNeeded(true);
-        }
+        if (!wsSettings.setupCompleted) setSetupNeeded(true);
       } catch {
         // fallback
       } finally {
@@ -110,15 +121,13 @@ function MainApp() {
     init();
   }, [workspace]);
 
-  const handleSetupComplete = useCallback(() => {
-    setSetupNeeded(false);
-  }, []);
+  const handleSetupComplete = useCallback(() => setSetupNeeded(false), []);
 
   const refreshMetrics = useCallback(async () => {
     try {
       const [healthData, agentStatus] = await Promise.all([
-        api.get('/metrics/health').catch(() => ({ score: 50 })),
-        api.get('/agent/status').catch(() => ({ pendingDecisions: 0 })),
+        api.get("/metrics/health").catch(() => ({ score: 50 })),
+        api.get("/agent/status").catch(() => ({ pendingDecisions: 0 })),
       ]);
       setHealthScore(healthData.score || 50);
       setPendingApprovals(agentStatus.pendingDecisions || 0);
@@ -129,10 +138,10 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif", background: T.bg }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 12, fontWeight: 800, letterSpacing: -1 }}>A</div>
-          <div style={{ fontSize: 14, color: T.dm }}>Loading Autonome…</div>
+      <div className={styles.loadScreen}>
+        <div className={styles.loadInner}>
+          <div className={styles.loadIcon}>A</div>
+          <div className={styles.loadText}>Loading Autonome…</div>
         </div>
       </div>
     );
@@ -140,12 +149,9 @@ function MainApp() {
 
   if (setupNeeded) {
     return (
-      <>
-        <style>{GLOBAL_STYLES}</style>
-        <ErrorBoundary>
-          <Setup onComplete={handleSetupComplete} />
-        </ErrorBoundary>
-      </>
+      <ErrorBoundary>
+        <Setup onComplete={handleSetupComplete} />
+      </ErrorBoundary>
     );
   }
 
@@ -164,97 +170,197 @@ function MainApp() {
     settings: <SettingsView />,
   };
 
+  const healthColor =
+    healthScore >= 70
+      ? "var(--color-success)"
+      : healthScore >= 40
+      ? "var(--color-warning)"
+      : "var(--color-danger)";
+  const currentLabel = ALL_NAV.find((n) => n.id === view)?.label || "Autonome";
+
   return (
-    <>
-      <style>{GLOBAL_STYLES}</style>
-      <div style={{ display: "flex", minHeight: "100vh" }}>
-        {/* Sidebar */}
-        <div style={{ width: sidebarOpen ? 220 : 60, background: T.tx, flexShrink: 0, display: "flex", flexDirection: "column", transition: "width 0.25s", overflow: "hidden" }}>
-          {/* Logo */}
-          <div style={{ padding: sidebarOpen ? "20px 16px 16px" : "20px 0 16px", display: "flex", alignItems: "center", gap: 10, justifyContent: sidebarOpen ? "flex-start" : "center", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>A</span>
-            {sidebarOpen && (
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>Autonome</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{workspace?.name || "v12"}</div>
-              </div>
-            )}
-          </div>
+    <div className={styles.appLayout}>
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className={styles.mobileOverlay}
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-          {/* Nav */}
-          <nav style={{ flex: 1, padding: "8px 8px", overflowY: "auto" }}>
-            {NAV_ITEMS.map((item) => {
-              const isActive = view === item.id;
-              const badge = item.id === "approvals" && pendingApprovals > 0 ? pendingApprovals : null;
-              return (
-                <button key={item.id} onClick={() => setView(item.id)} title={item.label} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: sidebarOpen ? "8px 10px" : "10px", borderRadius: 8, border: "none", background: isActive ? "rgba(255,255,255,0.15)" : "transparent", color: isActive ? "#fff" : "rgba(255,255,255,0.6)", fontWeight: isActive ? 700 : 500, fontSize: 13, cursor: "pointer", marginBottom: 2, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center", position: "relative", fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "background 0.15s, color 0.15s" }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, flexShrink: 0, letterSpacing: 0.5, minWidth: 32, textAlign: "center" }}>{item.icon}</span>
-                  {sidebarOpen && <span style={{ flex: 1 }}>{item.label}</span>}
-                  {badge !== null && sidebarOpen && <span style={{ background: T.rd, color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{badge}</span>}
-                  {badge !== null && !sidebarOpen && <span style={{ position: "absolute", top: 4, right: 4, background: T.rd, color: "#fff", borderRadius: 8, width: 14, height: 14, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{badge}</span>}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Health score */}
+      {/* Sidebar */}
+      <aside
+        className={[
+          styles.sidebar,
+          !sidebarOpen ? styles.sidebarCollapsed : "",
+          mobileOpen ? styles.sidebarMobileOpen : "",
+        ].join(" ")}
+        aria-label="Navigation"
+      >
+        {/* Logo */}
+        <div className={styles.sidebarLogo}>
+          <span className={styles.sidebarLogoIcon}>A</span>
           {sidebarOpen && (
-            <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>HEALTH SCORE</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 2 }}>
-                  <div style={{ width: `${healthScore}%`, height: "100%", background: healthScore >= 70 ? T.gn : healthScore >= 40 ? T.am : T.rd, borderRadius: 2 }} />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: healthScore >= 70 ? T.gn : healthScore >= 40 ? T.am : T.rd }}>{healthScore}</span>
-              </div>
+            <div>
+              <div className={styles.sidebarLogoText}>Autonome</div>
+              <div className={styles.sidebarLogoSub}>{workspace?.name || "v12"}</div>
             </div>
           )}
-
-          {/* Toggle */}
-          <button onClick={() => setSidebarOpen((v) => !v)} style={{ padding: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 16, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {sidebarOpen ? "◀" : "▶"}
-          </button>
         </div>
 
-        {/* Main content */}
-        <div style={{ flex: 1, overflow: "auto" }}>
-          {/* Top bar */}
-          <div style={{ padding: "16px 24px", borderBottom: `1px solid ${T.bd}`, background: T.wh, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.tx }}>{NAV_ITEMS.find((n) => n.id === view)?.label || "Autonome"}</h1>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ fontSize: 12, color: T.mt }}>{workspace?.name}{workspace?.industry ? ` · ${workspace.industry}` : ''}</div>
-              {user && <button onClick={logout} style={{ fontSize: 12, color: T.mt, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sign out</button>}
+        {/* Nav */}
+        <nav className={styles.nav}>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className={styles.navGroup}>
+              {sidebarOpen && <div className={styles.navGroupLabel}>{group.label}</div>}
+              {group.items.map((item) => {
+                const isActive = view === item.id;
+                const badge =
+                  item.id === "approvals" && pendingApprovals > 0 ? pendingApprovals : null;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setView(item.id);
+                      setMobileOpen(false);
+                    }}
+                    title={item.label}
+                    aria-current={isActive ? "page" : undefined}
+                    className={[
+                      styles.navItem,
+                      isActive ? styles.navItemActive : "",
+                    ].join(" ")}
+                  >
+                    <span className={styles.navIcon}>{item.icon}</span>
+                    {sidebarOpen && <span className={styles.navLabel}>{item.label}</span>}
+                    {badge !== null && sidebarOpen && (
+                      <span className={styles.badge}>{badge}</span>
+                    )}
+                    {badge !== null && !sidebarOpen && (
+                      <span className={styles.badgeAbsolute}>{badge}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Health score */}
+        {sidebarOpen && (
+          <div className={styles.healthSection}>
+            <div className={styles.healthLabel}>Health Score</div>
+            <div className={styles.healthRow}>
+              <div className={styles.healthTrack}>
+                <div
+                  className={styles.healthFill}
+                  style={{ width: `${healthScore}%`, background: healthColor }}
+                />
+              </div>
+              <span className={styles.healthVal} style={{ color: healthColor }}>
+                {healthScore}
+              </span>
             </div>
           </div>
+        )}
 
-          {/* View content */}
-          <div style={{ padding: "24px" }}>
-            <ErrorBoundary key={view}>
-              {VIEWS[view] || <div style={{ color: T.mt }}>View not found.</div>}
-            </ErrorBoundary>
+        {/* Collapse toggle */}
+        <button
+          className={styles.toggleBtn}
+          onClick={() => setSidebarOpen((v) => !v)}
+          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {sidebarOpen ? "◀" : "▶"}
+        </button>
+      </aside>
+
+      {/* Main */}
+      <div className={styles.main}>
+        {/* Topbar */}
+        <header className={styles.topbar}>
+          <div className={styles.topbarLeft}>
+            <button
+              className={styles.hamburger}
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label="Open navigation"
+            >
+              ☰
+            </button>
+            <h1 className={styles.pageTitle}>{currentLabel}</h1>
           </div>
-        </div>
+          <div className={styles.topbarRight}>
+            <span className={styles.workspaceInfo}>
+              {workspace?.name}
+              {workspace?.industry ? ` · ${workspace.industry}` : ""}
+            </span>
+            {user && <Avatar name={user.full_name || user.email} size="sm" />}
+            {user && (
+              <button className={styles.signOutBtn} onClick={logout}>
+                Sign out
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className={styles.content}>
+          <ErrorBoundary key={view}>
+            {VIEWS[view] || (
+              <div style={{ color: "var(--color-text-muted)" }}>View not found.</div>
+            )}
+          </ErrorBoundary>
+        </main>
       </div>
-    </>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <style>{GLOBAL_STYLES}</style>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/create-workspace" element={<RequireAuth><CreateWorkspacePage /></RequireAuth>} />
-        <Route path="/onboarding" element={<RequireWorkspace><OnboardingPage /></RequireWorkspace>} />
-        <Route path="/checkout" element={<RequireWorkspace><CheckoutPage /></RequireWorkspace>} />
-        <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
-        <Route path="/" element={<RequireSubscription><MainApp /></RequireSubscription>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/create-workspace"
+            element={
+              <RequireAuth>
+                <CreateWorkspacePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/onboarding"
+            element={
+              <RequireWorkspace>
+                <OnboardingPage />
+              </RequireWorkspace>
+            }
+          />
+          <Route
+            path="/checkout"
+            element={
+              <RequireWorkspace>
+                <CheckoutPage />
+              </RequireWorkspace>
+            }
+          />
+          <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+          <Route
+            path="/"
+            element={
+              <RequireSubscription>
+                <MainApp />
+              </RequireSubscription>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ToastProvider>
     </AuthProvider>
   );
 }
