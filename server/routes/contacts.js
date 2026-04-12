@@ -1,9 +1,29 @@
 import { Router } from 'express';
+import { body } from 'express-validator';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
+
+const CONTACT_TYPES = ['lead', 'prospect', 'customer', 'partner', 'vendor', 'other'];
+
+const contactCreateRules = [
+  body('name').trim().notEmpty().isLength({ max: 255 }),
+  body('email').optional({ nullable: true }).isEmail(),
+  body('phone').optional({ nullable: true }).isLength({ max: 50 }),
+  body('type').optional().isIn(CONTACT_TYPES),
+  validate,
+];
+
+const contactUpdateRules = [
+  body('name').optional().trim().notEmpty().isLength({ max: 255 }),
+  body('email').optional({ nullable: true }).isEmail(),
+  body('phone').optional({ nullable: true }).isLength({ max: 50 }),
+  body('type').optional().isIn(CONTACT_TYPES),
+  validate,
+];
 
 router.get('/', ...guard, async (req, res, next) => {
   try {
@@ -22,7 +42,7 @@ router.get('/', ...guard, async (req, res, next) => {
   }
 });
 
-router.post('/', ...guard, async (req, res, next) => {
+router.post('/', ...guard, ...contactCreateRules, async (req, res, next) => {
   try {
     const { name, email, phone, company, type, source, tags, metadata } = req.body;
     if (!name) return res.status(400).json({ message: 'name is required' });
@@ -47,7 +67,7 @@ router.get('/:id', ...guard, async (req, res, next) => {
   }
 });
 
-router.patch('/:id', ...guard, async (req, res, next) => {
+router.patch('/:id', ...guard, ...contactUpdateRules, async (req, res, next) => {
   try {
     const { name, email, phone, company, type, source, tags, metadata } = req.body;
     const result = await pool.query(

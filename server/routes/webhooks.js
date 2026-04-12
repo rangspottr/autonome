@@ -2,18 +2,34 @@ import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace } from '../middleware/auth.js';
+import { encrypt, decrypt } from '../lib/crypto.js';
 
 const router = Router();
 
 // Resolve a workspace by API key from x-api-key header.
-// Returns the workspace row or null.
+// Keys are stored encrypted; we decrypt and compare in application code.
 async function resolveWorkspaceByApiKey(apiKey) {
   if (!apiKey) return null;
   const result = await pool.query(
-    `SELECT * FROM workspaces WHERE settings->>'webhook_api_key' = $1`,
-    [apiKey]
+    `SELECT * FROM workspaces WHERE settings->>'webhook_api_key' IS NOT NULL`
   );
-  return result.rows[0] || null;
+  for (const row of result.rows) {
+    const stored = row.settings?.webhook_api_key;
+    if (!stored) continue;
+    try {
+      // Encrypted keys contain two colons (iv:authTag:ciphertext)
+      if (stored.includes(':')) {
+        const decrypted = decrypt(stored);
+        if (decrypted === apiKey) return row;
+      } else if (stored === apiKey) {
+        // Legacy plaintext key comparison
+        return row;
+      }
+    } catch {
+      // Skip rows that fail decryption
+    }
+  }
+  return null;
 }
 
 // ── Ingest endpoints (API-key auth) ─────────────────────────────────────────
@@ -114,12 +130,13 @@ router.post('/generate-key', requireAuth, requireWorkspace, async (req, res, nex
   try {
     // Generate a 64-character hex key (32 random bytes encoded as hex)
     const newKey = randomBytes(32).toString('hex');
+    const encryptedKey = encrypt(newKey);
 
     await pool.query(
       `UPDATE workspaces
        SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('webhook_api_key', $1)
        WHERE id = $2`,
-      [newKey, req.workspace.id]
+      [encryptedKey, req.workspace.id]
     );
 
     res.json({ key: newKey });
@@ -128,15 +145,28 @@ router.post('/generate-key', requireAuth, requireWorkspace, async (req, res, nex
   }
 });
 
-// GET /api/webhooks/key — get the current webhook API key (masked)
+// GET /api/webhooks/key — get the current webhook API key (decrypted for authenticated user)
 router.get('/key', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT settings->>'webhook_api_key' AS webhook_api_key FROM workspaces WHERE id = $1`,
       [req.workspace.id]
     );
-    const key = result.rows[0]?.webhook_api_key || null;
-    // Return full key so the frontend can copy it — the user already authenticated
+    const stored = result.rows[0]?.webhook_api_key || null;
+    let key = null;
+    if (stored) {
+      // Encrypted keys contain two colons (iv:authTag:ciphertext)
+      if (stored.includes(':')) {
+        try {
+          key = decrypt(stored);
+        } catch {
+          key = null; // Decryption failed; do not expose corrupted data
+        }
+      } else {
+        // Legacy plaintext key — return as-is (will be re-encrypted on next generate-key call)
+        key = stored;
+      }
+    }
     res.json({ key });
   } catch (err) {
     next(err);

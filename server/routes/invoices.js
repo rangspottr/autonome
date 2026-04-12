@@ -1,9 +1,29 @@
 import { Router } from 'express';
+import { body } from 'express-validator';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
+
+const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue', 'cancelled'];
+
+const invoiceCreateRules = [
+  body('amount').isFloat({ gt: 0 }),
+  body('status').optional().isIn(INVOICE_STATUSES),
+  body('due_date').optional({ nullable: true }).isISO8601(),
+  body('issued_date').optional({ nullable: true }).isISO8601(),
+  validate,
+];
+
+const invoiceUpdateRules = [
+  body('amount').optional().isFloat({ gt: 0 }),
+  body('status').optional().isIn(INVOICE_STATUSES),
+  body('due_date').optional({ nullable: true }).isISO8601(),
+  body('issued_date').optional({ nullable: true }).isISO8601(),
+  validate,
+];
 
 router.get('/', ...guard, async (req, res, next) => {
   try {
@@ -22,7 +42,7 @@ router.get('/', ...guard, async (req, res, next) => {
   }
 });
 
-router.post('/', ...guard, async (req, res, next) => {
+router.post('/', ...guard, ...invoiceCreateRules, async (req, res, next) => {
   try {
     const { contact_id, deal_id, description, amount, status, due_date, issued_date, metadata } = req.body;
     if (amount === undefined || amount === null) return res.status(400).json({ message: 'amount is required' });
@@ -47,7 +67,7 @@ router.get('/:id', ...guard, async (req, res, next) => {
   }
 });
 
-router.patch('/:id', ...guard, async (req, res, next) => {
+router.patch('/:id', ...guard, ...invoiceUpdateRules, async (req, res, next) => {
   try {
     const { contact_id, deal_id, description, amount, amount_paid, status, due_date, issued_date, metadata } = req.body;
     const result = await pool.query(

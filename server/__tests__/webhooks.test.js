@@ -3,6 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockQuery = vi.fn();
 vi.mock('../db/index.js', () => ({ pool: { query: mockQuery } }));
 
+// Mock crypto so tests don't need real encryption keys
+vi.mock('../lib/crypto.js', () => ({
+  encrypt: (text) => `encrypted:${text}`,
+  decrypt: (text) => {
+    if (text.startsWith('encrypted:')) return text.slice('encrypted:'.length);
+    throw new Error('Not encrypted');
+  },
+}));
+
 const { default: webhookRouter } = await import('../routes/webhooks.js');
 import express from 'express';
 import request from 'supertest';
@@ -14,13 +23,14 @@ function buildApp() {
   return app;
 }
 
-const VALID_WORKSPACE = { id: 'ws-1', settings: { webhook_api_key: 'validkey' } };
+// The workspace now stores an encrypted key; the mock decrypt above handles 'encrypted:validkey'
+const VALID_WORKSPACE = { id: 'ws-1', settings: { webhook_api_key: 'encrypted:validkey' } };
 
 describe('POST /api/webhooks/lead', () => {
   beforeEach(() => mockQuery.mockReset());
 
   it('creates contact with valid API key', async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [VALID_WORKSPACE] }); // resolveWorkspaceByApiKey
+    mockQuery.mockResolvedValueOnce({ rows: [VALID_WORKSPACE] }); // resolveWorkspaceByApiKey scan
     mockQuery.mockResolvedValueOnce({ rows: [{ id: 'contact-1' }] }); // insert contact
     mockQuery.mockResolvedValueOnce({ rows: [] }); // audit log
 
@@ -33,7 +43,7 @@ describe('POST /api/webhooks/lead', () => {
   });
 
   it('returns 401 for missing API key', async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] }); // no workspace
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // no workspaces
     const res = await request(buildApp())
       .post('/api/webhooks/lead')
       .send({ name: 'Test Lead' });
@@ -41,7 +51,7 @@ describe('POST /api/webhooks/lead', () => {
   });
 
   it('returns 401 for invalid API key', async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] }); // no workspace found
+    mockQuery.mockResolvedValueOnce({ rows: [VALID_WORKSPACE] }); // scan returns workspace but key won't match
     const res = await request(buildApp())
       .post('/api/webhooks/lead')
       .set('x-api-key', 'badkey')
