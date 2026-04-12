@@ -33,7 +33,7 @@ export default function CheckoutPage() {
           <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {['Autonomous agents across all business functions', 'Revenue, finance, operations & support automation', 'Real-time workflow execution', 'Full CRM + invoicing + task management', 'AI-powered briefings and insights', 'Unlimited workspace seats'].map(f => (
               <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: T.tx }}>
-                <span style={{ color: '#22C55E', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ color: '#22C55E', fontWeight: 700, flexShrink: 0 }}>[OK]</span>
                 {f}
               </div>
             ))}

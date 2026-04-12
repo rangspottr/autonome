@@ -448,7 +448,7 @@ export default function Setup({ db, onSave }) {
               </Button>
             ) : (
               <Button onClick={finish} disabled={!form.name}>
-                Complete Setup ✓
+                Complete Setup
               </Button>
             )}
           </div>

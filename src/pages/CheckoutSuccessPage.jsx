@@ -40,13 +40,13 @@ export default function CheckoutSuccessPage() {
       <div style={{ width: 480, padding: 40, background: T.wh, borderRadius: 12, border: `1px solid ${T.bd}`, textAlign: 'center' }}>
         {status === 'active' ? (
           <>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
+            <div style={{ fontSize: 48, marginBottom: 16, color: '#22C55E', fontWeight: 800 }}>[OK]</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: T.tx }}>Subscription active!</div>
             <div style={{ fontSize: 13, color: T.mt, marginTop: 8 }}>Redirecting you to Autonome…</div>
           </>
         ) : status === 'timeout' || status === 'error' ? (
           <>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+            <div style={{ fontSize: 32, marginBottom: 16, color: '#D97706', fontWeight: 800 }}>[!]</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: T.tx }}>Almost there</div>
             <div style={{ fontSize: 13, color: T.mt, marginTop: 8 }}>Your payment was received. Please wait a moment and then <a href="/" style={{ color: T.tx }}>go to the app</a>.</div>
           </>

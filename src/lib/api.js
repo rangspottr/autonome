@@ -3,7 +3,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 function getHeaders() {
   const token = localStorage.getItem('autonome_token');
   const workspaceId = localStorage.getItem('autonome_workspace_id');
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-requested-with': 'XMLHttpRequest',
+  };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (workspaceId) headers['x-workspace-id'] = workspaceId;
   return headers;

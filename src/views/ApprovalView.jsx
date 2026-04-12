@@ -89,10 +89,10 @@ export default function ApprovalView({ db, onUpdate }) {
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <Button onClick={() => approve(decision)} size="sm">
-                      ✓ Approve
+                      Approve
                     </Button>
                     <Button variant="secondary" onClick={() => reject(decision)} size="sm">
-                      ✕ Reject
+                      Reject
                     </Button>
                   </div>
                 </div>
