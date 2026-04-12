@@ -11,7 +11,7 @@ function colorFromName(name) {
 
 export default function Avatar({ name, size = "md" }) {
   const initials = name
-    ? name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+    ? name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase()
     : "?";
   return (
     <span
