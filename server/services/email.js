@@ -35,7 +35,7 @@ export async function sendEmail({ to, subject, body, html }) {
     });
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error(`[Email] Send failed to ${to}:`, err.message);
+    console.error('[Email] Send failed:', err.message);
     return { success: false, error: err.message };
   }
 }

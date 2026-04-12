@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
 import { pool } from '../db/index.js';
 import { config } from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
+import { sendEmail } from '../services/email.js';
 
 const router = Router();
 
@@ -85,6 +87,66 @@ router.get('/me', requireAuth, async (req, res, next) => {
       [req.user.id]
     );
     res.json({ user, workspaces: workspacesResult.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'email is required' });
+    }
+    // Always return 200 to avoid leaking email existence
+    const user = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (user.rows.length > 0) {
+      const token = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await pool.query(
+        `INSERT INTO password_reset_tokens (user_id, token, expires_at)
+         VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING`,
+        [user.rows[0].id, token, expiresAt]
+      );
+      const resetUrl = `${config.CLIENT_URL}/reset-password?token=${token}`;
+      if (config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS) {
+        await sendEmail({
+          to: email,
+          subject: 'Reset your Autonome password',
+          body: `Click the link below to reset your password (expires in 1 hour):\n\n${resetUrl}\n\nIf you did not request this, please ignore this email.`,
+        });
+      } else {
+        console.warn(`[Auth] Password reset token for ${email}: ${resetUrl}`);
+      }
+    }
+    res.json({ message: 'If that email exists, a reset link has been sent' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'token and newPassword are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    }
+    const result = await pool.query(
+      `SELECT * FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW()`,
+      [token]
+    );
+    if (result.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+    const resetToken = result.rows[0];
+    const password_hash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [password_hash, resetToken.user_id]);
+    await pool.query('DELETE FROM password_reset_tokens WHERE token = $1', [token]);
+    res.json({ message: 'Password updated' });
   } catch (err) {
     next(err);
   }

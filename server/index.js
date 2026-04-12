@@ -3,6 +3,8 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
 
 import authRoutes from './routes/auth.js';
@@ -48,6 +50,22 @@ const apiLimiter = rateLimit({
   message: { message: 'Too many requests, please try again later.' },
 });
 
+// CSRF protection — require custom header on all state-changing requests
+// except webhook ingestion endpoints (which use API-key auth instead)
+app.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (req.path.startsWith('/api/webhooks/lead') ||
+      req.path.startsWith('/api/webhooks/payment') ||
+      req.path.startsWith('/api/webhooks/event') ||
+      req.path.startsWith('/api/billing/webhook')) {
+    return next();
+  }
+  if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
+    return res.status(403).json({ message: 'Forbidden: missing required header' });
+  }
+  next();
+});
+
 // Raw body for Stripe webhooks (must be before express.json())
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 
@@ -78,6 +96,17 @@ app.use('/api/metrics', apiLimiter, metricsRoutes);
 app.use('/api/ai', apiLimiter, aiRoutes);
 app.use('/api/webhooks', apiLimiter, webhookRoutes);
 app.use('/api/settings', apiLimiter, settingsRoutes);
+
+// In production, serve the Vite build
+if (process.env.NODE_ENV === 'production') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  app.use(express.static(path.join(__dirname, '..', 'dist')));
+  // SPA fallback — serve index.html for all non-API routes
+  app.get('*', apiLimiter, (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  });
+}
 
 // Centralized error handler
 app.use((err, req, res, next) => {
