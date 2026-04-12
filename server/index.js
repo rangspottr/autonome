@@ -28,6 +28,7 @@ import aiRoutes from './routes/ai.js';
 import webhookRoutes from './routes/webhooks.js';
 import settingsRoutes from './routes/settings.js';
 import { startScheduler } from './engine/cycle.js';
+import { autoSeed } from './db/auto-seed.js';
 
 const app = express();
 
@@ -156,8 +157,13 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
-app.listen(config.PORT, () => {
+app.listen(config.PORT, async () => {
   console.log(`Autonome server running on port ${config.PORT}`);
+  try {
+    await autoSeed();
+  } catch (err) {
+    console.error('[Auto-Seed] Failed:', err.message);
+  }
   try {
     startScheduler();
   } catch (err) {
