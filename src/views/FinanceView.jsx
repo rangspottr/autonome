@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { T } from "../lib/theme.js";
 import { $$, sd, da } from "../lib/utils.js";
 import { api } from "../lib/api.js";
-import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
-import Pill from "../components/Pill.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
-import Row from "../components/Row.jsx";
+import Stat from "../components/Stat.jsx";
+import Table from "../components/Table.jsx";
+import Tabs from "../components/Tabs.jsx";
+import StatusDot from "../components/StatusDot.jsx";
+import styles from "./FinanceView.module.css";
 
 const TYPE_MAP = { inv: "invoice", inc: "income", exp: "expense" };
 
@@ -87,90 +88,92 @@ export default function FinanceView() {
     }
   }
 
-  const statusPill = (t) => {
-    if (t.status === "paid") return <Pill label="Paid" variant="green" />;
-    if (t.status === "cancelled") return <Pill label="Cancelled" variant="red" />;
-    if (t.status === "overdue") return <Pill label="Overdue" variant="red" />;
-    const overdue = t.due_date && new Date(t.due_date) < new Date();
-    return overdue ? <Pill label={`${da(t.due_date)}d overdue`} variant="red" /> : <Pill label="Pending" variant="amber" />;
-  };
-
-  if (loading) {
-    return <p style={{ color: T.mt, fontSize: 13 }}>Loading financial data…</p>;
+  function getStatus(row) {
+    if (row.status === "paid") return "paid";
+    if (row.status === "cancelled") return "cancelled";
+    if (row.status === "overdue") return "overdue";
+    if (row.due_date && new Date(row.due_date) < new Date()) return "overdue";
+    return "pending";
   }
 
+  const activeData = tab === "invoices" ? invoices : tab === "income" ? income : expenses;
+
+  const invoiceColumns = [
+    { key: "description", label: "Description" },
+    {
+      key: "amount", label: "Amount", align: "right",
+      render: (v) => <strong>{$$(v)}</strong>,
+    },
+    {
+      key: "status", label: "Status",
+      render: (v, row) => {
+        const s = getStatus(row);
+        return <StatusDot status={s} label={s === "overdue" ? `${da(row.due_date)}d overdue` : s.charAt(0).toUpperCase() + s.slice(1)} />;
+      },
+    },
+    {
+      key: "due_date", label: "Due Date", sortable: true,
+      render: (v) => v ? sd(v) : "—",
+    },
+    {
+      key: "issued_date", label: "Issued",
+      render: (v, row) => sd(v || row.created_at),
+    },
+    {
+      key: "_actions", label: "",
+      render: (_, row) => row.status === "pending" ? (
+        <Button size="sm" variant="success" onClick={() => markPaid(row.id)}>Mark Paid</Button>
+      ) : null,
+    },
+  ];
+
+  const simpleColumns = [
+    { key: "description", label: "Description" },
+    { key: "amount", label: "Amount", align: "right", render: (v) => $$(v) },
+    { key: "issued_date", label: "Date", sortable: true, render: (v, row) => sd(v || row.created_at) },
+  ];
+
   return (
-    <div>
+    <div className={styles.page}>
+      <div className={styles.pageHeader}>
+        <h2 className={styles.pageTitle}>Finance</h2>
+        <Button size="sm" onClick={() => setShowForm(true)}>+ Add Record</Button>
+      </div>
+
       {error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", marginBottom: 12, color: "#dc2626", fontSize: 13 }}>
-          {error}
-          <button onClick={() => setError(null)} style={{ marginLeft: 8, background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>✕</button>
+        <div className={styles.errorBanner}>
+          <span>{error}</span>
+          <button className={styles.errorClose} onClick={() => setError(null)}>✕</button>
         </div>
       )}
 
-      {/* Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "Revenue", value: $$(totalRevenue), color: T.gn },
-          { label: "Expenses", value: $$(totalExpenses), color: T.rd },
-          { label: "Outstanding", value: $$(totalOutstanding), color: T.am },
-          { label: "Overdue", value: $$(totalOverdue), color: T.rd },
-        ].map((m) => (
-          <div key={m.label} style={{ background: T.wh, border: `1px solid ${T.bd}`, borderRadius: 12, padding: "14px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: m.color }}>{m.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.dm }}>{m.label}</div>
-          </div>
-        ))}
+      <div className={styles.statsGrid}>
+        <Stat label="Revenue" value={$$(totalRevenue)} color="success" />
+        <Stat label="Expenses" value={$$(totalExpenses)} color="danger" />
+        <Stat label="Outstanding" value={$$(totalOutstanding)} color="warning" />
+        <Stat label="Overdue" value={$$(totalOverdue)} color="danger" />
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-        {[["invoices", "Invoices"], ["income", "Income"], ["expenses", "Expenses"]].map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            style={{
-              padding: "6px 16px",
-              borderRadius: 8,
-              border: "none",
-              background: tab === key ? T.bl : T.bd,
-              color: tab === key ? "#fff" : T.dm,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-            }}
-          >
-            {label}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <Button size="sm" onClick={() => setShowForm(true)}>+ Add</Button>
-      </div>
+      <Tabs
+        tabs={[
+          { id: "invoices", label: "Invoices", badge: invoices.length },
+          { id: "income", label: "Income", badge: income.length },
+          { id: "expenses", label: "Expenses", badge: expenses.length },
+        ]}
+        active={tab}
+        onChange={setTab}
+      >
+        <Table
+          columns={tab === "invoices" ? invoiceColumns : simpleColumns}
+          data={activeData}
+          loading={loading}
+          emptyIcon="📄"
+          emptyTitle={`No ${tab} yet`}
+          emptyDescription="Add a record to get started."
+          emptyAction={<Button size="sm" onClick={() => setShowForm(true)}>+ Add Record</Button>}
+        />
+      </Tabs>
 
-      {/* List */}
-      <Card>
-        {tab === "invoices" && invoices.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No invoices yet.</p>}
-        {tab === "income" && income.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No income records yet.</p>}
-        {tab === "expenses" && expenses.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No expense records yet.</p>}
-        {(tab === "invoices" ? invoices : tab === "income" ? income : expenses).map((t) => (
-          <Row key={t.id}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{t.description}</div>
-              <div style={{ fontSize: 11, color: T.mt }}>
-                {sd(t.issued_date || t.created_at)} {t.due_date && `· Due ${sd(t.due_date)}`}
-              </div>
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: T.tx }}>{$$(t.amount)}</div>
-            {tab === "invoices" && statusPill(t)}
-            {tab === "invoices" && t.status === "pending" && (
-              <Button size="sm" variant="success" onClick={() => markPaid(t.id)}>Mark Paid</Button>
-            )}
-          </Row>
-        ))}
-      </Card>
-
-      {/* Add dialog */}
       {showForm && (
         <Dialog title="Add Financial Record" onClose={() => setShowForm(false)} onConfirm={saveRecord} confirmLabel={saving ? "Saving…" : "Save"}>
           <Select

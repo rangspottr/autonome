@@ -1,0 +1,69 @@
+.page {}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.pageTitle { font-size: var(--text-xl); font-weight: 700; color: var(--color-text-primary); margin: 0 0 var(--space-1); }
+.pageSubtitle { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+.healthCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.healthHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.healthTitle { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-primary); }
+.healthSub { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+
+.healthScore {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.workflowGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.workflowStat { text-align: center; }
+.workflowValue { font-size: var(--text-3xl); font-weight: 800; }
+.workflowLabel { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+
+.emailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-4);
+}
+
+.errorState { padding: var(--space-10); text-align: center; }
+.errorTitle { font-size: var(--text-base); font-weight: 700; color: var(--color-danger); margin-bottom: var(--space-2); }
+.errorMsg { font-size: var(--text-sm); color: var(--color-text-muted); }

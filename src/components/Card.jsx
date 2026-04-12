@@ -1,14 +1,13 @@
-import { T } from "../lib/theme.js";
+import styles from "./Card.module.css";
 
-const BASE = {
-  fontFamily: "'Plus Jakarta Sans', sans-serif",
-  background: T.wh,
-  border: `1px solid ${T.bd}`,
-  borderRadius: 12,
-  padding: "16px 20px",
-  marginBottom: 12,
-};
-
-export default function Card({ children, style }) {
-  return <div style={{ ...BASE, ...style }}>{children}</div>;
+export default function Card({ children, style, variant = "default", padding = "md", header, footer, className = "" }) {
+  const padClass = padding === "sm" ? styles.padSm : padding === "lg" ? styles.padLg : styles.padMd;
+  const cls = [styles.card, styles[variant] || styles.default, padClass, className].filter(Boolean).join(" ");
+  return (
+    <div className={cls} style={style}>
+      {header && <div className={styles.header}>{header}</div>}
+      <div className={styles.body}>{children}</div>
+      {footer && <div className={styles.footer}>{footer}</div>}
+    </div>
+  );
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { T } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
@@ -7,6 +6,8 @@ import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Pill from "../components/Pill.jsx";
+import Table from "../components/Table.jsx";
+import styles from "./KnowledgeView.module.css";
 
 const CATEGORIES = ["Policies", "Pricing", "Objection Handling", "Troubleshooting", "SOPs", "Product Info"];
 const CAT_COLORS = {
@@ -92,90 +93,80 @@ export default function KnowledgeView() {
     }
   }
 
-  if (loading) {
-    return (
-      <div>
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Knowledge Base</h2>
-          <div style={{ fontSize: 13, color: T.dm }}>
+  const columns = [
+    {
+      key: "title", label: "Article",
+      render: (v, row) => (
+        <div>
+          <div className={styles.articleTitle}>{v}</div>
+          <div className={styles.articleContent}>
+            {row.content.length > 160 ? row.content.slice(0, 160) + "…" : row.content}
+          </div>
+          <div className={styles.articlePills}>
+            <Pill label={row.category} variant={CAT_COLORS[row.category] || "muted"} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "updated_at", label: "Updated", sortable: true,
+      render: (v, row) => new Date(v || row.created_at).toLocaleDateString(),
+    },
+    {
+      key: "_actions", label: "",
+      render: (_, row) => (
+        <div className={styles.rowActions}>
+          <Button size="sm" variant="secondary" onClick={() => openEdit(row)}>Edit</Button>
+          <Button size="sm" variant="ghost" onClick={() => deleteArticle(row.id)}>Del</Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>Knowledge Base</h2>
+          <div className={styles.pageSubtitle}>
             Articles here are included as context in AI queries. Keep them accurate and up-to-date.
           </div>
         </div>
-        <Card>
-          <p style={{ color: T.mt, fontSize: 13, textAlign: "center", padding: 24 }}>Loading articles…</p>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Knowledge Base</h2>
-        <div style={{ fontSize: 13, color: T.dm }}>
-          Articles here are included as context in AI queries. Keep them accurate and up-to-date.
-        </div>
+        <Button size="sm" onClick={openNew}>+ New Article</Button>
       </div>
 
-      {error && (
-        <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, fontSize: 13, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca" }}>
-          {error}
-        </div>
-      )}
+      {error && <div className={styles.errorBanner}>{error}</div>}
 
-      {/* Search + Filter */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "flex-end" }}>
+      <div className={styles.filterRow}>
         <Input
           label=""
           value={search}
           onChange={setSearch}
           placeholder="Search articles..."
-          style={{ flex: 1, marginBottom: 0 }}
+          style={{ marginBottom: 0, flex: 1 }}
         />
         <select
+          className={styles.catFilter}
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
-          style={{ padding: "8px 12px", border: `1px solid ${T.bd}`, borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: T.tx, background: T.wh, cursor: "pointer" }}
         >
           <option value="All">All Categories</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <Button size="sm" onClick={openNew}>+ New Article</Button>
       </div>
 
-      {/* Articles */}
-      {filtered.length === 0 ? (
-        <Card>
-          <p style={{ color: T.mt, fontSize: 13, textAlign: "center", padding: 24 }}>
-            {search || filterCat !== "All" ? "No articles match your search." : "No articles yet. Add your first knowledge base article."}
-          </p>
-        </Card>
-      ) : (
-        filtered.map((article) => (
-          <Card key={article.id} style={{ marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.tx }}>{article.title}</div>
-                  <Pill label={article.category} variant={CAT_COLORS[article.category] || "muted"} />
-                </div>
-                <div style={{ fontSize: 13, color: T.dm, lineHeight: 1.5, marginBottom: 4 }}>
-                  {article.content.length > 200 ? article.content.slice(0, 200) + "…" : article.content}
-                </div>
-                <div style={{ fontSize: 11, color: T.mt }}>
-                  Updated {new Date(article.updated_at || article.created_at).toLocaleDateString()}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <Button size="sm" variant="secondary" onClick={() => openEdit(article)}>Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => deleteArticle(article.id)}>Del</Button>
-              </div>
-            </div>
-          </Card>
-        ))
-      )}
+      <Card>
+        <Table
+          columns={columns}
+          data={filtered}
+          loading={loading}
+          emptyIcon="📚"
+          emptyTitle="No articles found"
+          emptyDescription={search || filterCat !== "All" ? "No articles match your search." : "Add your first knowledge base article."}
+          emptyAction={!search && filterCat === "All" ? <Button size="sm" onClick={openNew}>+ New Article</Button> : undefined}
+        />
+      </Card>
 
-      {/* Article Form Dialog */}
       {showForm && (
         <Dialog
           title={editId ? "Edit Article" : "New Article"}
@@ -190,26 +181,14 @@ export default function KnowledgeView() {
             onChange={set("category")}
             options={CATEGORIES.map((c) => ({ value: c, label: c }))}
           />
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.dm, marginBottom: 4 }}>
-              Content
-            </label>
+          <div>
+            <label className={styles.contentLabel}>Content</label>
             <textarea
+              className={styles.textarea}
               value={form.content}
               onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
               placeholder="Article content..."
               rows={8}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                border: `1px solid ${T.bd}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                color: T.tx,
-                resize: "vertical",
-                boxSizing: "border-box",
-              }}
             />
           </div>
         </Dialog>

@@ -1,0 +1,17 @@
+.track {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  height: 6px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+}
+
+.success { background: var(--color-success); }
+.warning { background: var(--color-warning); }
+.danger { background: var(--color-danger); }
+.brand { background: var(--color-brand); }

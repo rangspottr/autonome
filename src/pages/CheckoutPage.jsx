@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { api } from '../lib/api.js';
-import { T } from '../lib/theme.js';
+
+const FEATURES = [
+  'Autonomous agents across all business functions',
+  'Revenue, finance, operations & support automation',
+  'Real-time workflow execution',
+  'Full CRM + invoicing + task management',
+  'AI-powered briefings and insights',
+  'Unlimited workspace seats',
+];
 
 export default function CheckoutPage() {
   const { workspace } = useAuth();
@@ -21,29 +29,41 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.bg, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div style={{ width: 480, padding: 40, background: T.wh, borderRadius: 12, border: `1px solid ${T.bd}` }}>
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.tx }}>Autonome Pro</div>
-          <div style={{ fontSize: 13, color: T.mt, marginTop: 6 }}>Your complete AI operations layer.</div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ width: 440, padding: 40, background: 'var(--color-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 4 }}>Autonome Pro</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Your complete AI operations layer.</div>
         </div>
-        <div style={{ background: T.bg, border: `1px solid ${T.bd}`, borderRadius: 10, padding: 24, marginBottom: 24 }}>
-          <div style={{ fontSize: 36, fontWeight: 800, color: T.tx }}>$1,279<span style={{ fontSize: 16, fontWeight: 500, color: T.mt }}>/mo</span></div>
-          <div style={{ fontSize: 13, color: T.mt, marginTop: 4 }}>Billed monthly. Cancel anytime.</div>
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 24, marginBottom: 24 }}>
+          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--color-text-primary)' }}>
+            $1,279<span style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-muted)' }}>/mo</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 4 }}>Billed monthly. Cancel anytime.</div>
           <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {['Autonomous agents across all business functions', 'Revenue, finance, operations & support automation', 'Real-time workflow execution', 'Full CRM + invoicing + task management', 'AI-powered briefings and insights', 'Unlimited workspace seats'].map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: T.tx }}>
-                <span style={{ color: '#22C55E', fontWeight: 700, flexShrink: 0 }}>[OK]</span>
+            {FEATURES.map(f => (
+              <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                <span style={{ color: 'var(--color-success)', fontWeight: 700, flexShrink: 0 }}>✓</span>
                 {f}
               </div>
             ))}
           </div>
         </div>
-        {error && <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#DC2626', marginBottom: 16 }}>{error}</div>}
-        <button onClick={handleCheckout} disabled={loading} style={{ width: '100%', padding: '14px', background: T.tx, color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+        {error && (
+          <div style={{ background: 'var(--color-danger-light)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 13, color: 'var(--color-danger)', marginBottom: 'var(--space-4)' }}>
+            {error}
+          </div>
+        )}
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          style={{ width: '100%', padding: '14px', background: 'var(--color-brand)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, fontFamily: 'var(--font-family)' }}
+        >
           {loading ? 'Redirecting to Stripe…' : 'Subscribe — $1,279/mo'}
         </button>
-        <div style={{ fontSize: 12, color: T.mt, textAlign: 'center', marginTop: 12 }}>Secure checkout powered by Stripe</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', marginTop: 12 }}>
+          Secure checkout powered by Stripe
+        </div>
       </div>
     </div>
   );
