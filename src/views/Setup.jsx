@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { T } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
+import styles from "./Setup.module.css";
 
 const INDUSTRY_DEFAULTS = {
   roofing: {
@@ -187,6 +187,11 @@ const INDUSTRY_DEFAULTS = {
   },
 };
 
+const INDUSTRY_ICONS = {
+  roofing: "🏠", hvac: "❄️", plumbing: "🔧", solar: "☀️", construction: "🏗️",
+  agency: "📢", ecommerce: "🛒", saas: "💻", services: "⚙️", other: "🏢",
+};
+
 const STEPS = [
   "Business Identity",
   "Service Model",
@@ -233,7 +238,6 @@ export default function Setup({ onComplete }) {
     setError(null);
 
     try {
-      // Save workspace settings
       const updatedWorkspace = await api.patch("/workspaces/" + workspace.id, {
         name: form.name,
         industry: form.type,
@@ -249,7 +253,6 @@ export default function Setup({ onComplete }) {
         },
       });
 
-      // Seed industry data if workspace has no contacts yet
       const existingContacts = await api.get("/contacts");
       const isFirstTime = !existingContacts || existingContacts.length === 0;
 
@@ -301,23 +304,30 @@ export default function Setup({ onComplete }) {
   const stepContent = [
     // Step 0: Business Identity
     <div key="s0">
-      <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
+      <p className={styles.stepSubtitle}>
         Tell Autonome about your business so it can personalize your experience.
       </p>
       <Input label="Business Name" value={form.name} onChange={set("name")} placeholder="e.g. ABC Roofing LLC" />
-      <Select
-        label="Industry"
-        value={form.type}
-        onChange={(v) => applyIndustryDefaults(v)}
-        options={Object.keys(INDUSTRY_DEFAULTS).map((k) => ({ value: k, label: k.charAt(0).toUpperCase() + k.slice(1) }))}
-      />
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>Industry</div>
+        <div className={styles.industryGrid}>
+          {Object.keys(INDUSTRY_DEFAULTS).map((k) => (
+            <div
+              key={k}
+              className={`${styles.industryCard} ${form.type === k ? styles.industryCardActive : ""}`}
+              onClick={() => applyIndustryDefaults(k)}
+            >
+              <div className={styles.industryIcon}>{INDUSTRY_ICONS[k] || "🏢"}</div>
+              <div className={styles.industryLabel}>{k.charAt(0).toUpperCase() + k.slice(1)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>,
 
     // Step 1: Service Model
     <div key="s1">
-      <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
-        How does your business deliver value?
-      </p>
+      <p className={styles.stepSubtitle}>How does your business deliver value?</p>
       <Select
         label="Service Model"
         value={form.type}
@@ -334,11 +344,9 @@ export default function Setup({ onComplete }) {
 
     // Step 2: Revenue Model
     <div key="s2">
-      <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
-        Set your revenue model parameters.
-      </p>
+      <p className={styles.stepSubtitle}>Set your revenue model parameters.</p>
       <Input label="Typical Deal Size ($)" type="number" value={String(form.typicalDealSize)} onChange={(v) => setForm((f) => ({ ...f, typicalDealSize: Number(v) }))} placeholder="5000" />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className={styles.formRow}>
         <Input label="Max Auto-Spend ($)" type="number" value={String(form.maxAutoSpend)} onChange={set("maxAutoSpend")} placeholder="500" style={{ flex: 1 }} />
         <Input label="Approval Threshold ($)" type="number" value={String(form.approvalAbove)} onChange={set("approvalAbove")} placeholder="5000" style={{ flex: 1 }} />
       </div>
@@ -346,13 +354,11 @@ export default function Setup({ onComplete }) {
 
     // Step 3: Comm Preferences
     <div key="s3">
-      <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
-        Communication settings.
-      </p>
+      <p className={styles.stepSubtitle}>Communication settings.</p>
       <Input label="Daily Email Limit" type="number" value={String(form.dailyEmailLimit)} onChange={set("dailyEmailLimit")} placeholder="50" />
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+      <div className={styles.checkboxRow}>
         <input type="checkbox" id="autoExec" checked={form.autoExec} onChange={(e) => set("autoExec")(e.target.checked)} />
-        <label htmlFor="autoExec" style={{ fontSize: 13, color: T.tx }}>
+        <label htmlFor="autoExec" className={styles.checkboxLabel}>
           Enable autonomous execution (auto-execute safe actions)
         </label>
       </div>
@@ -360,9 +366,7 @@ export default function Setup({ onComplete }) {
 
     // Step 4: Approval Thresholds
     <div key="s4">
-      <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
-        Configure when Autonome should ask for your approval.
-      </p>
+      <p className={styles.stepSubtitle}>Configure when Autonome should ask for your approval.</p>
       <Input label="Max Auto-Spend ($)" type="number" value={String(form.maxAutoSpend)} onChange={set("maxAutoSpend")} placeholder="500" />
       <Input label="Refund Threshold ($)" type="number" value={String(form.refundThreshold)} onChange={set("refundThreshold")} placeholder="100" />
       <Input label="Approval Required Above ($)" type="number" value={String(form.approvalAbove)} onChange={set("approvalAbove")} placeholder="5000" />
@@ -370,108 +374,63 @@ export default function Setup({ onComplete }) {
 
     // Step 5: Data Import
     <div key="s5">
-      <p style={{ color: T.dm, fontSize: 13, marginBottom: 20 }}>
-        Optionally paste existing customer or deal data to import.
-      </p>
+      <p className={styles.stepSubtitle}>Optionally paste existing customer or deal data to import.</p>
       <textarea
+        className={styles.textarea}
         value={form.importText}
         onChange={(e) => setForm((f) => ({ ...f, importText: e.target.value }))}
         placeholder="Paste customer names, emails, deal information..."
-        style={{
-          width: "100%",
-          height: 120,
-          padding: "8px 12px",
-          border: `1px solid ${T.bd}`,
-          borderRadius: 8,
-          fontSize: 13,
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-          resize: "vertical",
-          boxSizing: "border-box",
-        }}
       />
-      <p style={{ fontSize: 12, color: T.mt }}>
+      <p className={styles.textareaHint}>
         Autonome will parse this text and extract contacts, deals, and tasks.
       </p>
     </div>,
   ];
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: T.bg,
-        fontFamily: "'Plus Jakarta Sans', sans-serif",
-      }}
-    >
-      <div style={{ width: "100%", maxWidth: 520, padding: 32 }}>
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: T.tx, marginBottom: 4 }}>A Autonome</div>
-          <div style={{ fontSize: 13, color: T.dm }}>Your AI Business Operator</div>
+    <div className={styles.page}>
+      <div className={styles.card}>
+        <div className={styles.logo}>
+          <div className={styles.logoTitle}>⚡ Autonome</div>
+          <div className={styles.logoSub}>Your AI Business Operator</div>
         </div>
 
-        {/* Progress */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 28 }}>
+        <div className={styles.stepProgress}>
           {STEPS.map((s, i) => (
             <div
               key={i}
-              style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 2,
-                background: i <= step ? T.bl : T.bd,
-                transition: "background 0.3s",
-              }}
+              className={`${styles.stepDot} ${i < step ? styles.stepDotDone : i === step ? styles.stepDotActive : ""}`}
             />
           ))}
         </div>
 
-        {/* Card */}
-        <div
-          style={{
-            background: T.wh,
-            border: `1px solid ${T.bd}`,
-            borderRadius: 16,
-            padding: 28,
-          }}
-        >
-          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>
-            {STEPS[step]}
-          </h2>
-          <div style={{ fontSize: 12, color: T.mt, marginBottom: 20 }}>
-            Step {step + 1} of {STEPS.length}
-          </div>
+        <h2 className={styles.stepTitle}>{STEPS[step]}</h2>
+        <div className={styles.stepMeta}>Step {step + 1} of {STEPS.length}</div>
 
-          {stepContent[step]}
+        {stepContent[step]}
 
-          {error && (
-            <p style={{ color: "#e53e3e", fontSize: 13, margin: "8px 0 0" }}>{error}</p>
-          )}
+        {error && <div className={styles.errorBanner}>{error}</div>}
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 8 }}>
+        <div className={styles.actions}>
+          <Button
+            variant="secondary"
+            onClick={() => (step > 0 ? setStep(step - 1) : null)}
+            disabled={step === 0 || saving}
+          >
+            Back
+          </Button>
+          {step < STEPS.length - 1 ? (
             <Button
-              variant="secondary"
-              onClick={() => (step > 0 ? setStep(step - 1) : null)}
-              disabled={step === 0 || saving}
+              onClick={() => setStep(step + 1)}
+              disabled={step === 0 && !form.name}
             >
-              Back
+              Continue →
             </Button>
-            {step < STEPS.length - 1 ? (
-              <Button
-                onClick={() => setStep(step + 1)}
-                disabled={step === 0 && !form.name}
-              >
-                Continue →
-              </Button>
-            ) : (
-              <Button onClick={finish} disabled={!form.name || saving}>
-                {saving ? "Saving…" : "Complete Setup"}
-              </Button>
-            )}
-          </div>
+          ) : (
+            <Button onClick={finish} disabled={!form.name || saving}>
+              {saving ? "Saving…" : "Complete Setup"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

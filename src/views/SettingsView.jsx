@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { T } from "../lib/theme.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Pill from "../components/Pill.jsx";
+import styles from "./SettingsView.module.css";
 
 export default function SettingsView() {
   const { workspace } = useAuth();
@@ -22,23 +22,19 @@ export default function SettingsView() {
   const [csvImporting, setCsvImporting] = useState(false);
   const csvInputRef = useRef(null);
 
-  // Integration status from server
   const [integrations, setIntegrations] = useState(null);
   const [integrationsLoading, setIntegrationsLoading] = useState(true);
 
-  // Webhook key state
   const [webhookKey, setWebhookKey] = useState(null);
   const [webhookKeyLoading, setWebhookKeyLoading] = useState(true);
   const [webhookKeyCopied, setWebhookKeyCopied] = useState(false);
   const [webhookKeyGenerating, setWebhookKeyGenerating] = useState(false);
 
-  // Activation checklist from metrics
   const [metrics, setMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
 
   const [error, setError] = useState(null);
 
-  // Initialize risk limits from workspace settings
   useEffect(() => {
     if (workspace?.settings?.riskLimits) {
       const rl = workspace.settings.riskLimits;
@@ -51,7 +47,6 @@ export default function SettingsView() {
     }
   }, [workspace]);
 
-  // Fetch integrations, webhook key, and metrics in parallel
   useEffect(() => {
     api.get('/settings/integrations')
       .then(setIntegrations)
@@ -75,7 +70,7 @@ export default function SettingsView() {
       const data = await api.post('/webhooks/generate-key', {});
       setWebhookKey(data.key);
     } catch {
-      // silently fail — key stays unchanged
+      // silently fail
     } finally {
       setWebhookKeyGenerating(false);
     }
@@ -191,7 +186,6 @@ export default function SettingsView() {
     }
   }
 
-  // Activation checklist derived from metrics
   const checks = metrics
     ? [
         { label: "Business configured", done: !!metrics.businessConfigured },
@@ -207,59 +201,71 @@ export default function SettingsView() {
   const webhookBase = apiBase.replace(/\/api$/, '');
 
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>Settings</h2>
-        <div style={{ fontSize: 13, color: T.dm }}>Configure integrations, risk limits, and platform preferences.</div>
+    <div className={styles.page}>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>Settings</h2>
+          <div className={styles.pageSubtitle}>Configure integrations, risk limits, and platform preferences.</div>
+        </div>
       </div>
 
-      {error && (
-        <Card style={{ marginBottom: 20, background: "#fef2f2", border: "1px solid #fecaca" }}>
-          <div style={{ fontSize: 13, color: T.rd }}>{error}</div>
-        </Card>
-      )}
+      {error && <div className={styles.errorBanner}>{error}</div>}
 
       {/* Activation Checklist */}
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: T.tx }}>Activation Checklist</h3>
-          {!metricsLoading && metrics && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: checksDone === checks.length ? T.gn : T.am }}>
-              {checksDone}/{checks.length} complete
-            </span>
-          )}
-        </div>
-        {metricsLoading ? (
-          <div style={{ fontSize: 13, color: T.mt }}>Loading...</div>
-        ) : metrics ? (
-          checks.map((c) => (
-            <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: c.done ? T.gn : T.mt }}>{c.done ? "[x]" : "[ ]"}</span>
-              <span style={{ fontSize: 13, color: c.done ? T.tx : T.mt }}>
-                {c.label}
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Activation Checklist</h3>
+        <Card>
+          <div className={styles.checklistHeader}>
+            <h4 className={styles.checklistTitle}>Setup Progress</h4>
+            {!metricsLoading && metrics && (
+              <span
+                className={styles.checklistProgress}
+                style={{ color: checksDone === checks.length ? "var(--color-success)" : "var(--color-warning)" }}
+              >
+                {checksDone}/{checks.length} complete
               </span>
-            </div>
-          ))
-        ) : (
-          <div style={{ fontSize: 13, color: T.mt }}>Unable to load checklist data.</div>
-        )}
-      </Card>
+            )}
+          </div>
+          {metricsLoading ? (
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading...</div>
+          ) : metrics ? (
+            checks.map((c) => (
+              <div key={c.label} className={styles.checkRow}>
+                <span
+                  className={styles.checkIcon}
+                  style={{ color: c.done ? "var(--color-success)" : "var(--color-text-muted)" }}
+                >
+                  {c.done ? "✓" : "○"}
+                </span>
+                <span
+                  className={styles.checkLabel}
+                  style={{ color: c.done ? "var(--color-text-primary)" : "var(--color-text-muted)" }}
+                >
+                  {c.label}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Unable to load checklist data.</div>
+          )}
+        </Card>
+      </div>
 
       {/* Integration Status */}
-      <Card style={{ marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: T.tx }}>Integration Status</h3>
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Integration Status</h3>
         {integrationsLoading ? (
-          <div style={{ fontSize: 13, color: T.mt }}>Loading...</div>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading...</div>
         ) : integrations ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className={styles.integrationGrid}>
             {[
-              { label: "Email (SMTP)", key: "email", provider: integrations.email?.provider },
-              { label: "SMS (Twilio)", key: "sms", provider: integrations.sms?.provider },
-              { label: "AI (Anthropic)", key: "ai", provider: integrations.ai?.provider },
-              { label: "Stripe Billing", key: "stripe", provider: "stripe" },
+              { label: "Email (SMTP)", key: "email" },
+              { label: "SMS (Twilio)", key: "sms" },
+              { label: "AI (Anthropic)", key: "ai" },
+              { label: "Stripe Billing", key: "stripe" },
             ].map((item) => (
-              <div key={item.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: T.bg, borderRadius: 8 }}>
-                <span style={{ fontSize: 13, color: T.tx }}>{item.label}</span>
+              <div key={item.key} className={styles.integrationCard}>
+                <span className={styles.integrationName}>{item.label}</span>
                 <Pill
                   label={integrations[item.key]?.configured ? "Configured" : "Not configured"}
                   variant={integrations[item.key]?.configured ? "green" : "muted"}
@@ -268,124 +274,121 @@ export default function SettingsView() {
             ))}
           </div>
         ) : (
-          <div style={{ fontSize: 13, color: T.mt }}>Unable to load integration status.</div>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Unable to load integration status.</div>
         )}
-      </Card>
+      </div>
 
       {/* Webhook Integration */}
-      <Card style={{ marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: T.tx }}>Webhook Integration</h3>
-        <div style={{ fontSize: 12, color: T.dm, marginBottom: 14 }}>
-          Use these endpoints to ingest leads, payments, and events from external systems.
-        </div>
-
-        {/* Webhook URLs */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: T.dm, marginBottom: 8 }}>Endpoint URLs</div>
-          {[
-            { path: "/api/webhooks/lead", desc: "Ingest a new lead/contact" },
-            { path: "/api/webhooks/payment", desc: "Ingest a payment notification" },
-            { path: "/api/webhooks/event", desc: "Ingest a generic event" },
-          ].map((ep) => (
-            <div key={ep.path} style={{ marginBottom: 6 }}>
-              <code style={{ fontSize: 12, background: T.bg, padding: "3px 8px", borderRadius: 4, color: T.bl }}>
-                POST {webhookBase}{ep.path}
-              </code>
-              <span style={{ fontSize: 12, color: T.mt, marginLeft: 8 }}>{ep.desc}</span>
-            </div>
-          ))}
-          <div style={{ fontSize: 12, color: T.dm, marginTop: 8 }}>
-            Include <code style={{ background: T.bg, padding: "1px 4px", borderRadius: 3 }}>x-api-key: YOUR_KEY</code> header with each request.
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Webhook Integration</h3>
+        <Card>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginBottom: "var(--space-4)" }}>
+            Use these endpoints to ingest leads, payments, and events from external systems.
           </div>
-        </div>
 
-        {/* API Key */}
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: T.dm, marginBottom: 8 }}>Webhook API Key</div>
-          {webhookKeyLoading ? (
-            <div style={{ fontSize: 13, color: T.mt }}>Loading...</div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <code style={{
-                flex: 1,
-                fontSize: 12,
-                background: T.bg,
-                padding: "8px 12px",
-                borderRadius: 8,
-                color: webhookKey ? T.tx : T.mt,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}>
-                {webhookKey
-                  ? `${webhookKey.slice(0, 8)}${'•'.repeat(Math.max(0, webhookKey.length - 12))}${webhookKey.slice(-4)}`
-                  : "No key generated yet"}
-              </code>
-              {webhookKey && (
-                <Button size="sm" variant="secondary" onClick={copyWebhookKey}>
-                  {webhookKeyCopied ? "Copied!" : "Copy"}
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>Endpoint URLs</div>
+            {[
+              { path: "/api/webhooks/lead", desc: "Ingest a new lead/contact" },
+              { path: "/api/webhooks/payment", desc: "Ingest a payment notification" },
+              { path: "/api/webhooks/event", desc: "Ingest a generic event" },
+            ].map((ep) => (
+              <div key={ep.path} className={styles.webhookEndpoint}>
+                <code className={styles.webhookCode}>POST {webhookBase}{ep.path}</code>
+                <span className={styles.webhookDesc}>{ep.desc}</span>
+              </div>
+            ))}
+            <div className={styles.webhookNote}>
+              Include <code className={styles.inlineCode}>x-api-key: YOUR_KEY</code> header with each request.
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>Webhook API Key</div>
+            {webhookKeyLoading ? (
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading...</div>
+            ) : (
+              <div className={styles.webhookKeyRow}>
+                <code
+                  className={styles.webhookKeyDisplay}
+                  style={{ color: webhookKey ? "var(--color-text-primary)" : "var(--color-text-muted)" }}
+                >
+                  {webhookKey
+                    ? `${webhookKey.slice(0, 8)}${"•".repeat(Math.max(0, webhookKey.length - 12))}${webhookKey.slice(-4)}`
+                    : "No key generated yet"}
+                </code>
+                {webhookKey && (
+                  <Button size="sm" variant="secondary" onClick={copyWebhookKey}>
+                    {webhookKeyCopied ? "Copied!" : "Copy"}
+                  </Button>
+                )}
+                <Button size="sm" variant="secondary" onClick={generateWebhookKey} disabled={webhookKeyGenerating}>
+                  {webhookKeyGenerating ? "..." : webhookKey ? "Regenerate" : "Generate Key"}
                 </Button>
-              )}
-              <Button size="sm" variant="secondary" onClick={generateWebhookKey} disabled={webhookKeyGenerating}>
-                {webhookKeyGenerating ? "..." : webhookKey ? "Regenerate" : "Generate Key"}
-              </Button>
-            </div>
-          )}
-          {webhookKey && (
-            <div style={{ fontSize: 11, color: T.am, marginTop: 6 }}>
-              Keep this key secret. Regenerating will invalidate the previous key.
-            </div>
-          )}
-        </div>
-      </Card>
+              </div>
+            )}
+            {webhookKey && (
+              <div className={styles.webhookWarning}>
+                Keep this key secret. Regenerating will invalidate the previous key.
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
 
       {/* Risk Limits */}
-      <Card style={{ marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 700, color: T.tx }}>Risk & Approval Limits</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {[
-            ["maxAutoSpend", "Max Auto-Spend ($)"],
-            ["approvalAbove", "Approval Required Above ($)"],
-            ["refundThreshold", "Refund Threshold ($)"],
-            ["dailyEmailLimit", "Daily Email Limit"],
-          ].map(([k, label]) => (
-            <Input
-              key={k}
-              label={label}
-              type="number"
-              value={String(limits[k])}
-              onChange={(v) => setLimits((l) => ({ ...l, [k]: v }))}
-              style={{ marginBottom: 0 }}
-            />
-          ))}
-        </div>
-      </Card>
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Risk & Approval Limits</h3>
+        <Card>
+          <div className={styles.formGrid}>
+            {[
+              ["maxAutoSpend", "Max Auto-Spend ($)"],
+              ["approvalAbove", "Approval Required Above ($)"],
+              ["refundThreshold", "Refund Threshold ($)"],
+              ["dailyEmailLimit", "Daily Email Limit"],
+            ].map(([k, label]) => (
+              <Input
+                key={k}
+                label={label}
+                type="number"
+                value={String(limits[k])}
+                onChange={(v) => setLimits((l) => ({ ...l, [k]: v }))}
+                style={{ marginBottom: 0 }}
+              />
+            ))}
+          </div>
+        </Card>
+      </div>
 
       {/* Data Import */}
-      <Card style={{ marginBottom: 20 }}>
-        <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: T.tx }}>Data Import</h3>
-        <p style={{ fontSize: 12, color: T.dm, marginBottom: 12 }}>
-          Import contacts from a CSV, TSV, or TXT file. Columns should include: name, email, phone.
-        </p>
-        <input
-          ref={csvInputRef}
-          type="file"
-          accept=".csv,.tsv,.txt"
-          onChange={handleCsvImport}
-          style={{ display: "none" }}
-        />
-        <Button variant="secondary" onClick={() => csvInputRef.current?.click()} disabled={csvImporting}>
-          {csvImporting ? "Importing..." : "Import CSV / TSV"}
-        </Button>
-        {csvStatus && (
-          <div style={{ marginTop: 10, fontSize: 12, color: csvStatus.startsWith("Error") ? T.rd : T.gn }}>
-            {csvStatus}
-          </div>
-        )}
-      </Card>
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Data Import</h3>
+        <Card>
+          <p style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginBottom: "var(--space-3)" }}>
+            Import contacts from a CSV, TSV, or TXT file. Columns should include: name, email, phone.
+          </p>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,.tsv,.txt"
+            onChange={handleCsvImport}
+            style={{ display: "none" }}
+          />
+          <Button variant="secondary" onClick={() => csvInputRef.current?.click()} disabled={csvImporting}>
+            {csvImporting ? "Importing..." : "Import CSV / TSV"}
+          </Button>
+          {csvStatus && (
+            <div
+              className={styles.csvStatus}
+              style={{ color: csvStatus.startsWith("Error") ? "var(--color-danger)" : "var(--color-success)" }}
+            >
+              {csvStatus}
+            </div>
+          )}
+        </Card>
+      </div>
 
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className={styles.actions}>
         <Button onClick={saveSettings} disabled={saving}>{saving ? "Saving..." : saved ? "Saved!" : "Save Settings"}</Button>
         <Button variant="secondary" onClick={resetSetup}>Reset Onboarding</Button>
       </div>

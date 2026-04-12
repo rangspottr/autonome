@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { T } from "../lib/theme.js";
 import { $$ } from "../lib/utils.js";
 import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Bar from "../components/Bar.jsx";
+import Stat from "../components/Stat.jsx";
+import styles from "./ROIView.module.css";
 
 export default function ROIView() {
   const [roi, setRoi] = useState(null);
@@ -29,90 +30,93 @@ export default function ROIView() {
 
   if (error) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: T.rd }}>
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Failed to load ROI data</div>
-        <div style={{ fontSize: 13, color: T.mt }}>{error}</div>
+      <div className={styles.errorState}>
+        <div className={styles.errorTitle}>Failed to load ROI data</div>
+        <div className={styles.errorMsg}>{error}</div>
       </div>
     );
   }
 
   if (!roi || health === null) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: T.mt }}>
-        <div style={{ fontSize: 14 }}>Loading metrics…</div>
-      </div>
+      <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)", padding: "var(--space-10)", textAlign: "center" }}>
+        Loading metrics…
+      </p>
     );
   }
 
+  const healthColor = health >= 70 ? "success" : health >= 40 ? "warning" : "danger";
+
   const metrics = [
-    { label: "Revenue Collected", value: $$(roi.collected), color: T.gn, sub: "via agent actions" },
-    { label: "Hours Saved", value: `${roi.hoursSaved}h`, color: T.bl, sub: "vs manual work" },
-    { label: "Labor Saved ($)", value: $$(roi.moneySaved), color: T.gn, sub: `at $35/hr rate` },
-    { label: "Headcount Equiv", value: `${roi.headcountEquiv} FTE`, color: T.pu, sub: "per month" },
-    { label: "Deals Closed", value: roi.dealsClosed, color: T.bl, sub: "by revenue agent" },
-    { label: "Total Actions", value: roi.totalActions, color: T.am, sub: "automated" },
+    { label: "Revenue Collected", value: $$(roi.collected), sub: "via agent actions", color: "success" },
+    { label: "Hours Saved", value: `${roi.hoursSaved}h`, sub: "vs manual work", color: "brand" },
+    { label: "Labor Saved ($)", value: $$(roi.moneySaved), sub: "at $35/hr rate", color: "success" },
+    { label: "Headcount Equiv", value: `${roi.headcountEquiv} FTE`, sub: "per month", color: "purple" },
+    { label: "Deals Closed", value: roi.dealsClosed, sub: "by revenue agent", color: "brand" },
+    { label: "Total Actions", value: roi.totalActions, sub: "automated", color: "warning" },
   ];
 
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: T.tx }}>ROI Dashboard</h2>
-        <div style={{ fontSize: 13, color: T.dm }}>Track the value Autonome is generating for your business.</div>
+    <div className={styles.page}>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>ROI Dashboard</h2>
+          <div className={styles.pageSubtitle}>Track the value Autonome is generating for your business.</div>
+        </div>
       </div>
 
       {/* Business Health */}
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+      <div className={styles.healthCard}>
+        <div className={styles.healthHeader}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.tx }}>Business Health Score</div>
-            <div style={{ fontSize: 11, color: T.mt }}>Based on revenue, deals, tasks, and inventory</div>
+            <div className={styles.healthTitle}>Business Health Score</div>
+            <div className={styles.healthSub}>Based on revenue, deals, tasks, and inventory</div>
           </div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd }}>
+          <div
+            className={styles.healthScore}
+            style={{ color: `var(--color-${healthColor})` }}
+          >
             {health}
           </div>
         </div>
         <Bar value={health} max={100} />
-      </Card>
+      </div>
 
       {/* ROI Metrics Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div className={styles.statsGrid}>
         {metrics.map((m) => (
-          <div key={m.label} style={{ background: T.wh, border: `1px solid ${T.bd}`, borderRadius: 12, padding: "16px 18px" }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: m.color }}>{m.value}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: T.tx, marginTop: 2 }}>{m.label}</div>
-            <div style={{ fontSize: 11, color: T.mt }}>{m.sub}</div>
-          </div>
+          <Stat key={m.label} label={m.label} value={m.value} sub={m.sub} color={m.color} />
         ))}
       </div>
 
       {/* Workflow Outcomes */}
-      <Card>
-        <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 700, color: T.tx }}>Workflow Outcomes</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      <Card style={{ marginBottom: "var(--space-3)" }}>
+        <h3 className={styles.sectionTitle}>Workflow Outcomes</h3>
+        <div className={styles.workflowGrid}>
           {[
-            { label: "Active", value: roi.activeWf, color: T.bl },
-            { label: "Completed", value: roi.completedWf, color: T.gn },
-            { label: "Led to Payment", value: roi.paidWf, color: T.gn },
+            { label: "Active", value: roi.activeWf, color: "var(--color-brand)" },
+            { label: "Completed", value: roi.completedWf, color: "var(--color-success)" },
+            { label: "Led to Payment", value: roi.paidWf, color: "var(--color-success)" },
           ].map((m) => (
-            <div key={m.label} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: m.color }}>{m.value}</div>
-              <div style={{ fontSize: 11, color: T.mt }}>{m.label}</div>
+            <div key={m.label} className={styles.workflowStat}>
+              <div className={styles.workflowValue} style={{ color: m.color }}>{m.value}</div>
+              <div className={styles.workflowLabel}>{m.label}</div>
             </div>
           ))}
         </div>
       </Card>
 
-      {/* Sent Emails */}
-      <Card style={{ marginTop: 12 }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 700, color: T.tx }}>Email Activity</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: T.gn }}>{roi.realSent}</div>
-            <div style={{ fontSize: 11, color: T.mt }}>Delivered (Real)</div>
+      {/* Email Activity */}
+      <Card>
+        <h3 className={styles.sectionTitle}>Email Activity</h3>
+        <div className={styles.emailGrid}>
+          <div className={styles.workflowStat}>
+            <div className={styles.workflowValue} style={{ color: "var(--color-success)" }}>{roi.realSent}</div>
+            <div className={styles.workflowLabel}>Delivered (Real)</div>
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: T.am }}>{roi.loggedSent}</div>
-            <div style={{ fontSize: 11, color: T.mt }}>Logged (Simulated)</div>
+          <div className={styles.workflowStat}>
+            <div className={styles.workflowValue} style={{ color: "var(--color-warning)" }}>{roi.loggedSent}</div>
+            <div className={styles.workflowLabel}>Logged (Simulated)</div>
           </div>
         </div>
       </Card>

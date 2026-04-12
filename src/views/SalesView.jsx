@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { T } from "../lib/theme.js";
 import { $$, sd, da } from "../lib/utils.js";
 import { api } from "../lib/api.js";
-import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
-import Row from "../components/Row.jsx";
+import Stat from "../components/Stat.jsx";
+import Table from "../components/Table.jsx";
+import Tabs from "../components/Tabs.jsx";
+import styles from "./SalesView.module.css";
 
 const STAGES = ["prospect", "qualified", "proposal", "negotiation", "closed"];
 const STAGE_COLORS = { prospect: "muted", qualified: "blue", proposal: "purple", negotiation: "amber", closed: "green" };
@@ -108,130 +109,142 @@ export default function SalesView() {
     }
   }
 
-  if (loading) {
-    return (
-      <div style={{ padding: 40, textAlign: "center", color: T.mt, fontSize: 14 }}>
-        Loading sales data…
-      </div>
-    );
-  }
-
   const pipelineValue = deals.filter((d) => d.stage !== "closed").reduce((s, d) => s + (d.value || 0), 0);
   const closedValue = deals.filter((d) => d.stage === "closed").reduce((s, d) => s + (d.value || 0), 0);
 
-  return (
-    <div>
-      {/* Error banner */}
-      {error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: "#dc2626", flex: 1 }}>{error}</span>
-          <button onClick={() => setError(null)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>✕</button>
-        </div>
-      )}
+  const contactColumns = [
+    { key: "name", label: "Name" },
+    { key: "email", label: "Email", render: (v, row) => v || row.phone || "—" },
+    {
+      key: "type", label: "Type",
+      render: (v) => <Pill label={v} variant={v === "lead" ? "amber" : v === "qualified" ? "blue" : "green"} />,
+    },
+    {
+      key: "_deals", label: "Deals",
+      render: (_, row) => {
+        const cDeals = deals.filter((d) => d.contact_id === row.id);
+        return cDeals.length > 0 ? <Pill label={`${cDeals.length} deal${cDeals.length > 1 ? "s" : ""}`} variant="purple" /> : null;
+      },
+    },
+    {
+      key: "_actions", label: "",
+      render: (_, row) => (
+        <Button size="sm" variant="secondary" onClick={() => setShowTimeline(row.id)}>Timeline</Button>
+      ),
+    },
+  ];
 
-      {/* Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "Contacts", value: contacts.length, color: T.bl },
-          { label: "Leads", value: contacts.filter((c) => c.type === "lead").length, color: T.am },
-          { label: "Pipeline", value: $$(pipelineValue), color: T.bl },
-          { label: "Closed", value: $$(closedValue), color: T.gn },
-        ].map((m) => (
-          <div key={m.label} style={{ background: T.wh, border: `1px solid ${T.bd}`, borderRadius: 12, padding: "14px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: m.color }}>{m.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.dm }}>{m.label}</div>
+  const dealColumns = [
+    {
+      key: "title", label: "Deal",
+      render: (v, row) => {
+        const contact = contacts.find((c) => c.id === row.contact_id);
+        return (
+          <div>
+            <div className={styles.itemName}>{v || contact?.name || "Unnamed Deal"}</div>
+            <div className={styles.itemMeta}>{contact?.name} · {da(row.updated_at || row.created_at)}d ago</div>
           </div>
-        ))}
-      </div>
+        );
+      },
+    },
+    { key: "value", label: "Value", align: "right", sortable: true, render: (v) => $$(v) },
+    { key: "stage", label: "Stage", render: (v) => <Pill label={v} variant={STAGE_COLORS[v] || "muted"} /> },
+    { key: "probability", label: "Win %", render: (v) => `${v}%` },
+    {
+      key: "_actions", label: "",
+      render: (_, row) => row.stage !== "closed" ? (
+        <Button size="sm" disabled={saving} onClick={() => advanceDeal(row)}>Advance →</Button>
+      ) : null,
+    },
+  ];
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-        {[["contacts", "Contacts"], ["deals", "Deals"], ["pipeline", "Pipeline"]].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} style={{ padding: "6px 16px", borderRadius: 8, border: "none", background: tab === key ? T.bl : T.bd, color: tab === key ? "#fff" : T.dm, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {label}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <Button size="sm" onClick={() => (tab === "contacts" ? setShowContactForm(true) : setShowDealForm(true))}>
-          + Add {tab === "contacts" ? "Contact" : "Deal"}
-        </Button>
-      </div>
-
-      {/* Contacts */}
-      {tab === "contacts" && (
-        <Card>
-          {contacts.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No contacts yet.</p>}
-          {contacts.map((c) => {
-            const cDeals = deals.filter((d) => d.contact_id === c.id);
-            return (
-              <Row key={c.id}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: T.mt }}>{c.email || c.phone || "No contact info"}</div>
-                </div>
-                <Pill label={c.type} variant={c.type === "lead" ? "amber" : c.type === "qualified" ? "blue" : "green"} />
-                {cDeals.length > 0 && <Pill label={`${cDeals.length} deal${cDeals.length > 1 ? "s" : ""}`} variant="purple" />}
-                <Button size="sm" variant="secondary" onClick={() => setShowTimeline(c.id)}>Timeline</Button>
-              </Row>
-            );
-          })}
-        </Card>
-      )}
-
-      {/* Deals */}
-      {tab === "deals" && (
-        <Card>
-          {deals.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No deals yet.</p>}
-          {deals.map((deal) => {
-            const contact = contacts.find((c) => c.id === deal.contact_id);
-            const stale = da(deal.updated_at || deal.created_at);
-            return (
-              <Row key={deal.id}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>
-                    {deal.title || contact?.name || "Unnamed Deal"}
-                  </div>
-                  <div style={{ fontSize: 11, color: T.mt }}>
-                    {contact?.name} · {$$(deal.value)} · {stale}d ago
-                  </div>
-                </div>
-                <Pill label={deal.stage} variant={STAGE_COLORS[deal.stage] || "muted"} />
-                <Pill label={`${deal.probability}%`} variant="muted" />
-                {deal.stage !== "closed" && (
-                  <Button size="sm" disabled={saving} onClick={() => advanceDeal(deal)}>Advance →</Button>
-                )}
-              </Row>
-            );
-          })}
-        </Card>
-      )}
-
-      {/* Pipeline view */}
-      {tab === "pipeline" && (
-        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-          {STAGES.map((stage) => {
-            const stageDeals = deals.filter((d) => d.stage === stage);
-            const stageValue = stageDeals.reduce((s, d) => s + (d.value || 0), 0);
-            return (
-              <div key={stage} style={{ minWidth: 200, background: T.wh, border: `1px solid ${T.bd}`, borderRadius: 12, padding: "14px 16px" }}>
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: T.dm, textTransform: "uppercase" }}>{stage}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{$$(stageValue)}</div>
-                </div>
-                {stageDeals.map((d) => {
-                  const c = contacts.find((x) => x.id === d.contact_id);
-                  return (
-                    <div key={d.id} style={{ background: T.bg, borderRadius: 8, padding: "8px 10px", marginBottom: 6 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{c?.name || "Unknown"}</div>
-                      <div style={{ fontSize: 11, color: T.mt }}>{$$(d.value)} · {d.probability}%</div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+  return (
+    <div className={styles.page}>
+      {error && (
+        <div className={styles.errorBanner}>
+          <span>{error}</span>
+          <button className={styles.errorClose} onClick={() => setError(null)}>✕</button>
         </div>
       )}
+
+      <div className={styles.statsGrid}>
+        <Stat label="Contacts" value={contacts.length} color="brand" />
+        <Stat label="Leads" value={contacts.filter((c) => c.type === "lead").length} color="warning" />
+        <Stat label="Pipeline" value={$$(pipelineValue)} color="brand" />
+        <Stat label="Closed" value={$$(closedValue)} color="success" />
+      </div>
+
+      <Tabs
+        tabs={[
+          { id: "contacts", label: "Contacts", badge: contacts.length },
+          { id: "deals", label: "Deals", badge: deals.length },
+          { id: "pipeline", label: "Pipeline" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      >
+        {tab === "contacts" && (
+          <>
+            <div className={styles.tabRow}>
+              <div className={styles.spacer} />
+              <Button size="sm" onClick={() => setShowContactForm(true)}>+ Add Contact</Button>
+            </div>
+            <Table
+              columns={contactColumns}
+              data={contacts}
+              loading={loading}
+              emptyIcon="👤"
+              emptyTitle="No contacts yet"
+              emptyDescription="Add your first contact."
+              emptyAction={<Button size="sm" onClick={() => setShowContactForm(true)}>+ Add Contact</Button>}
+            />
+          </>
+        )}
+
+        {tab === "deals" && (
+          <>
+            <div className={styles.tabRow}>
+              <div className={styles.spacer} />
+              <Button size="sm" onClick={() => setShowDealForm(true)}>+ Add Deal</Button>
+            </div>
+            <Table
+              columns={dealColumns}
+              data={deals}
+              loading={loading}
+              emptyIcon="💼"
+              emptyTitle="No deals yet"
+              emptyDescription="Add your first deal."
+              emptyAction={<Button size="sm" onClick={() => setShowDealForm(true)}>+ Add Deal</Button>}
+            />
+          </>
+        )}
+
+        {tab === "pipeline" && (
+          <div className={styles.pipelineBoard}>
+            {STAGES.map((stage) => {
+              const stageDeals = deals.filter((d) => d.stage === stage);
+              const stageValue = stageDeals.reduce((s, d) => s + (d.value || 0), 0);
+              return (
+                <div key={stage} className={styles.pipelineCol}>
+                  <div className={styles.pipelineColHeader}>
+                    <div className={styles.pipelineColLabel}>{stage}</div>
+                    <div className={styles.pipelineColValue}>{$$(stageValue)}</div>
+                  </div>
+                  {stageDeals.map((d) => {
+                    const c = contacts.find((x) => x.id === d.contact_id);
+                    return (
+                      <div key={d.id} className={styles.pipelineCard}>
+                        <div className={styles.pipelineCardName}>{c?.name || "Unknown"}</div>
+                        <div className={styles.pipelineCardMeta}>{$$(d.value)} · {d.probability}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Tabs>
 
       {/* Contact Timeline Dialog */}
       {showTimeline && (
@@ -243,13 +256,13 @@ export default function SalesView() {
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             return (
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, marginBottom: 12 }}>{c?.name}</div>
-                {contactDeals.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No deal history yet.</p>}
+                <div className={styles.timelineContactName}>{c?.name}</div>
+                {contactDeals.length === 0 && <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No deal history yet.</p>}
                 {contactDeals.map((d) => (
-                  <div key={d.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.bd}` }}>
-                    <div style={{ fontSize: 12, color: T.mt }}>{new Date(d.created_at).toLocaleDateString()}</div>
-                    <div style={{ fontSize: 13, color: T.tx }}>{d.title || "Untitled Deal"} — {$$(d.value)}</div>
-                    <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                  <div key={d.id} className={styles.timelineEntry}>
+                    <div className={styles.timelineDate}>{new Date(d.created_at).toLocaleDateString()}</div>
+                    <div className={styles.timelineTitle}>{d.title || "Untitled Deal"} — {$$(d.value)}</div>
+                    <div className={styles.timelinePills}>
                       <Pill label={d.stage} variant={STAGE_COLORS[d.stage] || "muted"} />
                       <Pill label={`${d.probability}%`} variant="muted" />
                     </div>
