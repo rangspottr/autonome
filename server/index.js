@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 
 import authRoutes from './routes/auth.js';
@@ -21,7 +22,25 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
 
-// Raw body for Stripe webhooks
+// Rate limiting for auth routes (strict)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' },
+});
+
+// General rate limiter for authenticated API routes
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' },
+});
+
+// Raw body for Stripe webhooks (must be before express.json())
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 
 // JSON body for everything else
@@ -33,17 +52,17 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/workspaces', workspaceRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/contacts', contactRoutes);
-app.use('/api/deals', dealRoutes);
-app.use('/api/invoices', invoiceRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/workflows', workflowRoutes);
-app.use('/api/audit-log', auditLogRoutes);
-app.use('/api/communications', communicationRoutes);
-app.use('/api/agent-runs', agentRunRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/workspaces', apiLimiter, workspaceRoutes);
+app.use('/api/billing', apiLimiter, billingRoutes);
+app.use('/api/contacts', apiLimiter, contactRoutes);
+app.use('/api/deals', apiLimiter, dealRoutes);
+app.use('/api/invoices', apiLimiter, invoiceRoutes);
+app.use('/api/tasks', apiLimiter, taskRoutes);
+app.use('/api/workflows', apiLimiter, workflowRoutes);
+app.use('/api/audit-log', apiLimiter, auditLogRoutes);
+app.use('/api/communications', apiLimiter, communicationRoutes);
+app.use('/api/agent-runs', apiLimiter, agentRunRoutes);
 
 // Centralized error handler
 app.use((err, req, res, next) => {
