@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { T } from "../lib/theme.js";
-import { uid, iso, $$, sd, da } from "../lib/utils.js";
+import { $$, sd, da } from "../lib/utils.js";
+import { api } from "../lib/api.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
@@ -12,72 +13,122 @@ import Row from "../components/Row.jsx";
 const STAGES = ["prospect", "qualified", "proposal", "negotiation", "closed"];
 const STAGE_COLORS = { prospect: "muted", qualified: "blue", proposal: "purple", negotiation: "amber", closed: "green" };
 
-export default function SalesView({ db, onUpdate }) {
+export default function SalesView() {
   const [tab, setTab] = useState("contacts");
   const [showContactForm, setShowContactForm] = useState(false);
   const [showDealForm, setShowDealForm] = useState(false);
   const [showTimeline, setShowTimeline] = useState(null);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", type: "lead", company: "" });
-  const [dealForm, setDealForm] = useState({ cid: "", title: "", val: "", stage: "prospect", prob: "20", notes: "" });
+  const [dealForm, setDealForm] = useState({ contact_id: "", title: "", value: "", stage: "prospect", probability: "20" });
 
-  const contacts = db.contacts || [];
-  const deals = db.deals || [];
+  const [contacts, setContacts] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const [contactsData, dealsData] = await Promise.all([
+        api.get("/contacts"),
+        api.get("/deals"),
+      ]);
+      setContacts(contactsData);
+      setDeals(dealsData);
+    } catch (err) {
+      setError(err.message || "Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const setC = (k) => (v) => setContactForm((f) => ({ ...f, [k]: v }));
   const setD = (k) => (v) => setDealForm((f) => ({ ...f, [k]: v }));
 
-  function saveContact() {
-    const updated = JSON.parse(JSON.stringify(db));
-    const contact = { id: uid(), ...contactForm, createdAt: iso(), tags: [] };
-    updated.contacts = [...(updated.contacts || []), contact];
-    onUpdate(updated);
-    setShowContactForm(false);
-    setContactForm({ name: "", email: "", phone: "", type: "lead", company: "" });
-  }
-
-  function saveDeal() {
-    const updated = JSON.parse(JSON.stringify(db));
-    const deal = {
-      id: uid(),
-      cid: dealForm.cid,
-      title: dealForm.title,
-      val: Number(dealForm.val) || 0,
-      stage: dealForm.stage,
-      prob: Number(dealForm.prob) || 20,
-      notes: dealForm.notes,
-      at: iso(),
-      createdAt: iso(),
-    };
-    updated.deals = [...(updated.deals || []), deal];
-    onUpdate(updated);
-    setShowDealForm(false);
-    setDealForm({ cid: "", title: "", val: "", stage: "prospect", prob: "20", notes: "" });
-  }
-
-  function advanceDeal(deal) {
-    const updated = JSON.parse(JSON.stringify(db));
-    const d = updated.deals.find((x) => x.id === deal.id);
-    if (!d) return;
-    const idx = STAGES.indexOf(d.stage);
-    if (idx < STAGES.length - 1) {
-      d.stage = STAGES[idx + 1];
-      d.at = iso();
-      if (d.stage === "closed") {
-        updated.outcomes.dealsClosed = (updated.outcomes.dealsClosed || 0) + 1;
-        updated.outcomes.collected = (updated.outcomes.collected || 0) + (d.val || 0);
-      }
+  async function saveContact() {
+    try {
+      setSaving(true);
+      await api.post("/contacts", {
+        name: contactForm.name,
+        email: contactForm.email,
+        phone: contactForm.phone,
+        company: contactForm.company,
+        type: contactForm.type,
+        source: "",
+        tags: [],
+        metadata: {},
+      });
+      await fetchData();
+      setShowContactForm(false);
+      setContactForm({ name: "", email: "", phone: "", type: "lead", company: "" });
+    } catch (err) {
+      setError(err.message || "Failed to save contact");
+    } finally {
+      setSaving(false);
     }
-    onUpdate(updated);
   }
 
-  const pipelineValue = deals.filter((d) => d.stage !== "closed").reduce((s, d) => s + (d.val || 0), 0);
-  const closedValue = deals.filter((d) => d.stage === "closed").reduce((s, d) => s + (d.val || 0), 0);
+  async function saveDeal() {
+    try {
+      setSaving(true);
+      await api.post("/deals", {
+        contact_id: dealForm.contact_id,
+        title: dealForm.title,
+        value: Number(dealForm.value) || 0,
+        stage: dealForm.stage,
+        probability: Number(dealForm.probability) || 20,
+        metadata: {},
+      });
+      await fetchData();
+      setShowDealForm(false);
+      setDealForm({ contact_id: "", title: "", value: "", stage: "prospect", probability: "20" });
+    } catch (err) {
+      setError(err.message || "Failed to save deal");
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  const getContactMemory = (cid) =>
-    (db.memory || []).filter((m) => m.contactId === cid).sort((a, b) => new Date(b.at) - new Date(a.at));
+  async function advanceDeal(deal) {
+    const idx = STAGES.indexOf(deal.stage);
+    if (idx >= STAGES.length - 1) return;
+    try {
+      setSaving(true);
+      await api.patch(`/deals/${deal.id}`, { stage: STAGES[idx + 1] });
+      await fetchData();
+    } catch (err) {
+      setError(err.message || "Failed to advance deal");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: T.mt, fontSize: 14 }}>
+        Loading sales data…
+      </div>
+    );
+  }
+
+  const pipelineValue = deals.filter((d) => d.stage !== "closed").reduce((s, d) => s + (d.value || 0), 0);
+  const closedValue = deals.filter((d) => d.stage === "closed").reduce((s, d) => s + (d.value || 0), 0);
 
   return (
     <div>
+      {/* Error banner */}
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "#dc2626", flex: 1 }}>{error}</span>
+          <button onClick={() => setError(null)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>✕</button>
+        </div>
+      )}
+
       {/* Metrics */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {[
@@ -101,7 +152,7 @@ export default function SalesView({ db, onUpdate }) {
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <Button size="sm" onClick={() => (tab === "contacts" ? setShowContactForm(true) : setShowDealForm(true))}>
+        <Button size="sm" disabled={saving} onClick={() => (tab === "contacts" ? setShowContactForm(true) : setShowDealForm(true))}>
           + Add {tab === "contacts" ? "Contact" : "Deal"}
         </Button>
       </div>
@@ -111,7 +162,7 @@ export default function SalesView({ db, onUpdate }) {
         <Card>
           {contacts.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No contacts yet.</p>}
           {contacts.map((c) => {
-            const cDeals = deals.filter((d) => d.cid === c.id);
+            const cDeals = deals.filter((d) => d.contact_id === c.id);
             return (
               <Row key={c.id}>
                 <div style={{ flex: 1 }}>
@@ -132,8 +183,8 @@ export default function SalesView({ db, onUpdate }) {
         <Card>
           {deals.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No deals yet.</p>}
           {deals.map((deal) => {
-            const contact = contacts.find((c) => c.id === deal.cid);
-            const stale = da(deal.at);
+            const contact = contacts.find((c) => c.id === deal.contact_id);
+            const stale = da(deal.updated_at || deal.created_at);
             return (
               <Row key={deal.id}>
                 <div style={{ flex: 1 }}>
@@ -141,13 +192,13 @@ export default function SalesView({ db, onUpdate }) {
                     {deal.title || contact?.name || "Unnamed Deal"}
                   </div>
                   <div style={{ fontSize: 11, color: T.mt }}>
-                    {contact?.name} · {$$(deal.val)} · {stale}d ago
+                    {contact?.name} · {$$(deal.value)} · {stale}d ago
                   </div>
                 </div>
                 <Pill label={deal.stage} variant={STAGE_COLORS[deal.stage] || "muted"} />
-                <Pill label={`${deal.prob}%`} variant="muted" />
+                <Pill label={`${deal.probability}%`} variant="muted" />
                 {deal.stage !== "closed" && (
-                  <Button size="sm" onClick={() => advanceDeal(deal)}>Advance →</Button>
+                  <Button size="sm" disabled={saving} onClick={() => advanceDeal(deal)}>Advance →</Button>
                 )}
               </Row>
             );
@@ -160,7 +211,7 @@ export default function SalesView({ db, onUpdate }) {
         <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
           {STAGES.map((stage) => {
             const stageDeals = deals.filter((d) => d.stage === stage);
-            const stageValue = stageDeals.reduce((s, d) => s + (d.val || 0), 0);
+            const stageValue = stageDeals.reduce((s, d) => s + (d.value || 0), 0);
             return (
               <div key={stage} style={{ minWidth: 200, background: T.wh, border: `1px solid ${T.bd}`, borderRadius: 12, padding: "14px 16px" }}>
                 <div style={{ marginBottom: 10 }}>
@@ -168,11 +219,11 @@ export default function SalesView({ db, onUpdate }) {
                   <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{$$(stageValue)}</div>
                 </div>
                 {stageDeals.map((d) => {
-                  const c = contacts.find((x) => x.id === d.cid);
+                  const c = contacts.find((x) => x.id === d.contact_id);
                   return (
                     <div key={d.id} style={{ background: T.bg, borderRadius: 8, padding: "8px 10px", marginBottom: 6 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{c?.name || "Unknown"}</div>
-                      <div style={{ fontSize: 11, color: T.mt }}>{$$(d.val)} · {d.prob}%</div>
+                      <div style={{ fontSize: 11, color: T.mt }}>{$$(d.value)} · {d.probability}%</div>
                     </div>
                   );
                 })}
@@ -187,20 +238,21 @@ export default function SalesView({ db, onUpdate }) {
         <Dialog title="Contact Timeline" onClose={() => setShowTimeline(null)}>
           {(() => {
             const c = contacts.find((x) => x.id === showTimeline);
-            const memory = getContactMemory(showTimeline);
+            const contactDeals = deals
+              .filter((d) => d.contact_id === showTimeline)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             return (
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, marginBottom: 12 }}>{c?.name}</div>
-                {memory.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No activity yet.</p>}
-                {memory.map((m) => (
-                  <div key={m.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.bd}` }}>
-                    <div style={{ fontSize: 12, color: T.mt }}>{new Date(m.at).toLocaleDateString()}</div>
-                    <div style={{ fontSize: 13, color: T.tx }}>{m.text}</div>
-                    {m.tags?.length > 0 && (
-                      <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                        {m.tags.map((tag) => <Pill key={tag} label={tag} variant="muted" />)}
-                      </div>
-                    )}
+                {contactDeals.length === 0 && <p style={{ color: T.mt, fontSize: 13 }}>No deal history yet.</p>}
+                {contactDeals.map((d) => (
+                  <div key={d.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.bd}` }}>
+                    <div style={{ fontSize: 12, color: T.mt }}>{new Date(d.created_at).toLocaleDateString()}</div>
+                    <div style={{ fontSize: 13, color: T.tx }}>{d.title || "Untitled Deal"} — {$$(d.value)}</div>
+                    <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                      <Pill label={d.stage} variant={STAGE_COLORS[d.stage] || "muted"} />
+                      <Pill label={`${d.probability}%`} variant="muted" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -223,11 +275,11 @@ export default function SalesView({ db, onUpdate }) {
       {/* Add Deal Dialog */}
       {showDealForm && (
         <Dialog title="Add Deal" onClose={() => setShowDealForm(false)} onConfirm={saveDeal} confirmLabel="Save Deal">
-          <Select label="Contact" value={dealForm.cid} onChange={setD("cid")} options={[{ value: "", label: "Select contact..." }, ...contacts.map((c) => ({ value: c.id, label: c.name }))]} />
+          <Select label="Contact" value={dealForm.contact_id} onChange={setD("contact_id")} options={[{ value: "", label: "Select contact..." }, ...contacts.map((c) => ({ value: c.id, label: c.name }))]} />
           <Input label="Deal Title" value={dealForm.title} onChange={setD("title")} placeholder="Website Redesign" />
-          <Input label="Value ($)" type="number" value={dealForm.val} onChange={setD("val")} placeholder="5000" />
+          <Input label="Value ($)" type="number" value={dealForm.value} onChange={setD("value")} placeholder="5000" />
           <Select label="Stage" value={dealForm.stage} onChange={setD("stage")} options={STAGES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))} />
-          <Input label="Win Probability (%)" type="number" value={dealForm.prob} onChange={setD("prob")} placeholder="50" />
+          <Input label="Win Probability (%)" type="number" value={dealForm.probability} onChange={setD("probability")} placeholder="50" />
         </Dialog>
       )}
     </div>

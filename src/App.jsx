@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { T } from "./lib/theme.js";
-import { dbLoad, dbSave, getStorageWarning } from "./lib/storage.js";
-import { calcHealth } from "./lib/engine/health.js";
+import { api } from "./lib/api.js";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 
-import { executiveDecisions } from "./lib/engine/decisions.js";
 import Setup from "./views/Setup.jsx";
 import CmdCenter from "./views/CmdCenter.jsx";
 import AgentView from "./views/AgentView.jsx";
@@ -82,25 +80,52 @@ function RequireSubscription({ children }) {
 
 function MainApp() {
   const { user, workspace, logout } = useAuth();
-  const [db, setDb] = useState(null);
   const [view, setView] = useState("cmd");
-  const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [setupNeeded, setSetupNeeded] = useState(false);
+  const [healthScore, setHealthScore] = useState(50);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
 
   useEffect(() => {
-    dbLoad().then((data) => {
-      setDb(data);
-      setLoading(false);
-    });
+    async function init() {
+      try {
+        const [healthData, agentStatus] = await Promise.all([
+          api.get('/metrics/health').catch(() => ({ score: 50 })),
+          api.get('/agent/status').catch(() => ({ pendingDecisions: 0 })),
+        ]);
+        setHealthScore(healthData.score || 50);
+        setPendingApprovals(agentStatus.pendingDecisions || 0);
+
+        const wsSettings = workspace?.settings || {};
+        if (!wsSettings.setupCompleted) {
+          setSetupNeeded(true);
+        }
+      } catch {
+        // fallback
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, [workspace]);
+
+  const handleSetupComplete = useCallback(() => {
+    setSetupNeeded(false);
   }, []);
 
-  const handleUpdate = useCallback(
-    async (newDb) => {
-      setDb(newDb);
-      await dbSave(newDb);
-    },
-    []
-  );
+  const refreshMetrics = useCallback(async () => {
+    try {
+      const [healthData, agentStatus] = await Promise.all([
+        api.get('/metrics/health').catch(() => ({ score: 50 })),
+        api.get('/agent/status').catch(() => ({ pendingDecisions: 0 })),
+      ]);
+      setHealthScore(healthData.score || 50);
+      setPendingApprovals(agentStatus.pendingDecisions || 0);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -113,33 +138,30 @@ function MainApp() {
     );
   }
 
-  if (!db.cfg.ok) {
+  if (setupNeeded) {
     return (
       <>
         <style>{GLOBAL_STYLES}</style>
         <ErrorBoundary>
-          <Setup db={db} onSave={handleUpdate} />
+          <Setup onComplete={handleSetupComplete} />
         </ErrorBoundary>
       </>
     );
   }
 
-  const health = calcHealth(db);
-  const pendingApprovals = db ? (executiveDecisions(db) || []).filter((d) => d.needsApproval && !d.auto).length : 0;
-
   const VIEWS = {
-    cmd: <CmdCenter db={db} onUpdate={handleUpdate} />,
-    agents: <AgentView db={db} onUpdate={handleUpdate} />,
-    approvals: <ApprovalView db={db} onUpdate={handleUpdate} />,
-    finance: <FinanceView db={db} onUpdate={handleUpdate} />,
-    sales: <SalesView db={db} onUpdate={handleUpdate} />,
-    ops: <OpsView db={db} onUpdate={handleUpdate} />,
-    inventory: <InventoryView db={db} onUpdate={handleUpdate} />,
-    roi: <ROIView db={db} />,
-    process: <ProcessView db={db} onUpdate={handleUpdate} />,
-    knowledge: <KnowledgeView db={db} onUpdate={handleUpdate} />,
-    audit: <AuditView db={db} />,
-    settings: <SettingsView db={db} onUpdate={handleUpdate} />,
+    cmd: <CmdCenter onRefreshMetrics={refreshMetrics} />,
+    agents: <AgentView onRefreshMetrics={refreshMetrics} />,
+    approvals: <ApprovalView onRefreshMetrics={refreshMetrics} />,
+    finance: <FinanceView />,
+    sales: <SalesView />,
+    ops: <OpsView />,
+    inventory: <InventoryView />,
+    roi: <ROIView />,
+    process: <ProcessView />,
+    knowledge: <KnowledgeView />,
+    audit: <AuditView />,
+    settings: <SettingsView />,
   };
 
   return (
@@ -154,7 +176,7 @@ function MainApp() {
             {sidebarOpen && (
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>Autonome</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{workspace?.name || db.cfg.name || "v12"}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{workspace?.name || "v12"}</div>
               </div>
             )}
           </div>
@@ -181,9 +203,9 @@ function MainApp() {
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>HEALTH SCORE</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 2 }}>
-                  <div style={{ width: `${health}%`, height: "100%", background: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd, borderRadius: 2 }} />
+                  <div style={{ width: `${healthScore}%`, height: "100%", background: healthScore >= 70 ? T.gn : healthScore >= 40 ? T.am : T.rd, borderRadius: 2 }} />
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: health >= 70 ? T.gn : health >= 40 ? T.am : T.rd }}>{health}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: healthScore >= 70 ? T.gn : healthScore >= 40 ? T.am : T.rd }}>{healthScore}</span>
               </div>
             </div>
           )}
@@ -200,18 +222,13 @@ function MainApp() {
           <div style={{ padding: "16px 24px", borderBottom: `1px solid ${T.bd}`, background: T.wh, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.tx }}>{NAV_ITEMS.find((n) => n.id === view)?.label || "Autonome"}</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ fontSize: 12, color: T.mt }}>{workspace?.name || db.cfg.name} · {db.cfg.type}</div>
+              <div style={{ fontSize: 12, color: T.mt }}>{workspace?.name}{workspace?.industry ? ` · ${workspace.industry}` : ''}</div>
               {user && <button onClick={logout} style={{ fontSize: 12, color: T.mt, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sign out</button>}
             </div>
           </div>
 
           {/* View content */}
           <div style={{ padding: "24px" }}>
-            {getStorageWarning() && (
-              <div style={{ background: "#FFF3CD", border: "1px solid #FFC107", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#856404", marginBottom: 16 }}>
-                WARNING: {getStorageWarning()}
-              </div>
-            )}
             <ErrorBoundary key={view}>
               {VIEWS[view] || <div style={{ color: T.mt }}>View not found.</div>}
             </ErrorBoundary>
