@@ -1,37 +1,90 @@
+import { useState, useEffect, useCallback } from "react";
 import { T } from "../lib/theme.js";
-import { $$, iso } from "../lib/utils.js";
-import { executiveDecisions } from "../lib/engine/decisions.js";
-import { executeAction } from "../lib/engine/execution.js";
+import { $$ } from "../lib/utils.js";
+import { api } from "../lib/api.js";
 import AgentMeta from "../components/AgentMeta.js";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 
-export default function ApprovalView({ db, onUpdate }) {
-  const decisions = executiveDecisions(db);
-  const pendingApprovals = decisions.filter((d) => d.needsApproval);
+export default function ApprovalView({ onRefreshMetrics }) {
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [processingIds, setProcessingIds] = useState(new Set());
+
+  const fetchDecisions = useCallback(async () => {
+    try {
+      setError(null);
+      const data = await api.get("/agent/decisions");
+      const pending = (data.pendingDecisions || []).filter((d) => d.needsApproval);
+      setPendingApprovals(pending);
+    } catch (err) {
+      setError(err.message || "Failed to load decisions");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDecisions();
+  }, [fetchDecisions]);
 
   async function approve(decision) {
-    const updated = await executeAction(db, { ...decision, auto: false }, { approvedBy: "operator" });
-    onUpdate(updated);
+    setProcessingIds((prev) => new Set(prev).add(decision.id));
+    try {
+      await api.post("/agent/approve/" + decision.id, {
+        agent: decision.agent,
+        action: decision.action,
+        target: decision.target,
+        targetName: decision.targetName,
+        contactId: decision.contactId,
+        desc: decision.desc,
+        impact: decision.impact,
+      });
+      await fetchDecisions();
+      onRefreshMetrics?.();
+    } catch (err) {
+      setError(err.message || "Failed to approve");
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(decision.id);
+        return next;
+      });
+    }
   }
 
-  function reject(decision) {
-    const updated = JSON.parse(JSON.stringify(db));
-    updated.audit = [
-      ...(updated.audit || []),
-      {
-        id: Date.now().toString(36),
-        at: iso(),
+  async function reject(decision) {
+    setProcessingIds((prev) => new Set(prev).add(decision.id));
+    try {
+      await api.post("/agent/reject/" + decision.id, {
         agent: decision.agent,
-        action: "rejected",
+        action: decision.action,
         target: decision.target,
-        desc: `Rejected: ${decision.desc}`,
-        auto: false,
-        approvedBy: null,
-      },
-    ];
-    onUpdate(updated);
+        targetName: decision.targetName,
+      });
+      await fetchDecisions();
+      onRefreshMetrics?.();
+    } catch (err) {
+      setError(err.message || "Failed to reject");
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(decision.id);
+        return next;
+      });
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <div style={{ textAlign: "center", padding: 32, color: T.dm, fontSize: 14 }}>
+          Loading approvals…
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -45,7 +98,15 @@ export default function ApprovalView({ db, onUpdate }) {
         </div>
       </div>
 
-      {pendingApprovals.length === 0 ? (
+      {error && (
+        <Card>
+          <div style={{ textAlign: "center", padding: 16, color: T.rd, fontSize: 14, fontWeight: 600 }}>
+            {error}
+          </div>
+        </Card>
+      )}
+
+      {pendingApprovals.length === 0 && !error ? (
         <Card>
           <div style={{ textAlign: "center", padding: 32 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.gn, marginBottom: 8 }}>[OK]</div>
@@ -55,8 +116,9 @@ export default function ApprovalView({ db, onUpdate }) {
       ) : (
         pendingApprovals.map((decision) => {
           const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: T.dm, bg: T.bg };
+          const isProcessing = processingIds.has(decision.id);
           return (
-            <Card key={`${decision.agent}-${decision.action}-${decision.target}`}>
+            <Card key={decision.id}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                 <div
                   style={{
@@ -88,11 +150,11 @@ export default function ApprovalView({ db, onUpdate }) {
                     <Pill label={`Priority: ${decision.priority}`} variant="amber" />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <Button onClick={() => approve(decision)} size="sm">
-                      Approve
+                    <Button onClick={() => approve(decision)} size="sm" disabled={isProcessing}>
+                      {isProcessing ? "Processing…" : "Approve"}
                     </Button>
-                    <Button variant="secondary" onClick={() => reject(decision)} size="sm">
-                      Reject
+                    <Button variant="secondary" onClick={() => reject(decision)} size="sm" disabled={isProcessing}>
+                      {isProcessing ? "Processing…" : "Reject"}
                     </Button>
                   </div>
                 </div>
