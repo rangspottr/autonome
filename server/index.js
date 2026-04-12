@@ -16,6 +16,11 @@ import workflowRoutes from './routes/workflows.js';
 import auditLogRoutes from './routes/audit-log.js';
 import communicationRoutes from './routes/communications.js';
 import agentRunRoutes from './routes/agent-runs.js';
+import assetRoutes from './routes/assets.js';
+import knowledgeRoutes from './routes/knowledge.js';
+import agentRoutes from './routes/agent.js';
+import metricsRoutes from './routes/metrics.js';
+import { startScheduler } from './engine/cycle.js';
 
 const app = express();
 
@@ -63,6 +68,10 @@ app.use('/api/workflows', apiLimiter, workflowRoutes);
 app.use('/api/audit-log', apiLimiter, auditLogRoutes);
 app.use('/api/communications', apiLimiter, communicationRoutes);
 app.use('/api/agent-runs', apiLimiter, agentRunRoutes);
+app.use('/api/assets', apiLimiter, assetRoutes);
+app.use('/api/knowledge', apiLimiter, knowledgeRoutes);
+app.use('/api/agent', apiLimiter, agentRoutes);
+app.use('/api/metrics', apiLimiter, metricsRoutes);
 
 // Centralized error handler
 app.use((err, req, res, next) => {
@@ -72,4 +81,9 @@ app.use((err, req, res, next) => {
 
 app.listen(config.PORT, () => {
   console.log(`Autonome server running on port ${config.PORT}`);
+  try {
+    startScheduler();
+  } catch (err) {
+    console.error('[Agent Scheduler] Failed to start scheduler:', err);
+  }
 });
