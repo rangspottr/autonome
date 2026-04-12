@@ -4,6 +4,7 @@ import { uid, iso, $$, da } from "../lib/utils.js";
 import { executiveDecisions } from "../lib/engine/decisions.js";
 import { computeBriefing } from "../lib/engine/briefing.js";
 import { executeAction } from "../lib/engine/execution.js";
+import { api } from "../lib/api.js";
 import Button from "../components/Button.jsx";
 import Card from "../components/Card.jsx";
 import Pill from "../components/Pill.jsx";
@@ -117,72 +118,11 @@ export default function CmdCenter({ db, onUpdate }) {
     setAiLoading(true);
     setAiResponse(null);
 
-    // Build business context for the query
-    const overdueInvoices = (db.txns || []).filter(
-      (t) => t.type === "inv" && t.st === "pending" && t.due && new Date(t.due) < new Date()
-    );
-    const totalRevenue = (db.txns || [])
-      .filter((t) => t.type === "inc" && t.st === "paid")
-      .reduce((s, t) => s + (t.amt || 0), 0);
-    const totalExpenses = (db.txns || [])
-      .filter((t) => t.type === "exp")
-      .reduce((s, t) => s + (t.amt || 0), 0);
-    const openDeals = (db.deals || []).filter((d) => d.stage !== "closed");
-    const pipelineValue = openDeals.reduce((s, d) => s + (d.val || 0), 0);
-
-    const context = `Business: ${db.cfg.name} (${db.cfg.type})
-Revenue: $${Math.round(totalRevenue).toLocaleString()} | Expenses: $${Math.round(totalExpenses).toLocaleString()} | Net: $${Math.round(totalRevenue - totalExpenses).toLocaleString()}
-Overdue invoices: ${overdueInvoices.length} totaling $${Math.round(overdueInvoices.reduce((s, t) => s + (t.amt || 0), 0)).toLocaleString()}
-Open pipeline: ${openDeals.length} deals worth $${Math.round(pipelineValue).toLocaleString()}
-Contacts: ${(db.contacts || []).length} | Tasks pending: ${(db.tasks || []).filter((t) => t.st !== "done").length}
-Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")}`;
-
-    const localSummary = `Business Snapshot for ${db.cfg.name}:
-• Revenue collected: $${Math.round(totalRevenue).toLocaleString()}
-• Expenses: $${Math.round(totalExpenses).toLocaleString()}
-• Net cash position: $${Math.round(totalRevenue - totalExpenses).toLocaleString()}
-• Overdue invoices: ${overdueInvoices.length} ($${Math.round(overdueInvoices.reduce((s, t) => s + (t.amt || 0), 0)).toLocaleString()} at risk)
-• Open deals: ${openDeals.length} ($${Math.round(pipelineValue).toLocaleString()} pipeline)
-• Pending tasks: ${(db.tasks || []).filter((t) => t.st !== "done").length}`;
-
-    const llmKey = db.cfg.keys?.llm;
-    if (!llmKey) {
-      setAiResponse(localSummary);
-      setAiLoading(false);
-      return;
-    }
-
     try {
-      // DEV ONLY: Direct browser API call — keys should be proxied through a backend server in production
-      const model = db.cfg.llmModel || "claude-sonnet-4-20250514";
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": llmKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true", // DEV ONLY: remove in production
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 1024,
-          messages: [
-            {
-              role: "user",
-              content: `You are Autonome, an AI business operator assistant. Here is the current business context:\n\n${context}\n\nUser question: ${aiQuery}\n\nProvide a concise, actionable answer.`,
-            },
-          ],
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAiResponse(data.content?.[0]?.text || localSummary);
-      } else {
-        setAiResponse(localSummary);
-      }
-    } catch {
-      setAiResponse(localSummary);
+      const data = await api.post('/ai/query', { message: aiQuery.trim() });
+      setAiResponse(data.response || 'No response received.');
+    } catch (err) {
+      setAiResponse(`Error: ${err.message}`);
     } finally {
       setAiLoading(false);
     }
@@ -361,11 +301,6 @@ Recent audit entries: ${(db.audit || []).slice(-5).map((a) => a.desc).join("; ")
       >
         <div style={{ fontSize: 13, fontWeight: 700, color: T.tx, marginBottom: 10 }}>
           AI Ask Autonome
-          {!db.cfg.keys?.llm && (
-            <span style={{ fontSize: 11, fontWeight: 400, color: T.mt, marginLeft: 8 }}>
-              (Add LLM key in Settings for AI answers)
-            </span>
-          )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <input

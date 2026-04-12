@@ -20,6 +20,9 @@ import assetRoutes from './routes/assets.js';
 import knowledgeRoutes from './routes/knowledge.js';
 import agentRoutes from './routes/agent.js';
 import metricsRoutes from './routes/metrics.js';
+import aiRoutes from './routes/ai.js';
+import webhookRoutes from './routes/webhooks.js';
+import settingsRoutes from './routes/settings.js';
 import { startScheduler } from './engine/cycle.js';
 
 const app = express();
@@ -72,6 +75,9 @@ app.use('/api/assets', apiLimiter, assetRoutes);
 app.use('/api/knowledge', apiLimiter, knowledgeRoutes);
 app.use('/api/agent', apiLimiter, agentRoutes);
 app.use('/api/metrics', apiLimiter, metricsRoutes);
+app.use('/api/ai', apiLimiter, aiRoutes);
+app.use('/api/webhooks', apiLimiter, webhookRoutes);
+app.use('/api/settings', apiLimiter, settingsRoutes);
 
 // Centralized error handler
 app.use((err, req, res, next) => {

@@ -1,4 +1,6 @@
 import { pool } from '../db/index.js';
+import { processEmailQueue } from '../services/email.js';
+import { processSMSQueue } from '../services/sms.js';
 
 const CYCLE_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -50,6 +52,20 @@ export async function runAgentCycle(workspaceId) {
   // Advance workflows
   const wfResult = await advanceWorkflows(workspaceId);
 
+  // Process queued email and SMS communications
+  let emailsSent = 0;
+  let smsSent = 0;
+  try {
+    emailsSent = await processEmailQueue(workspaceId);
+  } catch (emailErr) {
+    console.error(`[Agent Cycle] Email queue error for workspace ${workspaceId}:`, emailErr);
+  }
+  try {
+    smsSent = await processSMSQueue(workspaceId);
+  } catch (smsErr) {
+    console.error(`[Agent Cycle] SMS queue error for workspace ${workspaceId}:`, smsErr);
+  }
+
   // Build pending decisions list with stable IDs
   const pendingDecisions = needsApproval.map((d) => ({
     ...d,
@@ -64,6 +80,8 @@ export async function runAgentCycle(workspaceId) {
     decisionsPending: pendingDecisions.length,
     workflowsAdvanced: wfResult.advanced,
     workflowsCompleted: wfResult.completed,
+    emailsSent,
+    smsSent,
     pendingDecisions,
   };
 
