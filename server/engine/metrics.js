@@ -8,7 +8,8 @@ const HOURS_PER_ACTION = 0.25;
  * communications, audit_log, and agent_runs tables.
  */
 export async function calculateROI(workspaceId) {
-  // Count delivered (sent) communications
+  // Count delivered vs simulated communications across all channels (email + sms).
+  // realSent = successfully delivered via SMTP/Twilio; loggedSent = simulated (no credentials configured).
   const commResult = await pool.query(
     `SELECT
        COUNT(*) FILTER (WHERE status = 'sent') AS sent_count,

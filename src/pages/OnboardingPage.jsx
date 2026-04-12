@@ -27,7 +27,6 @@ export default function OnboardingPage() {
       const updated = await api.post(`/workspaces/${workspace.id}/complete-onboarding`, { company_size: companySize, phone, address });
       setWorkspace(updated);
       // If the subscription is already active (e.g. BYPASS_SUBSCRIPTION), go straight to the dashboard.
-      const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
       navigate(isActive ? '/' : '/checkout');
     } catch (err) {
       setError(err.message || 'Failed to save company details');
@@ -35,6 +34,9 @@ export default function OnboardingPage() {
       setLoading(false);
     }
   }
+
+  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+  const btnLabel = isActive ? 'Go to Dashboard' : 'Continue to Payment';
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
@@ -65,7 +67,7 @@ export default function OnboardingPage() {
             <textarea value={address} onChange={e => setAddress(e.target.value)} rows={3} placeholder="123 Main St, City, State 00000" style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
           <button type="submit" disabled={loading} style={btnStyle(loading)}>
-            {loading ? 'Saving…' : (subscription?.status === 'active' || subscription?.status === 'trialing') ? 'Go to Dashboard' : 'Continue to Payment'}
+            {loading ? 'Saving…' : btnLabel}
           </button>
         </form>
       </div>
