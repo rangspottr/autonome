@@ -177,14 +177,18 @@ Provide concise, actionable answers grounded in this data.`;
       return res.json({ response: summary, source: 'local' });
     }
 
-    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, 'anthropic', entityResult);
+    const totalPromptTokens = data.usage?.input_tokens ?? null;
+    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, 'anthropic', entityResult, totalPromptTokens);
+    if (!hasEntityMatches && totalPromptTokens !== null) {
+      console.log(`[CONTEXT] workspace=${workspaceId} query="${trimmedMessage.slice(0, 60)}" entities=0 tier=aggregate total=${totalPromptTokens}`);
+    }
     res.json({ response: text, source: 'anthropic' });
   } catch (err) {
     next(err);
   }
 });
 
-async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null, source = 'local', entityResult = null) {
+async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null, source = 'local', entityResult = null, totalPromptTokens = null) {
   try {
     const metadata = { source };
     if (entityResult && entityResult.matches.length > 0) {
@@ -192,9 +196,13 @@ async function saveChatMessages(workspaceId, userId, userMessage, assistantMessa
         entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
         entity_context_tier: 'L1',
         entity_tokens: entityResult.tokens_consumed,
+        ...(totalPromptTokens !== null ? { total_prompt_tokens: totalPromptTokens } : {}),
         // matches are sorted by score desc; first entry is always the best match
         match_method: entityResult.matches[0].score >= 1.0 ? 'exact_name' : 'partial_match',
       };
+      const entitySummary = entityResult.matches.map((m) => `${m.type}:${m.name} (score=${m.score.toFixed(2)})`).join(', ');
+      const totalStr = totalPromptTokens !== null ? ` total=${totalPromptTokens}` : '';
+      console.log(`[CONTEXT] workspace=${workspaceId} query="${userMessage.slice(0, 60)}" entities=${entityResult.matches.length} [${entitySummary}] tier=L1 tokens=${entityResult.tokens_consumed}${totalStr}`);
     }
     await pool.query(
       `INSERT INTO chat_messages (workspace_id, user_id, role, content, session_id, metadata)
