@@ -340,7 +340,8 @@ export default function SettingsView() {
   const [error, setError] = useState(null);
 
   // Refs for scroll-to sections
-  const aiSectionRef = useRef(null);
+  const integrationsSectionRef = useRef(null);
+  const emailIntegrationRef = useRef(null);
   const csvSectionRef = useRef(null);
 
   useEffect(() => {
@@ -530,13 +531,13 @@ export default function SettingsView() {
         {
           label: "AI configured",
           done: aiConfigured,
-          action: () => aiSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
+          action: () => integrationsSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
           actionLabel: "Configure",
         },
         {
           label: "Email configured",
           done: emailConfigured,
-          action: () => aiSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
+          action: () => emailIntegrationRef.current?.scrollIntoView({ behavior: "smooth" }),
           actionLabel: "Configure",
         },
         {
@@ -622,7 +623,7 @@ export default function SettingsView() {
       </div>
 
       {/* Integration Setup */}
-      <div className={styles.section} ref={aiSectionRef}>
+      <div className={styles.section} ref={integrationsSectionRef}>
         <h3 className={styles.sectionTitle}>Integration Setup</h3>
         {integrationsLoading ? (
           <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading…</div>
@@ -642,6 +643,7 @@ export default function SettingsView() {
             </IntegrationCard>
 
             {/* Email (SMTP) */}
+            <div ref={emailIntegrationRef}>
             <IntegrationCard
               title="Email (SMTP)"
               statusLabel={integrationStatus("email").label}
@@ -653,6 +655,7 @@ export default function SettingsView() {
               )}
               <EmailForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
             </IntegrationCard>
+            </div>
 
             {/* SMS (Twilio) */}
             <IntegrationCard

@@ -86,17 +86,16 @@ export async function resolveCredentials(workspaceId) {
     fetchDbCredentials(workspaceId, 'stripe'),
   ]);
 
-  // AI credentials: anthropic takes priority, then openai, then env
+  // AI credentials: anthropic DB takes priority, then env var, then openai DB (future use).
+  // OpenAI DB credentials are stored separately and available via OPENAI_API_KEY for future routing.
   let ANTHROPIC_API_KEY = config.ANTHROPIC_API_KEY;
   let AI_MODEL = config.AI_MODEL;
   if (anthropic?.credentials?.api_key) {
     ANTHROPIC_API_KEY = anthropic.credentials.api_key;
     if (anthropic.credentials.model) AI_MODEL = anthropic.credentials.model;
-  } else if (openai?.credentials?.api_key) {
-    // OpenAI stored but not anthropic — still return as ANTHROPIC-like field for now
-    // (future: route to OpenAI endpoint)
-    ANTHROPIC_API_KEY = null;
   }
+  // OpenAI DB credentials — available for callers that support OpenAI routing
+  const OPENAI_API_KEY = openai?.credentials?.api_key || null;
 
   // SMTP credentials
   const SMTP_HOST = smtp?.credentials?.host || config.SMTP_HOST;
@@ -116,6 +115,7 @@ export async function resolveCredentials(workspaceId) {
 
   return {
     ANTHROPIC_API_KEY,
+    OPENAI_API_KEY,
     AI_MODEL,
     SMTP_HOST,
     SMTP_PORT,

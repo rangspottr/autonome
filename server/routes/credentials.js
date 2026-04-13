@@ -84,10 +84,15 @@ router.put('/:provider', ...guard, async (req, res, next) => {
       return res.status(400).json({ message: 'credentials object is required' });
     }
 
-    // Encrypt each string credential field
+    // Encrypt each non-empty string credential field; skip empty strings to avoid unencrypted blanks
     const encrypted = {};
     for (const [k, v] of Object.entries(credentials)) {
-      encrypted[k] = typeof v === 'string' && v.length > 0 ? obfuscate(v) : v;
+      if (typeof v === 'string') {
+        if (v.length > 0) encrypted[k] = obfuscate(v);
+        // Skip empty strings — don't store them
+      } else {
+        encrypted[k] = v;
+      }
     }
 
     await pool.query(
