@@ -245,8 +245,8 @@ function scoreEntity(entityType, entity, tokensLower) {
     if (nameL.includes(t) && t.length >= 3) maxScore = Math.max(maxScore, 0.7);
     if (companyL && companyL === t) maxScore = Math.max(maxScore, 0.6);
     if (companyL && companyL.includes(t) && t.length >= 3) maxScore = Math.max(maxScore, 0.5);
-    // Description match (invoices/tasks) already covered by name above
-    if (!nameL.includes(t) && !companyL.includes(t) && nameL.includes(t.slice(0, 4))) {
+    // Fuzzy prefix match: token starts with or contains the candidate (description match, score 0.3)
+    if (maxScore === 0 && t.length >= 4 && (nameL.includes(t.slice(0, Math.ceil(t.length * 0.6))))) {
       maxScore = Math.max(maxScore, 0.3);
     }
   }

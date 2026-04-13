@@ -189,7 +189,8 @@ async function saveChatMessages(workspaceId, userId, userMessage, assistantMessa
         entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
         entity_context_tier: 'L1',
         entity_tokens: entityResult.tokens_consumed,
-        match_method: entityResult.matches[0]?.score >= 1.0 ? 'exact_name' : 'partial_match',
+        // matches are sorted by score desc; first entry is always the best match
+        match_method: entityResult.matches[0].score >= 1.0 ? 'exact_name' : 'partial_match',
       };
     }
     await pool.query(
