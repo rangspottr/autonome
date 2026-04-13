@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/index.js';
 import { config } from '../config.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
-import { buildWorkspaceContext, findEntityContext, buildRichLocalContext } from '../lib/ai-context.js';
+import { buildWorkspaceContext, findEntityContext, buildRichLocalContext, buildEntityL1 } from '../lib/ai-context.js';
 import { executeAction } from '../engine/execution.js';
 import rateLimit from 'express-rate-limit';
 
@@ -86,7 +86,7 @@ async function buildAgentContext(workspaceId, agent) {
 /**
  * Build a specialized system prompt for a single agent.
  */
-function buildAgentSystemPrompt(agent, agentCtx, workspaceCtx) {
+function buildAgentSystemPrompt(agent, agentCtx, workspaceCtx, entityL1 = '') {
   const agentLabels = {
     finance: 'Finance Agent — responsible for invoices, cash flow, collections, and financial health',
     revenue: 'Revenue Agent — responsible for deals, pipeline, sales follow-ups, and lead qualification',
@@ -140,7 +140,7 @@ ${recentEvents}
 
 Operator instructions for you:
 ${instructionItems}
-
+${entityL1 ? `\nEntity context (directly relevant to this query):\n${entityL1}\n` : ''}
 Business context:
 - Contacts: ${workspaceCtx.contacts}
 - Deals: ${workspaceCtx.deals.count} deals, pipeline value $${Math.round(workspaceCtx.deals.totalValue).toLocaleString()}
@@ -385,15 +385,18 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
       buildWorkspaceContext(workspaceId),
     ]);
 
-    let entityContext = '';
+    let entityResult = { matches: [], tokens_consumed: 0 };
     try {
-      const found = await findEntityContext(workspaceId, trimmedMessage);
-      if (found) entityContext = `\n\nEntity context for this query:\n${found}`;
+      entityResult = await findEntityContext(workspaceId, trimmedMessage);
     } catch (entityErr) {
       console.error('[Command] Entity context lookup failed:', entityErr.message);
     }
 
-    const systemPrompt = buildAgentSystemPrompt(agent, agentCtx, workspaceCtx) + entityContext;
+    const entityL1 = entityResult.matches.length > 0
+      ? entityResult.matches.map((m) => m.l1).join('\n\n---\n\n')
+      : '';
+
+    const systemPrompt = buildAgentSystemPrompt(agent, agentCtx, workspaceCtx, entityL1);
 
     // Fetch recent conversation history for this session
     let conversationHistory = [];
@@ -435,7 +438,19 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
     await saveCommandMessages(
       workspaceId, userId, resolvedSessionId, agent,
       trimmedMessage, responseText,
-      { source, hasPendingActions }
+      {
+        source,
+        hasPendingActions,
+        ...(entityResult.matches.length > 0 ? {
+          context_trace: {
+            entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
+            entity_context_tier: 'L1',
+            entity_tokens: entityResult.tokens_consumed,
+            // matches are sorted by score desc; first entry is always the best match
+            match_method: entityResult.matches[0].score >= 1.0 ? 'exact_name' : 'partial_match',
+          },
+        } : {}),
+      }
     );
 
     res.json({
@@ -486,13 +501,16 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
       selectedAgents.map((agent) => buildAgentContext(workspaceId, agent).then((ctx) => ({ agent, ctx })))
     );
 
-    let entityContext = '';
+    // Resolve entity context ONCE — shared by all agents (eliminates silo problem)
+    let entityResult = { matches: [], tokens_consumed: 0 };
     try {
-      const found = await findEntityContext(workspaceId, trimmedMessage);
-      if (found) entityContext = `\n\nEntity context:\n${found}`;
+      entityResult = await findEntityContext(workspaceId, trimmedMessage);
     } catch (entityErr) {
       console.error('[Command] Entity context lookup failed:', entityErr.message);
     }
+    const entityL1 = entityResult.matches.length > 0
+      ? entityResult.matches.map((m) => m.l1).join('\n\n---\n\n')
+      : '';
 
     // Fetch boardroom conversation history
     let conversationHistory = [];
@@ -508,13 +526,13 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
 
     const historyMessages = conversationHistory.map((m) => ({ role: m.role, content: m.content }));
 
-    // Call each agent in parallel
+    // Call each agent in parallel — all agents receive the SAME entity context
     let richCtx = null;
     try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
 
     const agentResponses = await Promise.all(
       agentContexts.map(async ({ agent, ctx }) => {
-        const systemPrompt = buildAgentSystemPrompt(agent, ctx, workspaceCtx) + entityContext;
+        const systemPrompt = buildAgentSystemPrompt(agent, ctx, workspaceCtx, entityL1);
         const messages = [
           ...historyMessages,
           { role: 'user', content: trimmedMessage },
@@ -545,8 +563,9 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
     // Synthesize all agent responses
     let synthesis;
     if (config.ANTHROPIC_API_KEY) {
+      const entityContext = entityL1 ? `\nShared entity context (all agents have this):\n${entityL1}\n` : '';
       const synthesisPrompt = `You are a synthesis engine for ${workspaceCtx.businessName}.
-
+${entityContext}
 The owner asked: "${trimmedMessage}"
 
 Here are responses from each specialized agent:
@@ -674,7 +693,20 @@ Rules:
     await saveCommandMessages(
       workspaceId, userId, resolvedSessionId, 'boardroom',
       trimmedMessage, boardroomContent,
-      { source: 'boardroom', synthesis, agentCount: selectedAgents.length }
+      {
+        source: 'boardroom',
+        synthesis,
+        agentCount: selectedAgents.length,
+        ...(entityResult.matches.length > 0 ? {
+          context_trace: {
+            entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
+            entity_context_tier: 'L1',
+            entity_tokens: entityResult.tokens_consumed,
+            // matches are sorted by score desc; first entry is always the best match
+            match_method: entityResult.matches[0].score >= 1.0 ? 'exact_name' : 'partial_match',
+          },
+        } : {}),
+      }
     );
 
     res.json({
