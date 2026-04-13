@@ -14,11 +14,11 @@ function relativeTime(ts) {
 }
 
 const TYPE_ICONS = {
-  daily_digest: "📊",
-  approval_needed: "⚡",
-  critical_risk: "🚨",
-  boardroom_summary: "🏛️",
-  agent_alert: "🤖",
+  daily_digest: "DG",
+  approval_needed: "!",
+  critical_risk: "CRIT",
+  boardroom_summary: "BR",
+  agent_alert: "AG",
 };
 
 export default function NotificationBell() {
@@ -90,7 +90,7 @@ export default function NotificationBell() {
         aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
         aria-expanded={open}
       >
-        <span className={styles.bellIcon} aria-hidden="true">🔔</span>
+        <span className={styles.bellIcon} aria-hidden="true">●</span>
         {unread > 0 && (
           <span className={styles.badge}>{unread > 99 ? "99+" : unread}</span>
         )}
@@ -125,7 +125,7 @@ export default function NotificationBell() {
                 onKeyDown={(e) => e.key === "Enter" && !n.read && markRead(n.id)}
               >
                 <span className={styles.typeIcon} aria-hidden="true">
-                  {TYPE_ICONS[n.type] || "📌"}
+                  {TYPE_ICONS[n.type] || "●"}
                 </span>
                 <div className={styles.content}>
                   <div className={styles.notifTitle}>{n.title}</div>

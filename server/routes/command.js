@@ -200,7 +200,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
     lines.push(`Finance Agent briefing for ${businessName}:`);
     const overdueAmt = workspaceCtx.invoices.overdueAmount;
     if (overdueAmt > 0) {
-      lines.push(`\n🔴 CASH FLOW PRESSURE: $${Math.round(overdueAmt).toLocaleString()} outstanding in overdue invoices`);
+      lines.push(`\n[CRITICAL] CASH FLOW PRESSURE: $${Math.round(overdueAmt).toLocaleString()} outstanding in overdue invoices`);
       if (richCtx?.overdueInvoices?.length > 0) {
         lines.push('Priority collection targets:');
         richCtx.overdueInvoices.forEach((inv) => {
@@ -226,7 +226,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
   } else if (agent === 'revenue') {
     lines.push(`Revenue Agent briefing for ${businessName}:`);
     const pipelineValue = workspaceCtx.deals.totalValue;
-    lines.push(`\n📊 PIPELINE: ${workspaceCtx.deals.count} deal${workspaceCtx.deals.count !== 1 ? 's' : ''} — $${Math.round(pipelineValue).toLocaleString()} total value`);
+    lines.push(`\nPIPELINE: ${workspaceCtx.deals.count} deal${workspaceCtx.deals.count !== 1 ? 's' : ''} — $${Math.round(pipelineValue).toLocaleString()} total value`);
     if (richCtx?.staleDeals?.length > 0) {
       lines.push('\nStale deals requiring follow-up:');
       richCtx.staleDeals.forEach((deal) => {
@@ -248,7 +248,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
 
   } else if (agent === 'operations') {
     lines.push(`Operations Agent briefing for ${businessName}:`);
-    lines.push(`\n📋 TASKS: ${workspaceCtx.tasks.openCount} open task${workspaceCtx.tasks.openCount !== 1 ? 's' : ''} of ${workspaceCtx.tasks.count} total`);
+    lines.push(`\nTASKS: ${workspaceCtx.tasks.openCount} open task${workspaceCtx.tasks.openCount !== 1 ? 's' : ''} of ${workspaceCtx.tasks.count} total`);
     if (richCtx?.blockedTasks?.length > 0) {
       lines.push('\nOverdue tasks (workflow bottlenecks):');
       richCtx.blockedTasks.forEach((task) => {
@@ -270,7 +270,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
 
   } else if (agent === 'support') {
     lines.push(`Support Agent briefing for ${businessName}:`);
-    lines.push(`\n👥 CUSTOMER BASE: ${workspaceCtx.contacts} contact${workspaceCtx.contacts !== 1 ? 's' : ''} in workspace`);
+    lines.push(`\nCUSTOMER BASE: ${workspaceCtx.contacts} contact${workspaceCtx.contacts !== 1 ? 's' : ''} in workspace`);
     if (agentCtx.actions.length > 0) {
       const recentCustomerActions = agentCtx.actions.slice(0, 3);
       lines.push('\nRecent customer interactions:');
@@ -296,7 +296,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
 
   } else if (agent === 'growth') {
     lines.push(`Growth Agent briefing for ${businessName}:`);
-    lines.push(`\n🚀 GROWTH SIGNALS: ${workspaceCtx.contacts} total contacts, ${workspaceCtx.deals.count} deal${workspaceCtx.deals.count !== 1 ? 's' : ''} in pipeline`);
+    lines.push(`\nGROWTH SIGNALS: ${workspaceCtx.contacts} total contacts, ${workspaceCtx.deals.count} deal${workspaceCtx.deals.count !== 1 ? 's' : ''} in pipeline`);
     if (agentCtx.memory.length > 0) {
       const opportunities = agentCtx.memory.filter((m) => m.memory_type === 'observation' || m.memory_type === 'entity_note');
       if (opportunities.length > 0) {
@@ -324,7 +324,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
     }
   }
 
-  lines.push('\n⚠️ Connect your AI provider in Settings to unlock full specialist intelligence.');
+  lines.push('\n[WARNING] Connect your AI provider in Settings to unlock full specialist intelligence.');
   return lines.join('\n');
 }
 
@@ -664,7 +664,7 @@ Rules:
           return matches.map((m) => ({
             action: m.replace('[ACTION]', '').trim() || `Follow up on ${r.agent} agent recommendations`,
             agent: r.agent,
-            priority: r.response.includes('🔴') ? 'high' : r.response.includes('🟡') ? 'medium' : 'low',
+            priority: r.response.includes('[CRITICAL]') ? 'high' : r.response.includes('[MEDIUM]') ? 'medium' : 'low',
           }));
         });
 
@@ -687,7 +687,7 @@ Rules:
 
       // Build recommendation from highest-priority signals
       const hasBlocking = agentResponses.some((r) => r.response.includes('[BLOCKER]'));
-      const hasCashPressure = agentResponses.some((r) => r.response.includes('🔴'));
+      const hasCashPressure = agentResponses.some((r) => r.response.includes('[CRITICAL]'));
       let recommendation = '';
       if (hasCashPressure) recommendation += 'Immediate attention required on cash flow and overdue accounts. ';
       if (hasBlocking) recommendation += 'Active blockers need resolution before work can advance. ';

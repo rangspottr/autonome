@@ -70,13 +70,13 @@ async function seed() {
 
     await client.query('COMMIT');
 
-    console.log('✅ Dev seed complete.');
+    console.log('Dev seed complete.');
     console.log('   Email:    ', DEV_EMAIL);
     console.log('   Password: ', DEV_PASSWORD);
     process.exit(0);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('❌ Seed failed:', err.message);
+    console.error('Seed failed:', err.message);
     process.exit(1);
   } finally {
     client.release();

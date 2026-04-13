@@ -410,7 +410,7 @@ export default function Setup({ onComplete }) {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.logo}>
-          <div className={styles.logoTitle}>⚡ Autonome</div>
+          <div className={styles.logoTitle}>Autonome</div>
           <div className={styles.logoSub}>Your AI Business Operator</div>
         </div>
 

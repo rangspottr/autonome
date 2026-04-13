@@ -57,7 +57,7 @@ export default function SupportView() {
         <div className={styles.error}>Could not load contacts: {error}</div>
       ) : contacts.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>🤝</div>
+          <div className={styles.emptyIcon}>○</div>
           <div className={styles.emptyTitle}>No customers yet</div>
           <div className={styles.emptyDesc}>
             Customer contacts will appear here once your Support agent starts tracking interactions.

@@ -421,7 +421,7 @@ export default function ConnectionsView() {
             connected={false}
           >
             <div className={styles.comingSoon}>
-              <div className={styles.comingSoonIcon}>📅</div>
+              <div className={styles.comingSoonIcon}>—</div>
               <div className={styles.comingSoonText}>Calendar integrations are coming soon.</div>
               <div className={styles.comingSoonDesc}>Google Calendar, Calendly, and Outlook will be supported.</div>
             </div>

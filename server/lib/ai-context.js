@@ -122,7 +122,7 @@ export function buildLocalSummary(ctx, richCtx = null) {
 
   // Priority 1: Cash flow pressure
   if (ctx.invoices.overdueAmount > 0) {
-    lines.push(`\n🔴 CASH FLOW ALERT: $${Math.round(ctx.invoices.overdueAmount).toLocaleString()} overdue across ${ctx.invoices.count} invoice${ctx.invoices.count !== 1 ? 's' : ''}`);
+    lines.push(`\n[CRITICAL] CASH FLOW ALERT: $${Math.round(ctx.invoices.overdueAmount).toLocaleString()} overdue across ${ctx.invoices.count} invoice${ctx.invoices.count !== 1 ? 's' : ''}`);
     if (richCtx?.overdueInvoices?.length > 0) {
       lines.push('Top overdue:');
       richCtx.overdueInvoices.slice(0, 3).forEach((inv) => {
@@ -132,7 +132,7 @@ export function buildLocalSummary(ctx, richCtx = null) {
       lines.push('→ Recommended: Prioritize collection outreach on highest-value overdue invoices.');
     }
   } else {
-    lines.push(`\n✅ Finance: $${Math.round(ctx.invoices.paidAmount).toLocaleString()} collected, no overdue invoices`);
+    lines.push(`\n[OK] Finance: $${Math.round(ctx.invoices.paidAmount).toLocaleString()} collected, no overdue invoices`);
   }
 
   // Priority 2: Pipeline gaps
@@ -150,7 +150,7 @@ export function buildLocalSummary(ctx, richCtx = null) {
 
   // Priority 3: Operational blockers
   if (ctx.tasks.openCount > 0) {
-    lines.push(`\n🟡 OPERATIONS: ${ctx.tasks.openCount} open task${ctx.tasks.openCount !== 1 ? 's' : ''}`);
+    lines.push(`\n[MEDIUM] OPERATIONS: ${ctx.tasks.openCount} open task${ctx.tasks.openCount !== 1 ? 's' : ''}`);
     if (richCtx?.blockedTasks?.length > 0) {
       lines.push('Overdue tasks:');
       richCtx.blockedTasks.slice(0, 3).forEach((task) => {
@@ -162,9 +162,9 @@ export function buildLocalSummary(ctx, richCtx = null) {
   }
 
   // Agent activity summary
-  lines.push(`\n📊 Agent activity: ${ctx.agentActionsToday} action${ctx.agentActionsToday !== 1 ? 's' : ''} in last 24h · ${ctx.contacts} contact${ctx.contacts !== 1 ? 's' : ''} in workspace`);
+  lines.push(`\nAgent activity: ${ctx.agentActionsToday} action${ctx.agentActionsToday !== 1 ? 's' : ''} in last 24h · ${ctx.contacts} contact${ctx.contacts !== 1 ? 's' : ''} in workspace`);
 
-  lines.push('\n⚠️ Connect an Anthropic API key in Settings for full AI-powered analysis and recommendations.');
+  lines.push('\n[WARNING] Connect an Anthropic API key in Settings for full AI-powered analysis and recommendations.');
   return lines.join('\n');
 }
 

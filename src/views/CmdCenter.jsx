@@ -299,7 +299,7 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
       {/* AI Fallback Banner */}
       {aiStatus && !aiStatus.connected && (
         <div className={styles.aiFallbackBanner}>
-          <span className={styles.aiFallbackIcon}>⚡</span>
+          <span className={styles.aiFallbackIcon}>!</span>
           <div className={styles.aiFallbackBody}>
             <strong>Your AI team is operating in data-driven mode</strong>
             <span className={styles.aiFallbackSub}>Connect an AI provider to unlock full specialist intelligence across all 5 agents.</span>
@@ -555,7 +555,7 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
                     color: aiResponse.source === 'anthropic' ? 'var(--color-success)' : 'var(--color-warning)',
                   }}
                 >
-                  {aiResponse.source === 'anthropic' ? '✦ AI' : '⚡ Data-driven'}
+                  {aiResponse.source === 'anthropic' ? '✦ AI' : '● Data-driven'}
                 </span>
               </div>
             )}

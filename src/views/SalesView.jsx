@@ -194,7 +194,7 @@ export default function SalesView() {
               columns={contactColumns}
               data={contacts}
               loading={loading}
-              emptyIcon="👤"
+              emptyIcon="○"
               emptyTitle="No contacts yet"
               emptyDescription="Add your first contact."
               emptyAction={<Button size="sm" onClick={() => setShowContactForm(true)}>+ Add Contact</Button>}
@@ -212,7 +212,7 @@ export default function SalesView() {
               columns={dealColumns}
               data={deals}
               loading={loading}
-              emptyIcon="💼"
+              emptyIcon="○"
               emptyTitle="No deals yet"
               emptyDescription="Add your first deal."
               emptyAction={<Button size="sm" onClick={() => setShowDealForm(true)}>+ Add Deal</Button>}

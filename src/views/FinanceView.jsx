@@ -167,7 +167,7 @@ export default function FinanceView() {
           columns={tab === "invoices" ? invoiceColumns : simpleColumns}
           data={activeData}
           loading={loading}
-          emptyIcon="📄"
+          emptyIcon="—"
           emptyTitle={`No ${tab} yet`}
           emptyDescription="Add a record to get started."
           emptyAction={<Button size="sm" onClick={() => setShowForm(true)}>+ Add Record</Button>}
