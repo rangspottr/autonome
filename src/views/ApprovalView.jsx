@@ -9,11 +9,6 @@ import Skeleton from "../components/Skeleton.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import styles from "./ApprovalView.module.css";
 
-const PRIORITY_LABELS = {
-  high: "High Priority",
-  medium: "Medium Priority",
-  low: "Low Priority",
-};
 
 const TRIGGER_LABELS = {
   finance: (d) => {

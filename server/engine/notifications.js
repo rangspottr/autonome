@@ -3,7 +3,7 @@ import { pool } from '../db/index.js';
 /**
  * Check if current time is within quiet hours for a setting row.
  */
-function isQuietHours(setting) {
+function _isQuietHours(setting) {
   if (!setting?.quiet_hours_start || !setting?.quiet_hours_end) return false;
   try {
     const now = new Date();

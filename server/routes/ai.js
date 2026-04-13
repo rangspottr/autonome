@@ -18,8 +18,6 @@ const aiLimiter = rateLimit({
   message: { message: 'AI query rate limit exceeded. Max 20 requests per hour per workspace.' },
 });
 
-// Session window: continue same session within 30 minutes
-const SESSION_WINDOW_MS = 30 * 60 * 1000;
 
 /**
  * Get or create a quick-query session for this user (continuing if within window).

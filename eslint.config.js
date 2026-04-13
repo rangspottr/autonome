@@ -32,6 +32,7 @@ export default [
         'error',
         {
           vars: 'all',
+          varsIgnorePattern: '^_',
           args: 'after-used',
           argsIgnorePattern: '^_',
           caughtErrors: 'none',
