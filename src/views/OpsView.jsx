@@ -146,7 +146,7 @@ export default function OpsView() {
           columns={columns}
           data={filtered}
           loading={loading}
-          emptyIcon="✅"
+          emptyIcon="○"
           emptyTitle="No tasks"
           emptyDescription="Add a task to get started."
           emptyAction={<Button size="sm" onClick={() => setShowForm(true)}>+ Add Task</Button>}

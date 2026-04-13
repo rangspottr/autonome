@@ -629,11 +629,11 @@ export default function SettingsView() {
           <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading…</div>
         ) : (
           <>
-            {/* 🧠 AI Brain — prominently first */}
+            {/* AI Brain — prominently first */}
             <div className={styles.aiBrainCard}>
               <div className={styles.aiBrainHeader}>
                 <div className={styles.aiBrainTitleRow}>
-                  <span className={styles.aiBrainIcon}>🧠</span>
+                  <span className={styles.aiBrainIcon}>AI</span>
                   <div>
                     <div className={styles.aiBrainTitle}>AI Brain</div>
                     <div className={styles.aiBrainSubtitle}>Connect your AI provider to power all agent intelligence</div>
@@ -656,7 +656,7 @@ export default function SettingsView() {
             {/* Infrastructure Connections — collapsed by default */}
             <details className={styles.infraDetails}>
               <summary className={styles.infraSummary}>
-                <span>⚙️ Infrastructure Connections</span>
+                <span>Infrastructure Connections</span>
                 <span className={styles.infraSummaryHint}>Email, SMS, Payments</span>
               </summary>
               <div className={styles.infraBody}>

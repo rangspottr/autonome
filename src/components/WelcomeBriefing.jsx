@@ -30,14 +30,14 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
   const topRisks = [];
   if (overdueInvoices > 0) {
     topRisks.push({
-      icon: "⚠️",
+      icon: "!",
       text: `${overdueInvoices} overdue invoice${overdueInvoices !== 1 ? "s" : ""} totaling ${$$(overdueAmount)}`,
       nav: "finance",
     });
   }
   if (deals > 0) {
     topRisks.push({
-      icon: "⏳",
+      icon: "!",
       text: `${deals} open deal${deals !== 1 ? "s" : ""} in pipeline — review for stale activity`,
       nav: "sales",
     });
@@ -46,31 +46,31 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
   const topOpps = [];
   if (pipelineValue > 0) {
     topOpps.push({
-      icon: "🚀",
+      icon: "▲",
       text: `${$$(pipelineValue)} pipeline value ready to close`,
       nav: "sales",
     });
   }
   if (contacts > 0) {
     topOpps.push({
-      icon: "👥",
+      icon: "▲",
       text: `${contacts} contact${contacts !== 1 ? "s" : ""} in your CRM — nurture them`,
       nav: "sales",
     });
   }
 
   const nextActions = [
-    { icon: "💬", text: "Ask your agents a question in the Boardroom", nav: "boardroom" },
-    { icon: "⚖️", text: "Set autonomy rules for your agents", nav: "autonomy-rules" },
-    ...(overdueInvoices > 0 ? [{ icon: "💸", text: `Review ${overdueInvoices} overdue invoice${overdueInvoices !== 1 ? "s" : ""}`, nav: "finance" }] : []),
-    ...(deals > 0 ? [{ icon: "📈", text: "Follow up on deals in your pipeline", nav: "sales" }] : []),
+    { icon: "→", text: "Ask your agents a question in the Boardroom", nav: "boardroom" },
+    { icon: "→", text: "Set autonomy rules for your agents", nav: "autonomy-rules" },
+    ...(overdueInvoices > 0 ? [{ icon: "→", text: `Review ${overdueInvoices} overdue invoice${overdueInvoices !== 1 ? "s" : ""}`, nav: "finance" }] : []),
+    ...(deals > 0 ? [{ icon: "→", text: "Follow up on deals in your pipeline", nav: "sales" }] : []),
   ].slice(0, 5);
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <span className={styles.headerIcon}>🏥</span>
+          <span className={styles.headerIcon}>●</span>
           <div>
             <div className={styles.headerTitle}>Your AI Team Has Completed Their Initial Scan</div>
             <div className={styles.headerSub}>Five specialist agents are now monitoring your business</div>
@@ -84,7 +84,7 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
       <div className={styles.grid}>
         {/* Initial Business Scan */}
         <div className={styles.card}>
-          <div className={styles.cardTitle}>🔍 Initial Business Scan</div>
+          <div className={styles.cardTitle}>Initial Business Scan</div>
           {loading ? (
             <div className={styles.loading}>Scanning…</div>
           ) : (
@@ -113,7 +113,7 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
 
         {/* Top Risks */}
         <div className={styles.card}>
-          <div className={styles.cardTitle}>⚠️ Top Risks</div>
+          <div className={styles.cardTitle}>Top Risks</div>
           {topRisks.length === 0 ? (
             <div className={styles.emptyMsg}>
               {hasData
@@ -135,7 +135,7 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
 
         {/* Top Opportunities */}
         <div className={styles.card}>
-          <div className={styles.cardTitle}>🚀 Top Opportunities</div>
+          <div className={styles.cardTitle}>Top Opportunities</div>
           {topOpps.length === 0 ? (
             <div className={styles.emptyMsg}>
               {hasData
@@ -157,7 +157,7 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
 
         {/* Recommended Next Actions */}
         <div className={styles.card}>
-          <div className={styles.cardTitle}>📋 Recommended Next Actions</div>
+          <div className={styles.cardTitle}>Recommended Next Actions</div>
           <div className={styles.actionsList}>
             {nextActions.map((a, i) => (
               <button key={i} className={styles.actionItem} onClick={() => onNavigate?.(a.nav)} type="button">

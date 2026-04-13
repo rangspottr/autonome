@@ -522,7 +522,7 @@ export default function AgentView({ onRefreshMetrics }) {
             Last cycle: {status?.lastRunAt ? new Date(status.lastRunAt).toLocaleTimeString() : "Never"}
           </div>
         </div>
-        <Button onClick={runCycle} disabled={running}>{running ? "⏳ Running…" : "▶ Run Cycle"}</Button>
+        <Button onClick={runCycle} disabled={running}>{running ? "Running…" : "▶ Run Cycle"}</Button>
       </div>
 
       {/* Agent cards */}

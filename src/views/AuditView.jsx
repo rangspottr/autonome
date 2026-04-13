@@ -114,7 +114,7 @@ export default function AuditView() {
           columns={columns}
           data={entries}
           loading={loading}
-          emptyIcon="📋"
+          emptyIcon="—"
           emptyTitle="No audit entries yet"
           emptyDescription="Actions will appear here as agents execute."
         />

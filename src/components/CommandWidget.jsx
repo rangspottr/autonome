@@ -208,7 +208,7 @@ export default function CommandWidget({ pendingApprovals = 0, workspace }) {
                         fontWeight: 600,
                       }}
                     >
-                      {quickResponse.source === 'anthropic' ? '✦ AI' : '⚡ Data-driven'}
+                      {quickResponse.source === 'anthropic' ? '✦ AI' : '● Data-driven'}
                     </span>
                   </div>
                   <div className={styles.quickText}>{quickResponse.response}</div>

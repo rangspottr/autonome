@@ -18,7 +18,7 @@ const OUTCOME_STYLES = {
   success: { color: "var(--color-success)", label: "✓" },
   completed: { color: "var(--color-success)", label: "✓" },
   blocked: { color: "var(--color-danger)", label: "✗" },
-  pending: { color: "var(--color-warning)", label: "⏳" },
+  pending: { color: "var(--color-warning)", label: "●" },
   handed_off: { color: "var(--color-info)", label: "→" },
 };
 
@@ -174,7 +174,7 @@ export default function ActivityFeed({ agent, pollInterval = 30000, limit = 30 }
   if (events.length === 0) {
     return (
       <div className={styles.empty}>
-        <div className={styles.emptyIcon}>📡</div>
+        <div className={styles.emptyIcon}>●</div>
         <div>No activity yet. Agents will appear here as they work.</div>
       </div>
     );

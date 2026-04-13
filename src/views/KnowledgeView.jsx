@@ -160,7 +160,7 @@ export default function KnowledgeView() {
           columns={columns}
           data={filtered}
           loading={loading}
-          emptyIcon="📚"
+          emptyIcon="—"
           emptyTitle="No articles found"
           emptyDescription={search || filterCat !== "All" ? "No articles match your search." : "Add your first knowledge base article."}
           emptyAction={!search && filterCat === "All" ? <Button size="sm" onClick={openNew}>+ New Article</Button> : undefined}

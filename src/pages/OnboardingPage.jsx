@@ -109,9 +109,9 @@ function Step1({ workspace, formData, onChange, onNext }) {
 }
 
 const BUSINESS_SYSTEMS = [
-  { key: 'email', icon: '📧', label: 'Email', desc: 'Receive and respond to customer emails', hint: 'SMTP' },
-  { key: 'phone', icon: '📱', label: 'Phone / SMS', desc: 'Handle calls and text messages', hint: 'Twilio' },
-  { key: 'payments', icon: '💳', label: 'Payments', desc: 'Track invoices and payments', hint: 'Stripe' },
+  { key: 'email', icon: 'EM', label: 'Email', desc: 'Receive and respond to customer emails', hint: 'SMTP' },
+  { key: 'phone', icon: 'PH', label: 'Phone / SMS', desc: 'Handle calls and text messages', hint: 'Twilio' },
+  { key: 'payments', icon: 'PM', label: 'Payments', desc: 'Track invoices and payments', hint: 'Stripe' },
 ];
 
 function Step2({ connected, onToggle, onNext, onBack }) {
@@ -142,7 +142,7 @@ function Step2({ connected, onToggle, onNext, onBack }) {
               transition: 'border-color 0.2s',
             }}
           >
-            <span style={{ fontSize: 22 }}>{sys.icon}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, background: 'var(--color-brand)', color: '#fff', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{sys.icon}</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)', marginBottom: 2 }}>
                 {sys.label}

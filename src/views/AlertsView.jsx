@@ -13,11 +13,11 @@ const SEVERITY_CONFIG = {
 };
 
 const TYPE_ICONS = {
-  risk: "⚠️",
-  opportunity: "💡",
-  blocker: "🚫",
-  escalation: "⬆️",
-  digest: "📊",
+  risk: "!",
+  opportunity: "▲",
+  blocker: "✕",
+  escalation: "↑",
+  digest: "—",
 };
 
 function relativeTime(ts) {
@@ -96,7 +96,7 @@ export default function AlertsView() {
         <div className={styles.headerStats}>
           {criticalCount > 0 && (
             <span className={styles.criticalBadge}>
-              🚨 {criticalCount} critical
+              !! {criticalCount} critical
             </span>
           )}
           <span className={styles.totalBadge}>{totalActive} active</span>
@@ -171,7 +171,7 @@ export default function AlertsView() {
         <div className={styles.error}>Could not load alerts: {error}</div>
       ) : alerts.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>✅</div>
+          <div className={styles.emptyIcon}>○</div>
           <div className={styles.emptyTitle}>No active alerts</div>
           <div className={styles.emptyDesc}>
             Agents are monitoring your business. Risks and opportunities will appear here automatically.
@@ -182,7 +182,7 @@ export default function AlertsView() {
           {alerts.map((alert) => {
             const cfg = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.low;
             const agentMeta = AgentMeta[alert.agent] || DEFAULT_AGENT_META;
-            const typeIcon = TYPE_ICONS[alert.alert_type] || "📌";
+            const typeIcon = TYPE_ICONS[alert.alert_type] || "●";
 
             return (
               <div

@@ -57,7 +57,7 @@ export default function GrowthView() {
         <div className={styles.error}>Could not load leads: {error}</div>
       ) : contacts.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>🌱</div>
+          <div className={styles.emptyIcon}>○</div>
           <div className={styles.emptyTitle}>No leads yet</div>
           <div className={styles.emptyDesc}>
             Leads and prospects will appear here once your Growth agent starts tracking them.

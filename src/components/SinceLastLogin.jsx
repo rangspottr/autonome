@@ -49,7 +49,7 @@ export default function SinceLastLogin({ onDismiss }) {
     <div className={styles.card}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <span className={styles.headerIcon} aria-hidden="true">⚡</span>
+          <span className={styles.headerIcon} aria-hidden="true">★</span>
           <div>
             <div className={styles.headerTitle}>Since you were away</div>
             <div className={styles.headerSub}>
@@ -71,7 +71,7 @@ export default function SinceLastLogin({ onDismiss }) {
       {/* Critical alerts */}
       {criticalAlerts.length > 0 && (
         <div className={styles.alertsBanner}>
-          <span className={styles.alertsIcon} aria-hidden="true">🚨</span>
+          <span className={styles.alertsIcon} aria-hidden="true">!</span>
           <span>
             {criticalAlerts.length} critical alert{criticalAlerts.length !== 1 ? "s" : ""} need your attention:
           </span>
@@ -144,7 +144,7 @@ export default function SinceLastLogin({ onDismiss }) {
       {data.pendingDecisions && data.pendingDecisions.length > 0 && (
         <div className={styles.pending}>
           <div className={styles.pendingTitle}>
-            ⚡ {data.pendingDecisions.length} decision{data.pendingDecisions.length !== 1 ? "s" : ""} need your approval
+            ! {data.pendingDecisions.length} decision{data.pendingDecisions.length !== 1 ? "s" : ""} need your approval
           </div>
           {data.pendingDecisions.slice(0, 3).map((d, i) => (
             <div key={i} className={styles.pendingItem}>
