@@ -52,9 +52,9 @@ export default function AIStatusBanner({ onNavigateToConnections }) {
         <span className={styles.offlineIcon}>!</span>
       </div>
       <div className={styles.offlineBody}>
-        <div className={styles.offlineHeadline}>Your AI team is waiting</div>
+        <div className={styles.offlineHeadline}>Your AI team is running in limited mode</div>
         <div className={styles.offlineText}>
-          Connect your AI provider to activate full intelligence across all 5 specialist agents.
+          Activate full intelligence in Connections to power all 5 specialist agents.
           Until then, agents operate in data-driven mode only.
         </div>
       </div>

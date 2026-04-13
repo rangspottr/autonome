@@ -35,12 +35,29 @@ function getPriorityColor(priority) {
   return "var(--color-text-muted)";
 }
 
+function buildFallbackReasoning(decision, meta) {
+  const agentLabel = `${meta.label} Agent`;
+  const action = decision.action ? ` recommends ${decision.action}` : " recommends this action";
+  const target = decision.targetName ? ` on ${decision.targetName}` : "";
+  const impact = decision.impact > 0 ? ` with ${$$(decision.impact)} potential impact` : "";
+  return `${agentLabel}${action}${target}${impact}.`;
+}
+
 export default function ApprovalView({ onRefreshMetrics }) {
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [processingIds, setProcessingIds] = useState(new Set());
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
+
+  function toggleReasoning(id) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const fetchDecisions = useCallback(async () => {
     try {
@@ -48,6 +65,17 @@ export default function ApprovalView({ onRefreshMetrics }) {
       const data = await api.get("/agent/decisions");
       const pending = (data.pendingDecisions || []).filter((d) => d.needsApproval);
       setPendingApprovals(pending);
+      // Auto-expand reasoning for high-priority decisions
+      const highPriorityIds = pending
+        .filter((d) => (d.priority || 50) >= 70)
+        .map((d) => d.id);
+      if (highPriorityIds.length > 0) {
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          highPriorityIds.forEach((id) => next.add(id));
+          return next;
+        });
+      }
     } catch (err) {
       setError(err.message || "Failed to load decisions");
     } finally {
@@ -110,9 +138,9 @@ export default function ApprovalView({ onRefreshMetrics }) {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h2 className={styles.title}>Pending Approvals</h2>
+          <h2 className={styles.title}>Decisions Awaiting Your Review</h2>
           <div className={styles.subtitle}>
-            {loading ? "Loading…" : `${pendingApprovals.length} action${pendingApprovals.length !== 1 ? "s" : ""} awaiting your review`}
+            {loading ? "Loading…" : `${pendingApprovals.length} decision${pendingApprovals.length !== 1 ? "s" : ""} need your approval`}
           </div>
         </div>
       </div>
@@ -135,14 +163,14 @@ export default function ApprovalView({ onRefreshMetrics }) {
       ) : pendingApprovals.length === 0 ? (
         <div className={styles.emptyCard}>
           <div className={styles.emptyIcon}>✓</div>
-          <div className={styles.emptyText}>No pending approvals</div>
+          <div className={styles.emptyText}>All clear — your agents have no decisions pending your review.</div>
         </div>
       ) : (
         <div className={styles.list}>
           {pendingApprovals.map((decision) => {
             const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: "var(--color-text-muted)", bg: "var(--color-bg)" };
             const isProcessing = processingIds.has(decision.id);
-            const isExpanded = expandedId === decision.id;
+            const isExpanded = expandedIds.has(decision.id);
             const triggerCtx = getTriggerContext(decision);
             const priorityColor = getPriorityColor(decision.priority || 50);
 
@@ -197,28 +225,36 @@ export default function ApprovalView({ onRefreshMetrics }) {
                   />
                 </div>
 
-                {/* Expandable reasoning */}
-                {decision.reasoning && (
-                  <div>
-                    <button
-                      className={styles.reasoningToggle}
-                      onClick={() => setExpandedId(isExpanded ? null : decision.id)}
+                {/* Expandable reasoning — always shown */}
+                <div>
+                  <button
+                    className={styles.reasoningToggle}
+                    onClick={() => toggleReasoning(decision.id)}
+                  >
+                    {isExpanded ? "▲ Hide agent reasoning" : "▼ Why is this recommended?"}
+                  </button>
+                  {isExpanded && (
+                    <div
+                      className={styles.reasoningBox}
+                      style={{ borderLeftColor: meta.color }}
                     >
-                      {isExpanded ? "▲ Hide agent reasoning" : "▼ Why is this recommended?"}
-                    </button>
-                    {isExpanded && (
-                      <div className={styles.reasoningBox}>
-                        <div className={styles.reasoningLabel}>Agent Reasoning</div>
-                        <p className={styles.reasoningText}>{decision.reasoning}</p>
-                        {decision.agent && (
-                          <div className={styles.reasoningMeta}>
-                            Recommended by: <strong>{meta.label} Agent</strong>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                      <div className={styles.reasoningLabel}>Agent Reasoning</div>
+                      <p className={styles.reasoningText}>
+                        {decision.reasoning || buildFallbackReasoning(decision, meta)}
+                      </p>
+                      {decision.agent && (
+                        <div className={styles.reasoningMeta}>
+                          Recommended by: <strong>{meta.label} Agent</strong>
+                        </div>
+                      )}
+                      {(decision.agent === "finance" || decision.agent === "revenue") && decision.impact > 0 && (
+                        <div className={styles.consequenceLine}>
+                          If not addressed: {$$(decision.impact)} remains at risk.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Action buttons */}
                 <div className={styles.cardActions}>
