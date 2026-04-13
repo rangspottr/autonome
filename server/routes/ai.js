@@ -70,7 +70,7 @@ router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
       provider: null,
       model: null,
       source: null,
-      message: 'No AI provider configured. Go to Settings → AI Provider to connect Anthropic or OpenAI.',
+      message: 'AI brain is not active. Activate it in Settings → AI Provider.',
     });
   } catch (err) {
     next(err);

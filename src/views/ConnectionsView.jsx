@@ -45,6 +45,7 @@ function EmailForm({ dbCreds, onSaved }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function handleSave() {
     if (!host.trim() || !user.trim()) { setSaveError("Email server and address are required."); return; }
@@ -70,15 +71,26 @@ function EmailForm({ dbCreds, onSaved }) {
 
   return (
     <div className={styles.formBody}>
-      <div className={styles.formGrid}>
-        <Input label="Email server" value={host} onChange={setHost} placeholder="smtp.example.com" />
-        <Input label="Port" type="number" value={port} onChange={setPort} placeholder="587" />
-      </div>
-      <div className={styles.formGrid}>
-        <Input label="Email address" value={user} onChange={setUser} placeholder="you@yourdomain.com" />
-        <Input label="Password" type="password" value={pass} onChange={setPass} placeholder={existing.pass ? "••••••••" : "Email password"} />
-      </div>
-      <Input label="Send-from address" value={from} onChange={setFrom} placeholder="noreply@yourdomain.com" style={{ marginTop: "var(--space-3)" }} />
+      <p className={styles.formHint}>Enter your email credentials below. Use the Advanced settings to configure SMTP directly.</p>
+      <Input label="Email address" value={user} onChange={setUser} placeholder="you@yourdomain.com" />
+      <Input label="Password" type="password" value={pass} onChange={setPass} placeholder={existing.pass ? "••••••••" : "Email password"} />
+      <button
+        type="button"
+        className={styles.advancedToggle}
+        onClick={() => setShowAdvanced((v) => !v)}
+      >
+        {showAdvanced ? "▲ Hide advanced settings" : "▼ Show advanced settings"}
+      </button>
+      {showAdvanced && (
+        <div className={styles.advancedSection}>
+          <p className={styles.advancedNote}>SMTP · Gmail · Outlook</p>
+          <div className={styles.formGrid}>
+            <Input label="Email server" value={host} onChange={setHost} placeholder="smtp.example.com" />
+            <Input label="Port" type="number" value={port} onChange={setPort} placeholder="587" />
+          </div>
+          <Input label="Send-from address" value={from} onChange={setFrom} placeholder="noreply@yourdomain.com" style={{ marginTop: "var(--space-3)" }} />
+        </div>
+      )}
       {saveError && <div className={styles.formError}>{saveError}</div>}
       <StatusMsg testing={testing} result={testResult} />
       <div className={styles.formActions}>
@@ -107,9 +119,10 @@ function SMSForm({ dbCreds, onSaved }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function handleSave() {
-    if (!accountId.trim()) { setSaveError("Account ID is required."); return; }
+    if (!accountId.trim()) { setSaveError("Twilio Account ID is required."); return; }
     setSaving(true); setSaveError(null);
     try {
       await api.put("/credentials/twilio", { credentials: { account_sid: accountId, auth_token: authToken || existing.auth_token, phone_number: phoneNumber } });
@@ -132,9 +145,22 @@ function SMSForm({ dbCreds, onSaved }) {
 
   return (
     <div className={styles.formBody}>
-      <Input label="Account ID" value={accountId} onChange={setAccountId} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style={{ marginBottom: "var(--space-3)" }} />
-      <Input label="Auth Token" type="password" value={authToken} onChange={setAuthToken} placeholder={existing.auth_token ? "••••••••" : "Auth token"} style={{ marginBottom: "var(--space-3)" }} />
-      <Input label="Phone Number" value={phoneNumber} onChange={setPhoneNumber} placeholder="+15550001234" style={{ marginBottom: "var(--space-4)" }} />
+      <Input label="Phone Number" value={phoneNumber} onChange={setPhoneNumber} placeholder="+15550001234" />
+      <button
+        type="button"
+        className={styles.advancedToggle}
+        onClick={() => setShowAdvanced((v) => !v)}
+      >
+        {showAdvanced ? "▲ Hide advanced settings" : "▼ Show advanced settings"}
+      </button>
+      {showAdvanced && (
+        <div className={styles.advancedSection}>
+          <p className={styles.advancedNote}>Twilio · OpenPhone (coming soon) · RingCentral (coming soon)</p>
+          <p className={styles.formHint}>Find these in your Twilio dashboard at twilio.com/console.</p>
+          <Input label="Twilio Account ID" value={accountId} onChange={setAccountId} placeholder="Your Twilio Account ID" style={{ marginBottom: "var(--space-3)" }} />
+          <Input label="Auth Token" type="password" value={authToken} onChange={setAuthToken} placeholder={existing.auth_token ? "••••••••" : "Auth token"} style={{ marginBottom: "var(--space-3)" }} />
+        </div>
+      )}
       {saveError && <div className={styles.formError}>{saveError}</div>}
       <StatusMsg testing={testing} result={testResult} />
       <div className={styles.formActions}>
@@ -162,9 +188,10 @@ function StripeForm({ dbCreds, onSaved }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function handleSave() {
-    if (!secretKey.trim() && !existing.secret_key) { setSaveError("Secret key is required."); return; }
+    if (!secretKey.trim() && !existing.secret_key) { setSaveError("Stripe API Key is required."); return; }
     setSaving(true); setSaveError(null);
     try {
       await api.put("/credentials/stripe", { credentials: { secret_key: secretKey || existing.secret_key, webhook_secret: webhookSecret || existing.webhook_secret } });
@@ -187,8 +214,21 @@ function StripeForm({ dbCreds, onSaved }) {
 
   return (
     <div className={styles.formBody}>
-      <Input label="Secret key" type="password" value={secretKey} onChange={setSecretKey} placeholder={existing.secret_key ? `Current: ${existing.secret_key}` : "sk_live_… or sk_test_…"} style={{ marginBottom: "var(--space-3)" }} />
-      <Input label="Webhook secret" type="password" value={webhookSecret} onChange={setWebhookSecret} placeholder={existing.webhook_secret ? "••••••••" : "whsec_…"} style={{ marginBottom: "var(--space-4)" }} />
+      <p className={styles.formHint}>Find your API key at <strong>dashboard.stripe.com/apikeys</strong>.</p>
+      <Input label="Stripe API Key" type="password" value={secretKey} onChange={setSecretKey} placeholder={existing.secret_key ? `Current: ${existing.secret_key}` : "sk_live_… or sk_test_…"} style={{ marginBottom: "var(--space-3)" }} />
+      <button
+        type="button"
+        className={styles.advancedToggle}
+        onClick={() => setShowAdvanced((v) => !v)}
+      >
+        {showAdvanced ? "▲ Hide advanced settings" : "▼ Show advanced settings"}
+      </button>
+      {showAdvanced && (
+        <div className={styles.advancedSection}>
+          <p className={styles.advancedNote}>Stripe · QuickBooks (coming soon)</p>
+          <Input label="Stripe Webhook Secret (optional)" type="password" value={webhookSecret} onChange={setWebhookSecret} placeholder={existing.webhook_secret ? "••••••••" : "whsec_…"} style={{ marginBottom: "var(--space-4)" }} />
+        </div>
+      )}
       {saveError && <div className={styles.formError}>{saveError}</div>}
       <StatusMsg testing={testing} result={testResult} />
       <div className={styles.formActions}>
@@ -325,7 +365,7 @@ export default function ConnectionsView() {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>Business Connections</h2>
-          <div className={styles.pageSubtitle}>Manage the systems Autonome uses to operate your business.</div>
+          <div className={styles.pageSubtitle}>Connect your business systems so your AI team can operate.</div>
         </div>
       </div>
 
@@ -345,7 +385,6 @@ export default function ConnectionsView() {
             connected={emailStatus.connected}
             defaultOpen={!emailStatus.connected}
           >
-            <div className={styles.providerNote}>SMTP · Gmail · Outlook</div>
             <EmailForm dbCreds={dbCreds} onSaved={handleSaved} />
           </ConnectionCard>
 
@@ -358,7 +397,6 @@ export default function ConnectionsView() {
             connected={smsStatus.connected}
             defaultOpen={!smsStatus.connected}
           >
-            <div className={styles.providerNote}>Twilio · OpenPhone (coming soon) · RingCentral (coming soon)</div>
             <SMSForm dbCreds={dbCreds} onSaved={handleSaved} />
           </ConnectionCard>
 
@@ -371,7 +409,6 @@ export default function ConnectionsView() {
             connected={stripeStatus.connected}
             defaultOpen={!stripeStatus.connected}
           >
-            <div className={styles.providerNote}>Stripe · QuickBooks (coming soon)</div>
             <StripeForm dbCreds={dbCreds} onSaved={handleSaved} />
           </ConnectionCard>
 

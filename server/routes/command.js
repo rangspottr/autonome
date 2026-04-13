@@ -324,7 +324,7 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
     }
   }
 
-  lines.push('\n⚠️ Connect an Anthropic API key in Settings for full AI-powered specialist responses.');
+  lines.push('\n⚠️ Connect your AI provider in Settings to unlock full specialist intelligence.');
   return lines.join('\n');
 }
 
