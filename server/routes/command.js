@@ -51,7 +51,7 @@ async function buildAgentContext(workspaceId, agent) {
     pool.query(
       `SELECT * FROM agent_runs
        WHERE workspace_id = $1
-       ORDER BY created_at DESC LIMIT 1`,
+       ORDER BY started_at DESC LIMIT 1`,
       [workspaceId]
     ),
     pool.query(
