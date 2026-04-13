@@ -28,6 +28,8 @@ import metricsRoutes from './routes/metrics.js';
 import aiRoutes from './routes/ai.js';
 import webhookRoutes from './routes/webhooks.js';
 import settingsRoutes from './routes/settings.js';
+import agentsRoutes from './routes/agents.js';
+import intelligenceRoutes from './routes/intelligence.js';
 import { startScheduler } from './engine/cycle.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
@@ -160,6 +162,8 @@ export function createApp() {
   app.use('/api/ai', apiLimiter, aiRoutes);
   app.use('/api/webhooks', apiLimiter, webhookRoutes);
   app.use('/api/settings', apiLimiter, settingsRoutes);
+  app.use('/api/agents', apiLimiter, agentsRoutes);
+  app.use('/api/intelligence', apiLimiter, intelligenceRoutes);
 
   // In production, serve the Vite build
   if (process.env.NODE_ENV === 'production') {

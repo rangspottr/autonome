@@ -18,11 +18,58 @@ const TIER_CONFIG = [
   { label: "Optimization", min: 0, color: T.mt, bg: "#F1F3F5", pillVariant: "muted" },
 ];
 
+const AGENT_BORDER_COLORS = {
+  finance: T.gn,
+  revenue: T.bl,
+  operations: T.am,
+  growth: T.pu,
+  support: "#0891B2",
+};
+
+function relativeTime(ts) {
+  if (!ts) return "";
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 2) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "yesterday";
+  return `${days}d ago`;
+}
+
+function buildSinceLoginSummary(events) {
+  if (!events || events.length === 0) return null;
+  const byAgent = {};
+  let totalAmount = 0;
+  let approvalCount = 0;
+  for (const e of events) {
+    if (!byAgent[e.agent]) byAgent[e.agent] = 0;
+    byAgent[e.agent]++;
+    if (e.metadata?.impact) totalAmount += parseFloat(e.metadata.impact) || 0;
+    if (e.outcome === "pending") approvalCount++;
+  }
+  const parts = Object.entries(byAgent).map(([agent, count]) => {
+    const meta = AgentMeta[agent] || { label: agent };
+    return `${meta.label} took ${count} action${count !== 1 ? "s" : ""}`;
+  });
+  const summary = parts.join(". ");
+  return {
+    text: summary + (totalAmount > 0 ? `. ${$$(totalAmount)} in financial activity.` : ".") +
+      (approvalCount > 0 ? ` ${approvalCount} item${approvalCount !== 1 ? "s" : ""} need your approval.` : ""),
+    count: events.length,
+  };
+}
+
 export default function CmdCenter({ onRefreshMetrics }) {
   const [decisions, setDecisions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activityFeed, setActivityFeed] = useState([]);
+  const [insights, setInsights] = useState([]);
+  const [agentMemory, setAgentMemory] = useState([]);
 
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState(null);
@@ -34,6 +81,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
   const [aiResponse, setAiResponse] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(false);
+  const [expandedReasoning, setExpandedReasoning] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,14 +99,44 @@ export default function CmdCenter({ onRefreshMetrics }) {
     }
   }, []);
 
+  // Load intelligence data (non-blocking, best-effort)
+  const fetchIntelligence = useCallback(async () => {
+    try {
+      const [feedRes, insightsRes] = await Promise.all([
+        api.get("/agents/activity-feed?limit=20"),
+        api.get("/intelligence/summary"),
+      ]);
+      setActivityFeed(feedRes.events || []);
+      setInsights(insightsRes || []);
+
+      // Gather memory from all agents
+      const allMemory = await Promise.all(
+        Object.keys(AgentMeta).map((agent) =>
+          api.get(`/agents/${agent}/memory?limit=3`).then((r) =>
+            (r || []).slice(0, 3).map((m) => ({ ...m, agent }))
+          ).catch(() => [])
+        )
+      );
+      setAgentMemory(allMemory.flat().slice(0, 6));
+    } catch {
+      // Intelligence feed is non-fatal
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchIntelligence();
+  }, [fetchData, fetchIntelligence]);
 
   // Derived metrics from summary
   const revenueAtRisk = summary?.invoices?.outstanding || 0;
   const pipelineRequiringAction = summary?.deals?.pipelineValue || 0;
   const pendingApprovals = decisions.filter((d) => d.needsApproval && !d.auto).length;
+  const agentActionsToday = activityFeed.filter((e) => {
+    return Date.now() - new Date(e.created_at).getTime() < 86400000;
+  }).length;
+
+  const sinceLoginSummary = buildSinceLoginSummary(activityFeed.slice(0, 10));
 
   async function handleExecute(decision) {
     setExecuting(decision.id);
@@ -77,6 +155,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
         impact: decision.impact,
       });
       await fetchData();
+      await fetchIntelligence();
       onRefreshMetrics?.();
     } catch (err) {
       setError(err.message || "Action failed");
@@ -132,6 +211,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
       const result = await api.post("/agent-runs/trigger");
       setTriggerResult(result);
       await fetchData();
+      await fetchIntelligence();
       onRefreshMetrics?.();
     } catch (err) {
       setError(err.message || "Agent trigger failed");
@@ -166,7 +246,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
     return (
       <div className={styles.page}>
         <div className={styles.metricsGrid}>
-          {[1,2,3,4].map(i => <Skeleton key={i} variant="card" height={96} />)}
+          {Array.from({ length: Object.keys(AgentMeta).length }, (_, i) => i + 1).map(i => <Skeleton key={i} variant="card" height={96} />)}
         </div>
         <Skeleton variant="rect" height={140} style={{ marginBottom: 'var(--space-6)' }} />
         <Skeleton variant="rect" height={200} />
@@ -196,12 +276,24 @@ export default function CmdCenter({ onRefreshMetrics }) {
         </div>
       )}
 
+      {/* Since Last Login Banner */}
+      {sinceLoginSummary && (
+        <div className={styles.sinceLoginBanner}>
+          <div className={styles.sinceLoginIcon}>★</div>
+          <div className={styles.sinceLoginText}>
+            <strong>Since your last login:</strong> {sinceLoginSummary.text}
+          </div>
+          <span className={styles.sinceLoginCount}>{sinceLoginSummary.count} actions</span>
+        </div>
+      )}
+
       {/* Revenue Impact Header */}
       <div className={styles.metricsGrid}>
         <Stat label="Revenue at Risk" value={$$(revenueAtRisk)} sub="overdue invoices" color="red" />
         <Stat label="Pipeline Needs Action" value={$$(pipelineRequiringAction)} sub="pipeline value" color="amber" />
         <Stat label="Invoices Paid" value={$$(summary?.invoices?.paid || 0)} sub="collected" color="green" />
         <Stat label="Pending Approvals" value={pendingApprovals} sub="awaiting review" color="blue" />
+        <Stat label="Agent Actions Today" value={agentActionsToday} sub="last 24h" color="purple" />
       </div>
 
       {/* Welcome empty state when workspace has no data yet */}
@@ -209,7 +301,100 @@ export default function CmdCenter({ onRefreshMetrics }) {
         <div className={styles.emptyActions} style={{ marginBottom: "var(--space-4)" }}>
           <div className={styles.emptyActionsIcon}>A</div>
           <div className={styles.emptyActionsTitle}>Welcome to Autonome</div>
-          <div className={styles.emptyActionsDesc}>Create your first contact or deal to get started.</div>
+          <div className={styles.emptyActionsDesc}>Your 5 AI agents are ready. Create your first contact, deal, or invoice to activate them.</div>
+        </div>
+      )}
+
+      {/* Live Activity Feed */}
+      {activityFeed.length > 0 && (
+        <div className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTag}>LIVE</span>
+            <span className={styles.sectionTitle}>Agent Activity Feed</span>
+            <span className={styles.sectionCount}>{activityFeed.length} events</span>
+          </div>
+          <div className={styles.activityFeed}>
+            {activityFeed.slice(0, 8).map((event) => {
+              const meta = AgentMeta[event.agent] || { icon: "CMD", label: event.agent, color: T.mt, bg: "#F1F3F5" };
+              const borderColor = AGENT_BORDER_COLORS[event.agent] || T.mt;
+              return (
+                <div key={event.id} className={styles.feedItem} style={{ borderLeftColor: borderColor }}>
+                  <div className={styles.feedItemHeader}>
+                    <div className={styles.feedItemAgent} style={{ background: meta.bg, color: meta.color }}>
+                      {meta.icon}
+                    </div>
+                    <div className={styles.feedItemContent}>
+                      <div className={styles.feedItemDesc}>{event.description}</div>
+                      {event.entity_name && (
+                        <div className={styles.feedItemMeta}>{event.entity_type} · {event.entity_name}</div>
+                      )}
+                      <div className={styles.feedItemPills}>
+                        <Pill label={meta.label} variant={
+                          event.agent === "finance" ? "green" :
+                          event.agent === "revenue" ? "blue" :
+                          event.agent === "operations" ? "amber" : "purple"
+                        } />
+                        {event.handed_off_to && (
+                          <Pill label={`→ ${event.handed_off_to}`} variant="blue" />
+                        )}
+                      </div>
+                    </div>
+                    <span className={styles.feedItemTime}>{relativeTime(event.created_at)}</span>
+                  </div>
+                  {event.reasoning && (
+                    <div>
+                      <button
+                        className={styles.reasoningToggle}
+                        onClick={() => setExpandedReasoning(expandedReasoning === event.id ? null : event.id)}
+                      >
+                        {expandedReasoning === event.id ? "▲ Hide reasoning" : "▼ Why?"}
+                      </button>
+                      {expandedReasoning === event.id && (
+                        <div className={styles.reasoningBox}>{event.reasoning}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Cross-Entity Intelligence Alerts */}
+      {insights.length > 0 && (
+        <div className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTag} style={{ color: T.am }}>INTEL</span>
+            <span className={styles.sectionTitle}>Cross-Entity Alerts</span>
+            <span className={styles.sectionCount}>{insights.length} insight{insights.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className={styles.insightsList}>
+            {insights.map((insight, i) => (
+              <div
+                key={i}
+                className={styles.insightItem}
+                style={{
+                  borderLeftColor:
+                    insight.severity === "high" ? T.rd :
+                    insight.severity === "medium" ? T.am : T.bl,
+                }}
+              >
+                <div className={styles.insightTitle}>{insight.title}</div>
+                <div className={styles.insightDesc}>{insight.description}</div>
+                <div className={styles.insightPills}>
+                  {insight.agents_involved.map((a) => {
+                    const meta = AgentMeta[a] || { label: a };
+                    return <Pill key={a} label={meta.label} variant="muted" />;
+                  })}
+                  <Pill
+                    label={insight.severity}
+                    variant={insight.severity === "high" ? "red" : insight.severity === "medium" ? "amber" : "blue"}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -218,7 +403,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
         <div className={styles.briefingHeader} onClick={() => setShowBriefing((v) => !v)}>
           <div className={styles.briefingHeaderLeft}>
             <span className={styles.briefingTag}>BRIEF</span>
-            <span className={styles.briefingTitle}>Daily Briefing</span>
+            <span className={styles.briefingTitle}>Business Overview</span>
           </div>
           <span className={styles.briefingToggle}>{showBriefing ? "▲ Hide" : "▼ Show"}</span>
         </div>
@@ -243,6 +428,32 @@ export default function CmdCenter({ onRefreshMetrics }) {
           </div>
         )}
       </div>
+
+      {/* Agent Memory Highlights */}
+      {agentMemory.length > 0 && (
+        <div className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTag} style={{ color: T.pu }}>MEMORY</span>
+            <span className={styles.sectionTitle}>Agent Observations</span>
+          </div>
+          <div className={styles.memoryList}>
+            {agentMemory.map((m) => {
+              const meta = AgentMeta[m.agent] || { icon: "CMD", label: m.agent, color: T.mt, bg: "#F1F3F5" };
+              return (
+                <div key={m.id} className={styles.memoryItem}>
+                  <div className={styles.memoryAgent} style={{ background: meta.bg, color: meta.color }}>
+                    {meta.icon}
+                  </div>
+                  <div className={styles.memoryContent}>
+                    <span className={styles.memoryAgentLabel}>{meta.label} learned: </span>
+                    {m.content}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Activation Checklist (shown until all done and dismissed) */}
       {!checklistDismissed && checklist.length > 0 && (
@@ -348,7 +559,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
         <div className={styles.emptyActions}>
           <div className={styles.emptyActionsIcon}>[OK]</div>
           <div className={styles.emptyActionsTitle}>All clear</div>
-          <div className={styles.emptyActionsDesc}>No priority actions right now.</div>
+          <div className={styles.emptyActionsDesc}>No priority actions right now. Agents are monitoring your business continuously.</div>
         </div>
       ) : (
         tiers.map((tier) => (
@@ -360,8 +571,9 @@ export default function CmdCenter({ onRefreshMetrics }) {
             {tier.items.map((decision) => {
               const meta = AgentMeta[decision.agent] || { icon: "CMD", label: decision.agent, color: 'var(--color-text-muted)', bg: 'var(--color-bg)' };
               const isRunning = executing === decision.id;
+              const borderColor = AGENT_BORDER_COLORS[decision.agent] || tier.color;
               return (
-                <div key={decision.id} className={styles.actionCard}>
+                <div key={decision.id} className={styles.actionCard} style={{ borderLeftColor: borderColor }}>
                   <div
                     className={styles.actionAgent}
                     style={{ background: meta.bg, color: meta.color }}
@@ -419,3 +631,4 @@ export default function CmdCenter({ onRefreshMetrics }) {
     </div>
   );
 }
+
