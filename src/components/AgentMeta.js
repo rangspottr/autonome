@@ -1,11 +1,65 @@
 const AGENT_META = {
-  finance: { icon: "FIN", label: "Finance", color: "#059669", bg: "#ECFDF5" },
-  revenue: { icon: "REV", label: "Revenue", color: "#2563EB", bg: "#EEF2FF" },
-  operations: { icon: "OPS", label: "Operations", color: "#D97706", bg: "#FFFBEB" },
-  growth: { icon: "GRO", label: "Growth", color: "#7C3AED", bg: "#F5F0FF" },
-  support: { icon: "SUP", label: "Support", color: "#0891B2", bg: "#ECFEFF" },
+  finance: {
+    icon: "FIN",
+    label: "Finance",
+    title: "Finance Specialist",
+    color: "#059669",
+    bg: "#ECFDF5",
+    description: "Monitors cash flow pressure, overdue invoices, payment patterns, and spend anomalies",
+    focus: "Money at risk",
+    watchesFor: ["Overdue invoices", "Cash flow gaps", "Spend anomalies", "Payment delays"],
+  },
+  revenue: {
+    icon: "REV",
+    label: "Revenue",
+    title: "Revenue Specialist",
+    color: "#2563EB",
+    bg: "#EEF2FF",
+    description: "Tracks pipeline health, deal velocity, stale opportunities, and close probability",
+    focus: "Pipeline pressure",
+    watchesFor: ["Stale deals", "Pipeline gaps", "Win rate changes", "Revenue leaks"],
+  },
+  operations: {
+    icon: "OPS",
+    label: "Operations",
+    title: "Operations Specialist",
+    color: "#D97706",
+    bg: "#FFFBEB",
+    description: "Identifies workflow bottlenecks, task overload, process inefficiencies, and delivery risks",
+    focus: "Execution blockers",
+    watchesFor: ["Task bottlenecks", "Workflow delays", "Resource conflicts", "SLA risks"],
+  },
+  growth: {
+    icon: "GRO",
+    label: "Growth",
+    title: "Growth Specialist",
+    color: "#7C3AED",
+    bg: "#F5F0FF",
+    description: "Identifies dormant leads, expansion opportunities, engagement drops, and nurture gaps",
+    focus: "Untapped potential",
+    watchesFor: ["Dormant leads", "Cold prospects", "Engagement drops", "Expansion signals"],
+  },
+  support: {
+    icon: "SUP",
+    label: "Support",
+    title: "Support Specialist",
+    color: "#0891B2",
+    bg: "#ECFEFF",
+    description: "Detects customer churn signals, satisfaction drops, escalation patterns, and response gaps",
+    focus: "Retention risk",
+    watchesFor: ["Churn signals", "Response delays", "Satisfaction drops", "Escalation spikes"],
+  },
 };
 
-export const DEFAULT_AGENT_META = { icon: "AGT", label: "Agent", color: "#64748B", bg: "#F1F5F9" };
+export const DEFAULT_AGENT_META = {
+  icon: "AGT",
+  label: "Agent",
+  title: "AI Agent",
+  color: "#64748B",
+  bg: "#F1F5F9",
+  description: "Monitors your business for patterns and opportunities",
+  focus: "Business intelligence",
+  watchesFor: [],
+};
 
 export default AGENT_META;

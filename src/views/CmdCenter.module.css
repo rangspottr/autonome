@@ -430,21 +430,46 @@
 
 .emptyActions {
   text-align: center;
-  padding: var(--space-12) var(--space-8);
-  background: var(--color-success-light);
+  padding: var(--space-10) var(--space-8);
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(5,150,105,0.15);
+  border: 1px solid var(--color-border);
 }
 
 .emptyActionsIcon {
   font-size: var(--text-xl);
   font-weight: 700;
-  color: var(--color-success);
+  color: var(--color-brand);
   margin-bottom: var(--space-2);
 }
 
-.emptyActionsTitle { font-size: var(--text-base); font-weight: 700; color: var(--color-success); }
-.emptyActionsDesc { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-1); }
+.emptyActionsTitle { font-size: var(--text-base); font-weight: 700; color: var(--color-text-primary); }
+.emptyActionsDesc { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-1); max-width: 420px; margin-left: auto; margin-right: auto; line-height: 1.5; }
+
+.emptyActionsCtas {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
+.emptyActionCta {
+  padding: 8px 16px;
+  background: var(--color-brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: opacity 0.15s;
+}
+
+.emptyActionCta:hover {
+  opacity: 0.88;
+}
 
 .errorBanner {
   background: var(--color-danger-light);
@@ -462,20 +487,31 @@
 
 .aiFallbackBanner {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: rgba(245,158,11,0.08);
-  border: 1px solid rgba(245,158,11,0.25);
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: rgba(245,158,11,0.1);
+  border: 1.5px solid rgba(245,158,11,0.35);
+  border-left: 4px solid var(--color-warning);
   border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-3);
   font-size: var(--text-sm);
-  color: var(--color-warning);
+  color: var(--color-text-primary);
 }
 
-.aiFallbackIcon { font-size: 14px; flex-shrink: 0; }
+.aiFallbackIcon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
 
-.aiFallbackText { line-height: 1.4; }
+.aiFallbackBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.aiFallbackSub {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
 
 .aiResponseSource {
   margin-bottom: var(--space-2);

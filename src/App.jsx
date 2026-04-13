@@ -362,8 +362,8 @@ function MainApp() {
               <span
                 className={styles.aiStatusBadge}
                 title={aiStatus.connected
-                  ? `AI: ${aiStatus.model || "Connected"}`
-                  : "AI: Limited Mode — Connect API key in Settings"}
+                  ? `AI Active · ${aiStatus.model || "Connected"} — Powering all 5 agents`
+                  : "AI Offline — Connect your AI provider in Connections"}
                 style={{
                   background: aiStatus.connected ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
                   color: aiStatus.connected ? "var(--color-success)" : "var(--color-warning)",
@@ -371,7 +371,9 @@ function MainApp() {
                 }}
               >
                 <span style={{ fontSize: 9, marginRight: 4 }}>●</span>
-                {aiStatus.connected ? "AI On" : "AI Limited"}
+                {aiStatus.connected
+                  ? (aiStatus.model ? `AI · ${aiStatus.model}` : "AI Active")
+                  : "AI Offline"}
               </span>
             )}
             <NotificationBell />
@@ -386,7 +388,7 @@ function MainApp() {
 
         {/* Content */}
         <main className={styles.content}>
-          <AIStatusBanner onNavigateToSettings={() => setView("settings")} />
+          <AIStatusBanner onNavigateToSettings={() => setView("connections")} />
           <ErrorBoundary key={view}>
             {VIEWS[view] || (
               <div style={{ color: "var(--color-text-muted)" }}>View not found.</div>

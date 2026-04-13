@@ -25,6 +25,8 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
   const overdueInvoices = summary?.invoices?.overdue || 0;
   const overdueAmount = summary?.invoices?.outstanding || 0;
 
+  const hasData = contacts > 0 || deals > 0 || (summary?.invoices?.total || 0) > 0;
+
   const topRisks = [];
   if (overdueInvoices > 0) {
     topRisks.push({
@@ -62,7 +64,6 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
     { icon: "⚖️", text: "Set autonomy rules for your agents", nav: "autonomy-rules" },
     ...(overdueInvoices > 0 ? [{ icon: "💸", text: `Review ${overdueInvoices} overdue invoice${overdueInvoices !== 1 ? "s" : ""}`, nav: "finance" }] : []),
     ...(deals > 0 ? [{ icon: "📈", text: "Follow up on deals in your pipeline", nav: "sales" }] : []),
-    { icon: "🧠", text: "Connect your AI provider in Settings", nav: "settings" },
   ].slice(0, 5);
 
   return (
@@ -71,8 +72,8 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
         <div className={styles.headerLeft}>
           <span className={styles.headerIcon}>🏥</span>
           <div>
-            <div className={styles.headerTitle}>Welcome to your AI Operating Room</div>
-            <div className={styles.headerSub}>Your agents have completed their initial scan</div>
+            <div className={styles.headerTitle}>Your AI Team Has Completed Their Initial Scan</div>
+            <div className={styles.headerSub}>Five specialist agents are now monitoring your business</div>
           </div>
         </div>
         <button className={styles.dismissBtn} onClick={onDismiss} type="button">
@@ -114,7 +115,11 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
         <div className={styles.card}>
           <div className={styles.cardTitle}>⚠️ Top Risks</div>
           {topRisks.length === 0 ? (
-            <div className={styles.emptyMsg}>No risks detected yet — agents are monitoring.</div>
+            <div className={styles.emptyMsg}>
+              {hasData
+                ? "No risks detected yet — agents are monitoring."
+                : "Add business data and your agents will flag risks immediately."}
+            </div>
           ) : (
             <div className={styles.riskList}>
               {topRisks.map((r, i) => (
@@ -132,7 +137,11 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
         <div className={styles.card}>
           <div className={styles.cardTitle}>🚀 Top Opportunities</div>
           {topOpps.length === 0 ? (
-            <div className={styles.emptyMsg}>Agents are analyzing your data for opportunities.</div>
+            <div className={styles.emptyMsg}>
+              {hasData
+                ? "Agents are analyzing your data for opportunities."
+                : "Import contacts and deals to unlock opportunity detection."}
+            </div>
           ) : (
             <div className={styles.riskList}>
               {topOpps.map((o, i) => (
@@ -163,18 +172,22 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
 
       {/* AI Team Status */}
       <div className={styles.agentSection}>
-        <div className={styles.agentSectionTitle}>🤖 Your AI Team is Active</div>
+        <div className={styles.agentSectionTitle}>Your AI Team is Active and Monitoring</div>
         <div className={styles.agentGrid}>
           {Object.entries(AgentMeta).map(([key, meta]) => (
-            <div key={key} className={styles.agentCard}>
-              <div className={styles.agentAvatar} style={{ background: meta.bg, color: meta.color }}>
-                {meta.icon}
+            <div key={key} className={styles.agentCard} style={{ borderTopColor: meta.color }}>
+              <div className={styles.agentAvatarRow}>
+                <div className={styles.agentAvatar} style={{ background: meta.bg, color: meta.color }}>
+                  {meta.icon}
+                </div>
+                <div className={styles.agentStatus}>
+                  <span className={styles.agentPulse} style={{ background: meta.color }} />
+                  <span className={styles.agentStatusText}>Active</span>
+                </div>
               </div>
               <div className={styles.agentName}>{meta.label}</div>
-              <div className={styles.agentStatus}>
-                <span className={styles.agentPulse} style={{ background: meta.color }} />
-                <span className={styles.agentStatusText}>Monitoring</span>
-              </div>
+              <div className={styles.agentFocus}>{meta.focus}</div>
+              <div className={styles.agentDesc}>{meta.description}</div>
             </div>
           ))}
         </div>

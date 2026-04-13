@@ -74,8 +74,9 @@ function AgentDetailPanel({ agent, meta, onClose }) {
             {meta.icon}
           </div>
           <div>
-            <div className={styles.agentName}>{meta.label} Agent</div>
-            <div className={styles.agentDesc}>Full operator profile</div>
+            <div className={styles.agentName}>{meta.title || meta.label} Agent</div>
+            <div className={styles.agentDesc}>{meta.description || "Full operator profile"}</div>
+            {meta.focus && <div className={styles.agentFocusTag}>{meta.focus}</div>}
           </div>
         </div>
         <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>

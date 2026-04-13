@@ -300,10 +300,10 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
       {aiStatus && !aiStatus.connected && (
         <div className={styles.aiFallbackBanner}>
           <span className={styles.aiFallbackIcon}>⚡</span>
-          <span className={styles.aiFallbackText}>
-            <strong>AI provider not connected</strong> — showing data-driven briefing.{" "}
-            <span style={{ opacity: 0.8 }}>Connect your API key in Settings for full AI responses.</span>
-          </span>
+          <div className={styles.aiFallbackBody}>
+            <strong>Your AI team is operating in data-driven mode</strong>
+            <span className={styles.aiFallbackSub}>Connect an AI provider to unlock full specialist intelligence across all 5 agents.</span>
+          </div>
         </div>
       )}
 
@@ -331,8 +331,13 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
       {summary && (summary.contacts?.total || 0) === 0 && (summary.invoices?.total || 0) === 0 && (summary.deals?.total || 0) === 0 && (
         <div className={styles.emptyActions} style={{ marginBottom: "var(--space-4)" }}>
           <div className={styles.emptyActionsIcon}>A</div>
-          <div className={styles.emptyActionsTitle}>Welcome to Autonome</div>
-          <div className={styles.emptyActionsDesc}>Your 5 AI agents are ready. Create your first contact, deal, or invoice to activate them.</div>
+          <div className={styles.emptyActionsTitle}>Your agents need business data to start working</div>
+          <div className={styles.emptyActionsDesc}>Import your contacts, create an invoice, or add a deal — then your AI team will start monitoring and acting.</div>
+          <div className={styles.emptyActionsCtas}>
+            <button className={styles.emptyActionCta} onClick={() => onNavigate?.("sales")} type="button">+ Add a Deal</button>
+            <button className={styles.emptyActionCta} onClick={() => onNavigate?.("finance")} type="button">+ Create Invoice</button>
+            <button className={styles.emptyActionCta} onClick={() => onNavigate?.("sales")} type="button">+ Import Contacts</button>
+          </div>
         </div>
       )}
 
