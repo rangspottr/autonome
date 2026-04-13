@@ -188,15 +188,21 @@ router.get('/since-last-login', ...guard, async (req, res, next) => {
     const wsId = req.workspace.id;
     const userId = req.user.id;
 
-    // Get user's last_login_at
+    // Get user's last_login_at and last_active_at
     const userResult = await pool.query(
-      `SELECT last_login_at FROM users WHERE id = $1`,
+      `SELECT last_login_at, last_active_at FROM users WHERE id = $1`,
       [userId]
     );
     const lastLogin = userResult.rows[0]?.last_login_at;
+    const lastActive = userResult.rows[0]?.last_active_at;
 
-    // Default to 24 hours ago if no last login recorded
-    const since = lastLogin || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Use GREATEST of both timestamps; fall back to 24 hours ago if neither is set
+    let since;
+    if (lastLogin && lastActive) {
+      since = lastLogin > lastActive ? lastLogin : lastActive;
+    } else {
+      since = lastLogin || lastActive || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    }
 
     // Agent action summaries
     const actionsResult = await pool.query(
@@ -243,9 +249,9 @@ router.get('/since-last-login', ...guard, async (req, res, next) => {
     );
     const pendingDecisions = latestRun.rows[0]?.summary?.pendingDecisions || [];
 
-    // Update last_login_at for current user
+    // Update both last_login_at and last_active_at for current user
     await pool.query(
-      `UPDATE users SET last_login_at = NOW() WHERE id = $1`,
+      `UPDATE users SET last_login_at = NOW(), last_active_at = NOW() WHERE id = $1`,
       [userId]
     );
 

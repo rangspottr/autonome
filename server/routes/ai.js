@@ -69,7 +69,7 @@ router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, null, 'local');
       return res.json({ response: summary, source: 'local' });
     }
 
@@ -134,7 +134,7 @@ Provide concise, actionable answers grounded in this data.`;
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId, 'local');
       return res.json({ response: summary, source: 'local' });
     }
 
@@ -144,7 +144,7 @@ Provide concise, actionable answers grounded in this data.`;
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId, 'local');
       return res.json({ response: summary, source: 'local' });
     }
 
@@ -154,23 +154,23 @@ Provide concise, actionable answers grounded in this data.`;
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId, 'local');
       return res.json({ response: summary, source: 'local' });
     }
 
-    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId);
+    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, 'anthropic');
     res.json({ response: text, source: 'anthropic' });
   } catch (err) {
     next(err);
   }
 });
 
-async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null) {
+async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null, source = 'local') {
   try {
     await pool.query(
-      `INSERT INTO chat_messages (workspace_id, user_id, role, content, session_id)
-       VALUES ($1, $2, 'user', $3, $4), ($1, $2, 'assistant', $5, $4)`,
-      [workspaceId, userId, userMessage, sessionId, assistantMessage]
+      `INSERT INTO chat_messages (workspace_id, user_id, role, content, session_id, metadata)
+       VALUES ($1, $2, 'user', $3, $4, NULL), ($1, $2, 'assistant', $5, $4, $6)`,
+      [workspaceId, userId, userMessage, sessionId, assistantMessage, JSON.stringify({ source })]
     );
   } catch (err) {
     console.error('[AI] Failed to save chat messages:', err.message);
