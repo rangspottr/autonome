@@ -246,7 +246,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
     return (
       <div className={styles.page}>
         <div className={styles.metricsGrid}>
-          {[1,2,3,4,5].map(i => <Skeleton key={i} variant="card" height={96} />)}
+          {Array.from({ length: Object.keys(AgentMeta).length }, (_, i) => i + 1).map(i => <Skeleton key={i} variant="card" height={96} />)}
         </div>
         <Skeleton variant="rect" height={140} style={{ marginBottom: 'var(--space-6)' }} />
         <Skeleton variant="rect" height={200} />
