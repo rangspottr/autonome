@@ -13,6 +13,93 @@ async function getModules() {
 }
 
 /**
+ * Detect patterns from recent agent activity and persist them as agent_memory entries.
+ */
+async function writeAgentMemory(workspaceId) {
+  // Pattern 1: Contacts that have received 3+ reminders
+  const reminderResult = await pool.query(
+    `SELECT c.id AS contact_id, c.name, COUNT(*) AS reminder_count
+     FROM agent_actions aa
+     JOIN invoices i ON i.id = aa.entity_id
+     JOIN contacts c ON c.id = i.contact_id
+     WHERE aa.workspace_id = $1
+       AND aa.agent = 'finance'
+       AND aa.action_type IN ('remind', 'pre', 'urgent')
+     GROUP BY c.id, c.name
+     HAVING COUNT(*) >= 3`,
+    [workspaceId]
+  );
+  for (const row of reminderResult.rows) {
+    await pool.query(
+      `INSERT INTO agent_memory (workspace_id, agent, memory_type, entity_type, entity_id, content, confidence)
+       VALUES ($1, 'finance', 'observation', 'contact', $2, $3, 0.9)
+       ON CONFLICT DO NOTHING`,
+      [
+        workspaceId,
+        row.contact_id,
+        `Contact ${row.name} has been reminded ${row.reminder_count} times — may need escalation or direct call`,
+      ]
+    );
+  }
+
+  // Pattern 2: Deals stale 7+ days despite follow-ups
+  const staleDealsResult = await pool.query(
+    `SELECT d.id, d.title,
+            EXTRACT(EPOCH FROM (NOW() - d.updated_at)) / 86400 AS days_stale
+     FROM deals d
+     WHERE d.workspace_id = $1
+       AND d.stage NOT IN ('closed', 'lost')
+       AND d.updated_at < NOW() - INTERVAL '7 days'
+       AND EXISTS (
+         SELECT 1 FROM agent_actions aa
+         WHERE aa.workspace_id = $1 AND aa.entity_id = d.id AND aa.agent = 'revenue'
+       )`,
+    [workspaceId]
+  );
+  for (const row of staleDealsResult.rows) {
+    const days = Math.floor(row.days_stale);
+    await pool.query(
+      `INSERT INTO agent_memory (workspace_id, agent, memory_type, entity_type, entity_id, content, confidence)
+       VALUES ($1, 'revenue', 'blocker', 'deal', $2, $3, 0.85)
+       ON CONFLICT DO NOTHING`,
+      [
+        workspaceId,
+        row.id,
+        `Deal "${row.title}" has been stale for ${days} days despite follow-ups`,
+      ]
+    );
+  }
+
+  // Pattern 3: Invoices paid after agent action — collection workflow effective
+  const paidResult = await pool.query(
+    `SELECT i.id, i.description AS label, c.name AS contact_name, aa.action_type
+     FROM invoices i
+     JOIN agent_actions aa ON aa.entity_id = i.id AND aa.workspace_id = i.workspace_id
+     LEFT JOIN contacts c ON c.id = i.contact_id
+     WHERE i.workspace_id = $1
+       AND i.status = 'paid'
+       AND aa.agent = 'finance'
+     ORDER BY i.updated_at DESC
+     LIMIT 10`,
+    [workspaceId]
+  );
+  for (const row of paidResult.rows) {
+    const label = row.label || `Invoice #${row.id.slice(0, 8)}`;
+    const contactName = row.contact_name || 'client';
+    await pool.query(
+      `INSERT INTO agent_memory (workspace_id, agent, memory_type, entity_type, entity_id, content, confidence)
+       VALUES ($1, 'finance', 'learned_preference', 'invoice', $2, $3, 0.95)
+       ON CONFLICT DO NOTHING`,
+      [
+        workspaceId,
+        row.id,
+        `Collection workflow effective for ${contactName} — paid after ${row.action_type}`,
+      ]
+    );
+  }
+}
+
+/**
  * Run a complete agent cycle for a workspace:
  * 1. Generate decisions from real DB data
  * 2. Filter by workspace risk limits
@@ -96,6 +183,13 @@ export async function runAgentCycle(workspaceId) {
       JSON.stringify(summary),
     ]
   );
+
+  // Write agent_memory entries for patterns detected in this cycle
+  try {
+    await writeAgentMemory(workspaceId);
+  } catch (memErr) {
+    console.error(`[Agent Cycle] Memory write error for workspace ${workspaceId}:`, memErr);
+  }
 
   return { ...summary, runId: runResult.rows[0]?.id };
 }

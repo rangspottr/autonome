@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace } from '../middleware/auth.js';
+import { seedScenario } from '../db/seed-scenario.js';
 
 const router = Router();
 
@@ -19,6 +20,14 @@ router.post('/', requireAuth, async (req, res, next) => {
       `INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`,
       [workspace.id, req.user.id]
     );
+
+    // Auto-seed new workspaces with realistic demo data (non-fatal)
+    try {
+      await seedScenario(workspace.id);
+    } catch (seedErr) {
+      console.error('[Workspace] Seed scenario failed (non-fatal):', seedErr.message);
+    }
+
     res.status(201).json(workspace);
   } catch (err) {
     next(err);

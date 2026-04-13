@@ -10,6 +10,41 @@ const AGENT_LABELS = {
 };
 
 /**
+ * Build a human-readable reasoning string explaining why an agent took an action.
+ */
+function buildReasoning(agent, action, decision, description) {
+  const targetName = decision.targetName || decision.target || 'entity';
+  const impact = decision.impact ? ` ($${Math.round(decision.impact).toLocaleString()} at risk)` : '';
+  if (agent === 'finance') {
+    if (action === 'remind' || action === 'pre') return `Invoice for ${targetName} is overdue${impact}. Workspace policy triggers automatic payment reminders for outstanding balances.`;
+    if (action === 'urgent') return `Invoice for ${targetName} is critically overdue${impact}. Escalating urgency to prompt immediate payment.`;
+    if (action === 'escalate') return `Multiple reminders sent for ${targetName} with no response${impact}. Escalating to collections per workspace policy.`;
+    if (action === 'mark_paid') return `Payment confirmed for ${targetName}. Marking invoice as paid and closing collection workflow.`;
+  }
+  if (agent === 'revenue') {
+    if (action === 'qualify') return `${targetName} shows signs of purchase intent. Qualifying lead to progress through sales pipeline.`;
+    if (action === 'followup') return `Deal with ${targetName} has been stale${impact}. Sending follow-up to re-engage and advance pipeline stage.`;
+    if (action === 'reengage') return `${targetName} has been unresponsive for an extended period. Re-engagement sequence initiated to recover deal.`;
+    if (action === 'close') return `Deal with ${targetName} meets closing criteria${impact}. Marking as closed-won.`;
+  }
+  if (agent === 'operations') {
+    if (action === 'escalate') return `Task for ${targetName} is overdue and blocking progress. Escalating priority and creating escalation workflow.`;
+    if (action === 'reorder') return `Asset ${targetName} is below reorder threshold. Initiating restock to prevent operational disruption.`;
+  }
+  return description;
+}
+
+/**
+ * Determine if an action should be handed off to another agent.
+ * Returns the target agent name, or null if no handoff.
+ */
+function resolveHandoff(agent, action) {
+  if (agent === 'revenue' && action === 'close') return 'finance';
+  if (agent === 'finance' && action === 'escalate') return 'support';
+  return null;
+}
+
+/**
  * Execute a single agent decision against real database tables.
  * - Email actions: create a communication record (status='queued')
  * - Status updates: update the target entity
@@ -231,6 +266,8 @@ export async function executeAction(workspaceId, decision, options = {}) {
     support: 'ticket',
   };
 
+  const entityType = entityTypeMap[agent] || agent;
+
   await pool.query(
     `INSERT INTO audit_log (workspace_id, agent, action, entity_type, entity_id, details, outcome)
      VALUES ($1, $2, $3, $4, $5, $6, 'executed')`,
@@ -238,7 +275,7 @@ export async function executeAction(workspaceId, decision, options = {}) {
       workspaceId,
       agentLabel,
       action,
-      entityTypeMap[agent] || agent,
+      entityType,
       target,
       JSON.stringify({
         desc: description,
@@ -249,6 +286,40 @@ export async function executeAction(workspaceId, decision, options = {}) {
       }),
     ]
   );
+
+  // ── Persistent agent action record ──────────────────────────────────────────
+  const reasoning = decision.reasoning || buildReasoning(agent, action, decision, description);
+  const handedOffTo = resolveHandoff(agent, action);
+  const outcome = handedOffTo ? 'handed_off' : 'completed';
+
+  try {
+    await pool.query(
+      `INSERT INTO agent_actions
+         (workspace_id, agent, action_type, entity_type, entity_id, description, reasoning, outcome, handed_off_to, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        workspaceId,
+        agent,
+        action,
+        entityType,
+        target || null,
+        description,
+        reasoning,
+        outcome,
+        handedOffTo,
+        JSON.stringify({
+          auto: decision.auto || false,
+          approvedBy: options.approvedBy || null,
+          communicationId,
+          workflowId,
+          impact: decision.impact || null,
+        }),
+      ]
+    );
+  } catch (agentActionErr) {
+    // Non-fatal — log and continue
+    console.error('[Execution] Failed to write agent_action:', agentActionErr.message);
+  }
 
   return { success: true, description, communicationId, workflowId };
 }
