@@ -179,7 +179,7 @@ function Step2({ connected, onToggle, onNext, onBack }) {
   );
 }
 
-function Step3({ onSubmit, loading, error, apiKey, onApiKeyChange, testResult, onTest, testing }) {
+function Step3({ onSubmit, onSkip, loading, error, apiKey, onApiKeyChange, testResult, onTest, testing }) {
   return (
     <div>
       <ProgressBar step={3} total={3} />
@@ -260,7 +260,7 @@ function Step3({ onSubmit, loading, error, apiKey, onApiKeyChange, testResult, o
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 8 }}>
-        <button onClick={onSubmit} disabled={loading} style={secondaryBtn}>
+        <button onClick={onSkip} disabled={loading} style={secondaryBtn}>
           Skip for now — set up later
         </button>
       </div>
@@ -330,6 +330,23 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleSkip() {
+    setError('');
+    setLoading(true);
+    try {
+      const updated = await api.post(`/workspaces/${workspace.id}/complete-onboarding`, {
+        company_size: formData.companySize,
+        industry: formData.industry,
+      });
+      setWorkspace(updated);
+      navigate(isActive ? '/' : '/checkout');
+    } catch (err) {
+      setError(err.message || 'Failed to complete setup.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div style={wrap}>
       <div style={card}>
@@ -352,6 +369,7 @@ export default function OnboardingPage() {
         {step === 3 && (
           <Step3
             onSubmit={handleFinish}
+            onSkip={handleSkip}
             loading={loading}
             error={error}
             apiKey={apiKey}
