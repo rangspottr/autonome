@@ -190,30 +190,99 @@ router.get('/:agent/workstream', ...guard, async (req, res, next) => {
           overdueTasks: parseInt(taskResult.rows[0]?.overdue_tasks) || 0,
         };
       } else if (agent === 'support') {
-        const riskResult = await pool.query(
-          `SELECT COUNT(*) AS at_risk
-           FROM agent_memory
-           WHERE workspace_id = $1 AND agent = 'support' AND memory_type = 'blocker'`,
-          [wsId]
-        );
+        const [atRiskResult, blockedResult, regressionResult] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(*) AS at_risk
+             FROM (
+               SELECT c.id
+               FROM contacts c
+               WHERE c.workspace_id = $1
+                 AND EXISTS (
+                   SELECT 1 FROM invoices i WHERE i.contact_id = c.id AND i.workspace_id = $1
+                     AND (i.status = 'overdue' OR (i.status = 'pending' AND i.due_date < NOW()))
+                 )
+                 AND EXISTS (
+                   SELECT 1 FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1
+                     AND d.stage NOT IN ('won', 'lost')
+                 )
+             ) sub`,
+            [wsId]
+          ),
+          pool.query(
+            `SELECT COUNT(*) AS blocked_count
+             FROM (
+               SELECT entity_id
+               FROM agent_actions
+               WHERE workspace_id = $1 AND entity_type = 'contact' AND outcome = 'blocked'
+               GROUP BY entity_id
+               HAVING COUNT(*) >= 3
+             ) sub`,
+            [wsId]
+          ),
+          pool.query(
+            `SELECT COUNT(*) AS regressions
+             FROM deals
+             WHERE workspace_id = $1
+               AND stage IN ('new', 'qualified', 'proposal')
+               AND probability >= 70`,
+            [wsId]
+          ),
+        ]);
         summary = {
-          atRiskContacts: parseInt(riskResult.rows[0]?.at_risk) || 0,
+          atRiskContacts: parseInt(atRiskResult.rows[0]?.at_risk) || 0,
+          blockedActionCount: parseInt(blockedResult.rows[0]?.blocked_count) || 0,
+          dealRegressions: parseInt(regressionResult.rows[0]?.regressions) || 0,
         };
       } else if (agent === 'growth') {
-        const dormantResult = await pool.query(
-          `SELECT COUNT(*) AS dormant
-           FROM contacts c
-           WHERE c.workspace_id = $1
-             AND c.type IN ('lead', 'prospect')
-             AND NOT EXISTS (
-               SELECT 1 FROM agent_actions aa
-               WHERE aa.entity_id = c.id AND aa.agent = 'growth'
-                 AND aa.created_at > NOW() - INTERVAL '30 days'
-             )`,
-          [wsId]
-        );
+        const [dormantResult, staleResult, expansionResult] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(*) AS dormant
+             FROM (
+               SELECT c.id,
+                      FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(
+                        (SELECT MAX(d.updated_at) FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1),
+                        c.created_at
+                      ))) / 86400)::int AS days_inactive
+               FROM contacts c
+               WHERE c.workspace_id = $1 AND c.type = 'customer'
+             ) sub
+             WHERE days_inactive >= 30`,
+            [wsId]
+          ),
+          pool.query(
+            `SELECT COUNT(*) AS stale
+             FROM contacts c
+             WHERE c.workspace_id = $1
+               AND c.type = 'lead'
+               AND c.created_at < NOW() - INTERVAL '7 days'
+               AND NOT EXISTS (
+                 SELECT 1 FROM agent_actions aa
+                 WHERE aa.entity_id = c.id AND aa.workspace_id = $1
+                   AND aa.entity_type = 'contact'
+               )`,
+            [wsId]
+          ),
+          pool.query(
+            `SELECT COUNT(*) AS expansion
+             FROM (
+               SELECT c.id
+               FROM contacts c
+               JOIN invoices i ON i.contact_id = c.id AND i.workspace_id = $1 AND i.status = 'paid'
+               WHERE c.workspace_id = $1
+                 AND NOT EXISTS (
+                   SELECT 1 FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1
+                     AND d.stage NOT IN ('won', 'lost')
+                 )
+               GROUP BY c.id
+               HAVING SUM(i.amount) > 5000
+             ) sub`,
+            [wsId]
+          ),
+        ]);
         summary = {
-          dormantLeads: parseInt(dormantResult.rows[0]?.dormant) || 0,
+          dormantCustomers: parseInt(dormantResult.rows[0]?.dormant) || 0,
+          staleLeads: parseInt(staleResult.rows[0]?.stale) || 0,
+          expansionOpportunities: parseInt(expansionResult.rows[0]?.expansion) || 0,
         };
       }
     } catch (summaryErr) {

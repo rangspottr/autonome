@@ -253,5 +253,227 @@ export async function generateDecisions(workspaceId) {
     });
   }
 
+  // ── Support: at-risk accounts (overdue invoices + open deals) ─────────────────
+  const atRiskResult = await pool.query(
+    `SELECT id, name, overdue_amount, deal_id, deal_value
+     FROM (
+       SELECT c.id, c.name,
+              (SELECT COALESCE(SUM(i.amount), 0)
+               FROM invoices i
+               WHERE i.contact_id = c.id AND i.workspace_id = $1
+                 AND (i.status = 'overdue' OR (i.status = 'pending' AND i.due_date < NOW()))
+              ) AS overdue_amount,
+              (SELECT d.id FROM deals d
+               WHERE d.contact_id = c.id AND d.workspace_id = $1
+                 AND d.stage NOT IN ('won', 'lost')
+               ORDER BY d.value DESC LIMIT 1
+              ) AS deal_id,
+              (SELECT COALESCE(SUM(d.value), 0) FROM deals d
+               WHERE d.contact_id = c.id AND d.workspace_id = $1
+                 AND d.stage NOT IN ('won', 'lost')
+              ) AS deal_value
+       FROM contacts c
+       WHERE c.workspace_id = $1
+         AND EXISTS (
+           SELECT 1 FROM invoices i WHERE i.contact_id = c.id AND i.workspace_id = $1
+             AND (i.status = 'overdue' OR (i.status = 'pending' AND i.due_date < NOW()))
+         )
+         AND EXISTS (
+           SELECT 1 FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1
+             AND d.stage NOT IN ('won', 'lost')
+         )
+     ) sub
+     WHERE overdue_amount > 0`,
+    [workspaceId]
+  );
+
+  for (const row of atRiskResult.rows) {
+    if (has('support', 'retention', row.id)) continue;
+    const overdueAmt = parseFloat(row.overdue_amount) || 0;
+    const dealVal = parseFloat(row.deal_value) || 0;
+    decisions.push({
+      id: `support-retention-${row.id}`,
+      agent: 'support',
+      action: 'retention',
+      target: row.id,
+      targetName: row.name,
+      priority: 88,
+      impact: dealVal,
+      desc: `At-risk account: ${row.name} has $${overdueAmt.toFixed(2)} overdue while a $${dealVal.toFixed(2)} deal is open. Prioritize retention outreach.`,
+      auto: false,
+      needsApproval: true,
+      contactId: row.id,
+      reasoning: `${row.name} has $${overdueAmt.toFixed(2)} in overdue invoices while a $${dealVal.toFixed(2)} deal remains open. This combination signals account stress — if the overdue balance goes unresolved the open deal is at serious risk of being lost. Retention outreach should be prioritized immediately.`,
+    });
+  }
+
+  // ── Support: repeat blockers (contacts with 3+ blocked agent actions) ─────────
+  const blockerResult = await pool.query(
+    `SELECT aa.entity_id AS contact_id, c.name, COUNT(*) AS blocked_count
+     FROM agent_actions aa
+     JOIN contacts c ON c.id = aa.entity_id AND c.workspace_id = $1
+     WHERE aa.workspace_id = $1 AND aa.entity_type = 'contact' AND aa.outcome = 'blocked'
+     GROUP BY aa.entity_id, c.name
+     HAVING COUNT(*) >= 3`,
+    [workspaceId]
+  );
+
+  for (const row of blockerResult.rows) {
+    if (has('support', 'escalate', row.contact_id)) continue;
+    const n = parseInt(row.blocked_count) || 0;
+    decisions.push({
+      id: `support-escalate-${row.contact_id}`,
+      agent: 'support',
+      action: 'escalate',
+      target: row.contact_id,
+      targetName: row.name,
+      priority: 82,
+      impact: 0,
+      desc: `Repeat blocker: ${row.name} has ${n} unresolved issues. Escalate to owner for direct intervention.`,
+      auto: false,
+      needsApproval: true,
+      contactId: row.contact_id,
+      reasoning: `${row.name} has accumulated ${n} blocked agent actions, indicating a persistent unresolved issue that automated workflows cannot clear. Direct owner intervention is required to break the cycle and restore service continuity.`,
+    });
+  }
+
+  // ── Support: deal regressions (high probability in early stage) ───────────────
+  const regressionResult = await pool.query(
+    `SELECT d.id, d.title, d.stage, d.probability, d.value, d.contact_id,
+            c.name AS contact_name
+     FROM deals d
+     LEFT JOIN contacts c ON c.id = d.contact_id
+     WHERE d.workspace_id = $1
+       AND d.stage IN ('new', 'qualified', 'proposal')
+       AND d.probability >= 70`,
+    [workspaceId]
+  );
+
+  for (const deal of regressionResult.rows) {
+    if (has('support', 'investigate', deal.id)) continue;
+    const dealVal = parseFloat(deal.value) || 0;
+    const contactName = deal.contact_name || 'contact';
+    // Infer expected stage from probability to give meaningful regression context
+    const expectedStage = deal.probability >= 80 ? 'negotiation' : 'proposal/negotiation';
+    decisions.push({
+      id: `support-investigate-${deal.id}`,
+      agent: 'support',
+      action: 'investigate',
+      target: deal.id,
+      targetName: deal.title,
+      priority: 78,
+      impact: dealVal,
+      desc: `Deal regression: "${deal.title}" is in ${deal.stage} at ${deal.probability}% — expected to be at ${expectedStage}. Investigate and recover.`,
+      auto: false,
+      needsApproval: true,
+      contactId: deal.contact_id,
+      reasoning: `"${deal.title}" with ${contactName} carries ${deal.probability}% close probability but sits in the ${deal.stage} stage, which is inconsistent with normal deal progression. This misalignment suggests a potential regression from a more advanced stage. Investigating the cause and executing a recovery plan can prevent the $${dealVal.toFixed(2)} deal from stalling permanently.`,
+    });
+  }
+
+  // ── Growth: dormant customers (type='customer', no deal activity in 30+ days) ─
+  const dormantResult = await pool.query(
+    `SELECT id, name, days_inactive
+     FROM (
+       SELECT c.id, c.name,
+              FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(
+                (SELECT MAX(d.updated_at) FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1),
+                c.created_at
+              ))) / 86400)::int AS days_inactive
+       FROM contacts c
+       WHERE c.workspace_id = $1 AND c.type = 'customer'
+     ) sub
+     WHERE days_inactive >= 30`,
+    [workspaceId]
+  );
+
+  for (const row of dormantResult.rows) {
+    if (has('growth', 'reactivate', row.id)) continue;
+    const days = parseInt(row.days_inactive) || 30;
+    decisions.push({
+      id: `growth-reactivate-${row.id}`,
+      agent: 'growth',
+      action: 'reactivate',
+      target: row.id,
+      targetName: row.name,
+      priority: 72,
+      impact: 0,
+      desc: `Dormant customer: ${row.name} — no deal activity in ${days} days. Reactivation campaign recommended.`,
+      auto: true,
+      needsApproval: false,
+      contactId: row.id,
+      reasoning: `${row.name} has been a customer with no deal activity for ${days} days. Dormant customers represent high-probability reactivation opportunities since they already trust the business. A targeted reactivation campaign now is more cost-effective than acquiring a new customer.`,
+    });
+  }
+
+  // ── Growth: stale leads (created 7+ days ago, no agent action) ───────────────
+  const staleLeadResult = await pool.query(
+    `SELECT c.id, c.name,
+            FLOOR(EXTRACT(EPOCH FROM (NOW() - c.created_at)) / 86400)::int AS days_since_added
+     FROM contacts c
+     WHERE c.workspace_id = $1
+       AND c.type = 'lead'
+       AND c.created_at < NOW() - INTERVAL '7 days'
+       AND NOT EXISTS (
+         SELECT 1 FROM agent_actions aa
+         WHERE aa.entity_id = c.id AND aa.workspace_id = $1
+           AND aa.entity_type = 'contact'
+       )`,
+    [workspaceId]
+  );
+
+  for (const row of staleLeadResult.rows) {
+    if (has('growth', 'outreach', row.id)) continue;
+    const days = parseInt(row.days_since_added) || 7;
+    decisions.push({
+      id: `growth-outreach-${row.id}`,
+      agent: 'growth',
+      action: 'outreach',
+      target: row.id,
+      targetName: row.name,
+      priority: 60,
+      impact: 0,
+      desc: `Stale lead: ${row.name} added ${days} days ago with no outreach. Qualify or archive.`,
+      auto: true,
+      needsApproval: false,
+      contactId: row.id,
+      reasoning: `${row.name} was added as a lead ${days} days ago but has received zero agent outreach. Leads left untouched beyond 7 days show a steep drop-off in conversion rates. Qualifying or archiving this contact now keeps the pipeline clean and prevents future confusion.`,
+    });
+  }
+
+  // ── Growth: expansion opportunities (paid > $5000, no active deal) ────────────
+  const expansionResult = await pool.query(
+    `SELECT c.id, c.name, SUM(i.amount) AS total_paid
+     FROM contacts c
+     JOIN invoices i ON i.contact_id = c.id AND i.workspace_id = $1 AND i.status = 'paid'
+     WHERE c.workspace_id = $1
+       AND NOT EXISTS (
+         SELECT 1 FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1
+           AND d.stage NOT IN ('won', 'lost')
+       )
+     GROUP BY c.id, c.name
+     HAVING SUM(i.amount) > 5000`,
+    [workspaceId]
+  );
+
+  for (const row of expansionResult.rows) {
+    if (has('growth', 'upsell', row.id)) continue;
+    const totalPaid = parseFloat(row.total_paid) || 0;
+    decisions.push({
+      id: `growth-upsell-${row.id}`,
+      agent: 'growth',
+      action: 'upsell',
+      target: row.id,
+      targetName: row.name,
+      priority: 68,
+      impact: totalPaid * 0.3,
+      desc: `Expansion opportunity: ${row.name} has paid $${totalPaid.toFixed(2)} total but has no active deal. Upsell recommended.`,
+      auto: false,
+      needsApproval: true,
+      contactId: row.id,
+      reasoning: `${row.name} has a strong payment history totalling $${totalPaid.toFixed(2)} with no active deal currently open. High-value customers with no open deal are prime expansion candidates — they have demonstrated willingness to pay and existing trust in the business. An upsell or cross-sell conversation now has a high probability of converting.`,
+    });
+  }
+
   return decisions.sort((a, b) => b.priority - a.priority);
 }

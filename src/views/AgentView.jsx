@@ -296,39 +296,43 @@ function AgentDomainMetrics({ agent, workstream, decisions, activeWorkflows }) {
 
   if (agent === "support") {
     const atRiskCount = workstream?.summary?.atRiskContacts || 0;
+    const blockedActions = workstream?.summary?.blockedActionCount || 0;
+    const dealRegressions = workstream?.summary?.dealRegressions || 0;
     return (
       <>
         <div className={styles.agentMetric}>
-          <div className={styles.agentMetricLabel}>Blockers</div>
-          <div className={styles.agentMetricVal} style={{ color: blockerCount > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>{blockerCount}</div>
-        </div>
-        <div className={styles.agentMetric}>
           <div className={styles.agentMetricLabel}>At Risk</div>
-          <div className={styles.agentMetricVal} style={{ color: atRiskCount > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{atRiskCount}</div>
+          <div className={styles.agentMetricVal} style={{ color: atRiskCount > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>{atRiskCount}</div>
         </div>
         <div className={styles.agentMetric}>
-          <div className={styles.agentMetricLabel}>Pending</div>
-          <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+          <div className={styles.agentMetricLabel}>Blocked</div>
+          <div className={styles.agentMetricVal} style={{ color: blockedActions > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{blockedActions}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Regressions</div>
+          <div className={styles.agentMetricVal} style={{ color: dealRegressions > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{dealRegressions}</div>
         </div>
       </>
     );
   }
 
   if (agent === "growth") {
-    const dormantLeads = workstream?.summary?.dormantLeads || 0;
+    const dormantCustomers = workstream?.summary?.dormantCustomers || 0;
+    const staleLeads = workstream?.summary?.staleLeads || 0;
+    const expansionOpps = workstream?.summary?.expansionOpportunities || 0;
     return (
       <>
         <div className={styles.agentMetric}>
-          <div className={styles.agentMetricLabel}>Dormant Leads</div>
-          <div className={styles.agentMetricVal} style={{ color: dormantLeads > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{dormantLeads}</div>
+          <div className={styles.agentMetricLabel}>Dormant</div>
+          <div className={styles.agentMetricVal} style={{ color: dormantCustomers > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{dormantCustomers}</div>
         </div>
         <div className={styles.agentMetric}>
-          <div className={styles.agentMetricLabel}>Active WFs</div>
-          <div className={styles.agentMetricVal} style={{ color: "var(--color-brand)" }}>{activeWorkflows}</div>
+          <div className={styles.agentMetricLabel}>Stale Leads</div>
+          <div className={styles.agentMetricVal} style={{ color: staleLeads > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{staleLeads}</div>
         </div>
         <div className={styles.agentMetric}>
-          <div className={styles.agentMetricLabel}>Pending</div>
-          <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+          <div className={styles.agentMetricLabel}>Expansion</div>
+          <div className={styles.agentMetricVal} style={{ color: expansionOpps > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{expansionOpps}</div>
         </div>
       </>
     );
