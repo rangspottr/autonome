@@ -206,35 +206,6 @@ function StripeForm({ dbCreds, onSaved }) {
   );
 }
 
-// ─── Lead Intake Form ─────────────────────────────────────────────────────────
-
-function LeadsForm() {
-  const [copied, setCopied] = useState(false);
-  const intakeUrl = `${window.location.origin}/api/webhooks/lead`;
-
-  function copyUrl() {
-    navigator.clipboard.writeText(intakeUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
-  return (
-    <div className={styles.formBody}>
-      <div className={styles.fieldLabel}>Your lead intake URL</div>
-      <div className={styles.urlRow}>
-        <code className={styles.urlCode}>{intakeUrl}</code>
-        <Button size="sm" variant="secondary" onClick={copyUrl}>
-          {copied ? "Copied!" : "Copy"}
-        </Button>
-      </div>
-      <div className={styles.urlHint}>
-        Submit a POST request with <code className={styles.inlineCode}>name</code>, <code className={styles.inlineCode}>email</code>, and <code className={styles.inlineCode}>phone</code> fields to this URL to add leads automatically.
-      </div>
-    </div>
-  );
-}
-
 // ─── Connection Card ──────────────────────────────────────────────────────────
 
 function ConnectionCard({ title, description, statusLabel, statusVariant, connected, defaultOpen, children }) {
@@ -478,7 +449,6 @@ export default function ConnectionsView() {
               )}
             </div>
 
-            <LeadsForm />
           </ConnectionCard>
 
         </div>
