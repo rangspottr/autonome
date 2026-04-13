@@ -774,7 +774,6 @@ export async function findEntityContext(workspaceId, message) {
   }
 
   if (candidates.length === 0) {
-    console.log(`[CONTEXT] workspace=${workspaceId} query="${message.slice(0, 60)}" entities=0 tier=aggregate tokens=0`);
     return { matches: [], tokens_consumed: 0 };
   }
 
@@ -796,10 +795,6 @@ export async function findEntityContext(workspaceId, message) {
       return { type: c.type, id: c.id, name: c.name, score: c.score, l0, l1, graph };
     })
     .filter(Boolean);
-
-  // Structured context log
-  const entitySummary = matches.map((m) => `${m.type}:${m.name} (score=${m.score.toFixed(2)})`).join(', ');
-  console.log(`[CONTEXT] workspace=${workspaceId} query="${message.slice(0, 60)}" entities=${matches.length} [${entitySummary}] tier=L1 tokens=${totalTokens}`);
 
   return { matches, tokens_consumed: totalTokens };
 }

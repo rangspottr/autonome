@@ -157,7 +157,7 @@ Respond as this specific agent. Be direct, data-driven, and actionable. When you
 async function callAI(systemPrompt, messages, maxTokens = 2048, creds = null) {
   const apiKey = creds?.ANTHROPIC_API_KEY ?? config.ANTHROPIC_API_KEY;
   const aiModel = creds?.AI_MODEL ?? config.AI_MODEL;
-  if (!apiKey) return null;
+  if (!apiKey) return { text: null, inputTokens: null };
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -177,14 +177,14 @@ async function callAI(systemPrompt, messages, maxTokens = 2048, creds = null) {
 
     if (!res.ok) {
       console.error('[Command] Anthropic API error:', res.status);
-      return null;
+      return { text: null, inputTokens: null };
     }
 
     const data = await res.json();
-    return data.content?.[0]?.text || null;
+    return { text: data.content?.[0]?.text || null, inputTokens: data.usage?.input_tokens ?? null };
   } catch (err) {
     console.error('[Command] Anthropic fetch error:', err.message);
-    return null;
+    return { text: null, inputTokens: null };
   }
 }
 
@@ -421,7 +421,11 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
       { role: 'user', content: trimmedMessage },
     ];
 
-    let responseText = await callAI(systemPrompt, messages, 2048, creds);
+    let responseText = null;
+    let agentChatInputTokens = null;
+    const aiResult = await callAI(systemPrompt, messages, 2048, creds);
+    responseText = aiResult.text;
+    agentChatInputTokens = aiResult.inputTokens;
     const source = responseText ? 'anthropic' : 'local';
     if (!responseText) {
       let richCtx = null;
@@ -441,6 +445,14 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
       hasPendingActions
     );
 
+    if (entityResult.matches.length > 0) {
+      const entitySummary = entityResult.matches.map((m) => `${m.type}:${m.name} (score=${m.score.toFixed(2)})`).join(', ');
+      const totalStr = agentChatInputTokens !== null ? ` total=${agentChatInputTokens}` : '';
+      console.log(`[CONTEXT] workspace=${workspaceId} agent=${agent} query="${trimmedMessage.slice(0, 60)}" entities=${entityResult.matches.length} [${entitySummary}] tier=L1 tokens=${entityResult.tokens_consumed}${totalStr}`);
+    } else if (agentChatInputTokens !== null) {
+      console.log(`[CONTEXT] workspace=${workspaceId} agent=${agent} query="${trimmedMessage.slice(0, 60)}" entities=0 tier=aggregate total=${agentChatInputTokens}`);
+    }
+
     await saveCommandMessages(
       workspaceId, userId, resolvedSessionId, agent,
       trimmedMessage, responseText,
@@ -452,6 +464,7 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
             entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
             entity_context_tier: 'L1',
             entity_tokens: entityResult.tokens_consumed,
+            ...(agentChatInputTokens !== null ? { total_prompt_tokens: agentChatInputTokens } : {}),
             // matches are sorted by score desc; first entry is always the best match
             match_method: entityResult.matches[0].score >= 1.0 ? 'exact_name' : 'partial_match',
           },
@@ -539,6 +552,7 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
     let richCtx = null;
     try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
 
+    let boardroomTotalInputTokens = 0;
     const agentResponses = await Promise.all(
       agentContexts.map(async ({ agent, ctx }) => {
         const systemPrompt = buildAgentSystemPrompt(agent, ctx, workspaceCtx, entityL1);
@@ -547,11 +561,10 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
           { role: 'user', content: trimmedMessage },
         ];
 
-        let responseText = await callAI(systemPrompt, messages, 2048, creds);
-        const source = responseText ? 'anthropic' : 'local';
-        if (!responseText) {
-          responseText = buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx);
-        }
+        const aiResult = await callAI(systemPrompt, messages, 2048, creds);
+        const source = aiResult.text ? 'anthropic' : 'local';
+        const responseText = aiResult.text || buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx);
+        if (aiResult.inputTokens !== null) boardroomTotalInputTokens += aiResult.inputTokens;
 
         return {
           agent,
@@ -594,7 +607,10 @@ Rules:
 - Priority disagreements (one agent marks high, another marks low for related work) are conflicts
 - Return ONLY valid JSON. No markdown code fences, no explanation text before or after.`;
 
-      let synthesisText = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048, creds);
+      let synthesisText = null;
+      const synthesisResult = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048, creds);
+      synthesisText = synthesisResult.text;
+      if (synthesisResult.inputTokens !== null) boardroomTotalInputTokens += synthesisResult.inputTokens;
 
       if (synthesisText) {
         // Try direct JSON parse first
@@ -614,14 +630,15 @@ Rules:
 
         // If still null, retry with a simpler structured-text prompt
         if (!synthesis) {
-          const retryText = await callAI(
+          const retryResult = await callAI(
             'You must output only a valid JSON object, no other text.',
             [{ role: 'user', content: `Return this as valid JSON only:\n${synthesisText}` }],
             1024,
             creds
           );
-          if (retryText) {
-            try { synthesis = JSON.parse(retryText); } catch { synthesis = null; }
+          if (retryResult.text) {
+            if (retryResult.inputTokens !== null) boardroomTotalInputTokens += retryResult.inputTokens;
+            try { synthesis = JSON.parse(retryResult.text); } catch { synthesis = null; }
           }
         }
       }
@@ -700,6 +717,14 @@ Rules:
       hasPendingActions
     );
 
+    if (entityResult.matches.length > 0) {
+      const entitySummary = entityResult.matches.map((m) => `${m.type}:${m.name} (score=${m.score.toFixed(2)})`).join(', ');
+      const totalStr = boardroomTotalInputTokens > 0 ? ` total=${boardroomTotalInputTokens}` : '';
+      console.log(`[CONTEXT] workspace=${workspaceId} mode=boardroom query="${trimmedMessage.slice(0, 60)}" entities=${entityResult.matches.length} [${entitySummary}] tier=L1 tokens=${entityResult.tokens_consumed}${totalStr}`);
+    } else if (boardroomTotalInputTokens > 0) {
+      console.log(`[CONTEXT] workspace=${workspaceId} mode=boardroom query="${trimmedMessage.slice(0, 60)}" entities=0 tier=aggregate total=${boardroomTotalInputTokens}`);
+    }
+
     await saveCommandMessages(
       workspaceId, userId, resolvedSessionId, 'boardroom',
       trimmedMessage, boardroomContent,
@@ -712,6 +737,7 @@ Rules:
             entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
             entity_context_tier: 'L1',
             entity_tokens: entityResult.tokens_consumed,
+            ...(boardroomTotalInputTokens > 0 ? { total_prompt_tokens: boardroomTotalInputTokens } : {}),
             // matches are sorted by score desc; first entry is always the best match
             match_method: entityResult.matches[0].score >= 1.0 ? 'exact_name' : 'partial_match',
           },
