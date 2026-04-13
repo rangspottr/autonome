@@ -973,6 +973,54 @@ router.get('/briefing', ...guard, async (req, res, next) => {
       [workspaceId]
     );
 
+    // Support & growth signal counts for owner briefing
+    const [supportSignalsResult, growthSignalsResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS at_risk
+         FROM (
+           SELECT c.id
+           FROM contacts c
+           WHERE c.workspace_id = $1
+             AND EXISTS (
+               SELECT 1 FROM invoices i WHERE i.contact_id = c.id AND i.workspace_id = $1
+                 AND (i.status = 'overdue' OR (i.status = 'pending' AND i.due_date < NOW()))
+             )
+             AND EXISTS (
+               SELECT 1 FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1
+                 AND d.stage NOT IN ('won', 'lost')
+             )
+         ) sub`,
+        [workspaceId]
+      ),
+      pool.query(
+        `SELECT
+           (SELECT COUNT(*) FROM (
+             SELECT c.id,
+                    FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(
+                      (SELECT MAX(d.updated_at) FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1),
+                      c.created_at
+                    ))) / 86400)::int AS days_inactive
+             FROM contacts c
+             WHERE c.workspace_id = $1 AND c.type = 'customer'
+           ) sub WHERE days_inactive >= 30) AS dormant_customers,
+           (SELECT COUNT(*) FROM contacts c
+            WHERE c.workspace_id = $1 AND c.type = 'lead'
+              AND c.created_at < NOW() - INTERVAL '7 days'
+              AND NOT EXISTS (
+                SELECT 1 FROM agent_actions aa
+                WHERE aa.entity_id = c.id AND aa.workspace_id = $1
+                  AND aa.entity_type = 'contact'
+              )
+           ) AS stale_leads`,
+        [workspaceId]
+      ),
+    ]);
+
+    const supportSignals = parseInt(supportSignalsResult.rows[0]?.at_risk) || 0;
+    const dormantCustomers = parseInt(growthSignalsResult.rows[0]?.dormant_customers) || 0;
+    const staleLeads = parseInt(growthSignalsResult.rows[0]?.stale_leads) || 0;
+    const growthSignals = dormantCustomers + staleLeads;
+
     res.json({
       since: lastActive.toISOString(),
       agent_actions: agentActions.rows,
@@ -987,6 +1035,8 @@ router.get('/briefing', ...guard, async (req, res, next) => {
         open_tasks: parseInt(metrics.open_tasks) || 0,
         blockers: parseInt(metrics.blockers) || 0,
       },
+      support_signals: supportSignals,
+      growth_signals: growthSignals,
       summary: {
         total_actions: agentActions.rows.length,
         total_pending: pendingDecisions.rows.length,

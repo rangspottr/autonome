@@ -231,6 +231,8 @@ export default function CmdCenter({ onRefreshMetrics }) {
         { label: "Set up a deal in the pipeline", done: (summary.deals?.total || 0) > 0 },
         { label: "Complete a task", done: (summary.tasks?.done || 0) > 0 },
         { label: "Review your first agent recommendation", done: (summary.recentAgentRuns || []).length > 0 },
+        { label: "Support signals monitored", done: (summary.contacts?.customers || 0) > 0 },
+        { label: "Growth pipeline active", done: (summary.contacts?.leads || 0) > 0 },
       ]
     : [];
   const checklistAllDone = checklist.length > 0 && checklist.every((c) => c.done);

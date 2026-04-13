@@ -42,7 +42,10 @@ router.get('/summary', ...guard, async (req, res, next) => {
     const wsId = req.workspace.id;
 
     const [contacts, deals, invoices, tasks, workflows, agentRuns] = await Promise.all([
-      pool.query('SELECT COUNT(*) AS total FROM contacts WHERE workspace_id = $1', [wsId]),
+      pool.query(`SELECT COUNT(*) AS total,
+                        COUNT(*) FILTER (WHERE type = 'customer') AS customers,
+                        COUNT(*) FILTER (WHERE type = 'lead') AS leads
+                 FROM contacts WHERE workspace_id = $1`, [wsId]),
       pool.query(
         `SELECT COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE stage NOT IN ('won', 'lost')) AS open,
@@ -81,6 +84,8 @@ router.get('/summary', ...guard, async (req, res, next) => {
     res.json({
       contacts: {
         total: parseInt(contacts.rows[0].total, 10) || 0,
+        customers: parseInt(contacts.rows[0].customers, 10) || 0,
+        leads: parseInt(contacts.rows[0].leads, 10) || 0,
       },
       deals: {
         total: parseInt(deals.rows[0].total, 10) || 0,
