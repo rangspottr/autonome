@@ -1,22 +1,23 @@
 import twilio from 'twilio';
 import { config } from '../config.js';
 import { pool } from '../db/index.js';
+import { resolveCredentials } from '../lib/credential-resolver.js';
 
-function isTwilioConfigured() {
-  return !!(config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN && config.TWILIO_PHONE_NUMBER);
+function isTwilioConfigured(creds) {
+  return !!(creds.TWILIO_ACCOUNT_SID && creds.TWILIO_AUTH_TOKEN && creds.TWILIO_PHONE_NUMBER);
 }
 
-export async function sendSMS({ to, body }) {
-  if (!isTwilioConfigured()) {
+export async function sendSMS({ to, body }, creds = config) {
+  if (!isTwilioConfigured(creds)) {
     console.log(`[SMS] Twilio not configured — simulating send to ${to}`);
     return { success: true, simulated: true };
   }
 
   try {
-    const client = twilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN);
+    const client = twilio(creds.TWILIO_ACCOUNT_SID, creds.TWILIO_AUTH_TOKEN);
     const message = await client.messages.create({
       body,
-      from: config.TWILIO_PHONE_NUMBER,
+      from: creds.TWILIO_PHONE_NUMBER,
       to,
     });
     return { success: true, sid: message.sid };
@@ -27,6 +28,8 @@ export async function sendSMS({ to, body }) {
 }
 
 export async function processSMSQueue(workspaceId) {
+  const resolvedCreds = await resolveCredentials(workspaceId).catch(() => config);
+
   const queued = await pool.query(
     `SELECT c.*, ct.phone AS contact_phone
      FROM communications c
@@ -47,7 +50,7 @@ export async function processSMSQueue(workspaceId) {
       continue;
     }
 
-    const result = await sendSMS({ to, body: comm.body || '' });
+    const result = await sendSMS({ to, body: comm.body || '' }, resolvedCreds);
 
     const newStatus = result.simulated ? 'simulated' : result.success ? 'sent' : 'failed';
     const metadata = result.simulated

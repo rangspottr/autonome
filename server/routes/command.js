@@ -5,6 +5,7 @@ import { requireAuth, requireWorkspace, requireActiveSubscription } from '../mid
 import { buildWorkspaceContext, findEntityContext, buildRichLocalContext } from '../lib/ai-context.js';
 import { executeAction } from '../engine/execution.js';
 import rateLimit from 'express-rate-limit';
+import { resolveCredentials } from '../lib/credential-resolver.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
@@ -153,19 +154,21 @@ Respond as this specific agent. Be direct, data-driven, and actionable. When you
 /**
  * Call Anthropic or fall back to a local structured response.
  */
-async function callAI(systemPrompt, messages, maxTokens = 2048) {
-  if (!config.ANTHROPIC_API_KEY) return null;
+async function callAI(systemPrompt, messages, maxTokens = 2048, creds = null) {
+  const apiKey = creds?.ANTHROPIC_API_KEY ?? config.ANTHROPIC_API_KEY;
+  const aiModel = creds?.AI_MODEL ?? config.AI_MODEL;
+  if (!apiKey) return null;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': config.ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: config.AI_MODEL,
+        model: aiModel,
         max_tokens: maxTokens,
         system: systemPrompt,
         messages,
@@ -385,6 +388,9 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
       buildWorkspaceContext(workspaceId),
     ]);
 
+    // Resolve credentials: DB takes priority over env vars
+    const creds = await resolveCredentials(workspaceId);
+
     let entityResult = { matches: [], tokens_consumed: 0 };
     try {
       entityResult = await findEntityContext(workspaceId, trimmedMessage);
@@ -415,7 +421,7 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
       { role: 'user', content: trimmedMessage },
     ];
 
-    let responseText = await callAI(systemPrompt, messages);
+    let responseText = await callAI(systemPrompt, messages, 2048, creds);
     const source = responseText ? 'anthropic' : 'local';
     if (!responseText) {
       let richCtx = null;
@@ -496,6 +502,9 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
 
     const workspaceCtx = await buildWorkspaceContext(workspaceId);
 
+    // Resolve credentials: DB takes priority over env vars
+    const creds = await resolveCredentials(workspaceId);
+
     // Gather context for all selected agents in parallel
     const agentContexts = await Promise.all(
       selectedAgents.map((agent) => buildAgentContext(workspaceId, agent).then((ctx) => ({ agent, ctx })))
@@ -538,7 +547,7 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
           { role: 'user', content: trimmedMessage },
         ];
 
-        let responseText = await callAI(systemPrompt, messages);
+        let responseText = await callAI(systemPrompt, messages, 2048, creds);
         const source = responseText ? 'anthropic' : 'local';
         if (!responseText) {
           responseText = buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx);
@@ -562,7 +571,7 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
 
     // Synthesize all agent responses
     let synthesis;
-    if (config.ANTHROPIC_API_KEY) {
+    if (creds.ANTHROPIC_API_KEY) {
       const entityContext = entityL1 ? `\nShared entity context (all agents have this):\n${entityL1}\n` : '';
       const synthesisPrompt = `You are a synthesis engine for ${workspaceCtx.businessName}.
 ${entityContext}
@@ -585,7 +594,7 @@ Rules:
 - Priority disagreements (one agent marks high, another marks low for related work) are conflicts
 - Return ONLY valid JSON. No markdown code fences, no explanation text before or after.`;
 
-      let synthesisText = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048);
+      let synthesisText = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048, creds);
 
       if (synthesisText) {
         // Try direct JSON parse first
@@ -608,7 +617,8 @@ Rules:
           const retryText = await callAI(
             'You must output only a valid JSON object, no other text.',
             [{ role: 'user', content: `Return this as valid JSON only:\n${synthesisText}` }],
-            1024
+            1024,
+            creds
           );
           if (retryText) {
             try { synthesis = JSON.parse(retryText); } catch { synthesis = null; }

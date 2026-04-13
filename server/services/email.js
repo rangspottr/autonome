@@ -1,33 +1,34 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 import { pool } from '../db/index.js';
+import { resolveCredentials } from '../lib/credential-resolver.js';
 
-function isSmtpConfigured() {
-  return !!(config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS);
+function isSmtpConfigured(creds) {
+  return !!(creds.SMTP_HOST && creds.SMTP_USER && creds.SMTP_PASS);
 }
 
-function createTransporter() {
+function createTransporter(creds) {
   return nodemailer.createTransport({
-    host: config.SMTP_HOST,
-    port: config.SMTP_PORT,
-    secure: config.SMTP_PORT === 465,
+    host: creds.SMTP_HOST,
+    port: creds.SMTP_PORT,
+    secure: creds.SMTP_PORT === 465,
     auth: {
-      user: config.SMTP_USER,
-      pass: config.SMTP_PASS,
+      user: creds.SMTP_USER,
+      pass: creds.SMTP_PASS,
     },
   });
 }
 
-export async function sendEmail({ to, subject, body, html }) {
-  if (!isSmtpConfigured()) {
+export async function sendEmail({ to, subject, body, html }, creds = config) {
+  if (!isSmtpConfigured(creds)) {
     console.log(`[Email] SMTP not configured — simulating send to ${to}: "${subject}"`);
     return { success: true, simulated: true };
   }
 
   try {
-    const transporter = createTransporter();
+    const transporter = createTransporter(creds);
     const info = await transporter.sendMail({
-      from: config.SMTP_FROM,
+      from: creds.SMTP_FROM,
       to,
       subject,
       text: body,
@@ -41,6 +42,8 @@ export async function sendEmail({ to, subject, body, html }) {
 }
 
 export async function processEmailQueue(workspaceId) {
+  const resolvedCreds = await resolveCredentials(workspaceId).catch(() => config);
+
   const queued = await pool.query(
     `SELECT c.*, ct.email AS contact_email
      FROM communications c
@@ -65,7 +68,7 @@ export async function processEmailQueue(workspaceId) {
       to,
       subject: comm.subject || '(No subject)',
       body: comm.body || '',
-    });
+    }, resolvedCreds);
 
     const newStatus = result.simulated ? 'simulated' : result.success ? 'sent' : 'failed';
     const metadata = result.simulated
