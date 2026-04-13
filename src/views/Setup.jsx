@@ -206,12 +206,13 @@ const INDUSTRY_OPTIMIZED_FOR = {
 };
 
 const STEPS = [
-  "Business Identity",
-  "Service Model",
-  "Revenue Model",
-  "Comm Preferences",
-  "Approval Thresholds",
-  "Data Import",
+  "Your Business",
+  "How You Operate",
+  "Your Deal Flow",
+  "Communication Rules",
+  "Agent Guardrails",
+  "Bring Your Data",
+  "Power Your AI Team",
 ];
 
 export default function Setup({ onComplete }) {
@@ -231,6 +232,7 @@ export default function Setup({ onComplete }) {
     approvalAbove: settings.riskLimits?.approvalAbove || 5000,
     typicalDealSize: Math.round((settings.riskLimits?.approvalAbove || 5000) / 2),
     importText: "",
+    apiKey: "",
   });
 
   const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
@@ -306,6 +308,17 @@ export default function Setup({ onComplete }) {
       }
 
       setWorkspace(updatedWorkspace);
+
+      // Save AI provider key if entered
+      if (form.apiKey.trim()) {
+        try {
+          await api.put("/credentials/anthropic", { credentials: { api_key: form.apiKey.trim() } });
+        } catch (e) { /* non-fatal */ }
+      }
+
+      // Trigger first agent cycle so the team is immediately active
+      try { await api.post("/agent/run-cycle"); } catch (e) { /* non-fatal */ }
+
       onComplete();
     } catch (err) {
       setError(err.message || "Setup failed. Please try again.");
@@ -371,27 +384,55 @@ export default function Setup({ onComplete }) {
       </div>
     </div>,
 
-    // Step 3: Comm Preferences
+    // Step 3: Communication Rules
     <div key="s3">
-      <p className={styles.stepSubtitle}>Communication settings.</p>
-      <Input label="Daily Email Limit" type="number" value={String(form.dailyEmailLimit)} onChange={set("dailyEmailLimit")} placeholder="50" />
+      <p className={styles.stepSubtitle}>Set communication preferences for your AI team.</p>
+      <Input
+        label="How many emails should your AI team send per day?"
+        type="number"
+        value={String(form.dailyEmailLimit)}
+        onChange={set("dailyEmailLimit")}
+        placeholder="50"
+      />
+      <p className={styles.textareaHint}>Your agents will stay within this limit when sending follow-ups, reminders, and outreach.</p>
       <div className={styles.checkboxRow}>
         <input type="checkbox" id="autoExec" checked={form.autoExec} onChange={(e) => set("autoExec")(e.target.checked)} />
         <label htmlFor="autoExec" className={styles.checkboxLabel}>
-          Enable autonomous execution (auto-execute safe actions)
+          Allow your AI team to take safe actions automatically (no approval needed for low-risk tasks)
         </label>
       </div>
     </div>,
 
-    // Step 4: Approval Thresholds
+    // Step 4: Agent Guardrails
     <div key="s4">
-      <p className={styles.stepSubtitle}>Configure when Autonome should ask for your approval.</p>
-      <Input label="Max Auto-Spend ($)" type="number" value={String(form.maxAutoSpend)} onChange={set("maxAutoSpend")} placeholder="500" />
-      <Input label="Refund Threshold ($)" type="number" value={String(form.refundThreshold)} onChange={set("refundThreshold")} placeholder="100" />
-      <Input label="Approval Required Above ($)" type="number" value={String(form.approvalAbove)} onChange={set("approvalAbove")} placeholder="5000" />
+      <p className={styles.stepSubtitle}>Tell your AI team when to act on their own and when to check with you first.</p>
+      <Input
+        label="What's the most your AI team should spend without asking?"
+        type="number"
+        value={String(form.maxAutoSpend)}
+        onChange={set("maxAutoSpend")}
+        placeholder="500"
+      />
+      <p className={styles.textareaHint}>Purchases, credits, or fees below this amount will be handled automatically.</p>
+      <Input
+        label="What's the most they should refund without checking?"
+        type="number"
+        value={String(form.refundThreshold)}
+        onChange={set("refundThreshold")}
+        placeholder="100"
+      />
+      <p className={styles.textareaHint}>Refunds below this amount are issued automatically to keep customers happy.</p>
+      <Input
+        label="At what dollar amount should they always get your approval?"
+        type="number"
+        value={String(form.approvalAbove)}
+        onChange={set("approvalAbove")}
+        placeholder="5000"
+      />
+      <p className={styles.textareaHint}>Any action above this threshold is sent to you for review before it's taken.</p>
     </div>,
 
-    // Step 5: Data Import
+    // Step 5: Bring Your Data
     <div key="s5">
       <p className={styles.stepSubtitle}>Optionally paste existing customer or deal data to import.</p>
       <textarea
@@ -402,6 +443,24 @@ export default function Setup({ onComplete }) {
       />
       <p className={styles.textareaHint}>
         Autonome will parse this text and extract contacts, deals, and tasks.
+      </p>
+    </div>,
+
+    // Step 6: Power Your AI Team
+    <div key="s6">
+      <p className={styles.stepSubtitle}>
+        Enter your Anthropic API key to power all 5 specialist agents with advanced intelligence.
+        You can also do this later in Connections.
+      </p>
+      <Input
+        label="Anthropic API Key"
+        type="password"
+        value={form.apiKey}
+        onChange={set("apiKey")}
+        placeholder="sk-ant-api…"
+      />
+      <p className={styles.textareaHint}>
+        Your key is stored securely and never shared. It unlocks advanced analysis, synthesis, and proactive recommendations across your entire AI team.
       </p>
     </div>,
   ];

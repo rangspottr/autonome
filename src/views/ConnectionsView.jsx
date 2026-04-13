@@ -178,6 +178,67 @@ function SMSForm({ dbCreds, onSaved }) {
   );
 }
 
+// ─── AI Provider Form ─────────────────────────────────────────────────────────
+
+function AIProviderForm({ dbCreds, onSaved }) {
+  const existing = dbCreds?.anthropic?.credentials || {};
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  async function handleSave() {
+    if (!apiKey.trim() && !existing.api_key) { setSaveError("API key is required."); return; }
+    setSaving(true); setSaveError(null);
+    try {
+      await api.put("/credentials/anthropic", { credentials: { api_key: apiKey || existing.api_key } });
+      onSaved?.();
+      setApiKey("");
+    } catch (err) {
+      setSaveError(err.message || "Failed to save.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    if (!apiKey.trim() && !existing.api_key) { setSaveError("Enter an API key to test."); return; }
+    setTesting(true); setTestResult(null); setSaveError(null);
+    try {
+      const result = await api.post("/credentials/anthropic/test", { credentials: { api_key: apiKey || existing.api_key } });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ success: false, error: err.message || "Test failed." });
+    } finally { setTesting(false); }
+  }
+
+  return (
+    <div className={styles.formBody}>
+      <p className={styles.formHint}>Find your API key at <strong>console.anthropic.com</strong>. Your key is stored securely and powers all 5 specialist agents.</p>
+      <Input
+        label="Anthropic API Key"
+        type="password"
+        value={apiKey}
+        onChange={setApiKey}
+        placeholder={existing.api_key ? `Current: ${existing.api_key}` : "sk-ant-api…"}
+        style={{ marginBottom: "var(--space-3)" }}
+      />
+      {saveError && <div className={styles.formError}>{saveError}</div>}
+      <StatusMsg testing={testing} result={testResult} />
+      <div className={styles.formActions}>
+        <Button size="sm" variant="secondary" onClick={handleTest} disabled={testing || saving}>
+          {testing ? "Testing…" : "Test Connection"}
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={saving || testing}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      {dbCreds?.anthropic?.last_verified_at && (
+        <div className={styles.lastVerified}>Last verified: {new Date(dbCreds.anthropic.last_verified_at).toLocaleString()}</div>
+      )}
+    </div>
+  );
+}
+
 // ─── Stripe Form ──────────────────────────────────────────────────────────────
 
 function StripeForm({ dbCreds, onSaved }) {
@@ -354,6 +415,8 @@ export default function ConnectionsView() {
     e.target.value = "";
   }
 
+  const aiStatus = connectionStatus(integrations, "ai", dbCreds) || connectionStatus(null, null, dbCreds?.anthropic ? { anthropic: dbCreds.anthropic } : null);
+  const aiConnected = !!(dbCreds?.anthropic?.credentials || integrations?.ai?.configured);
   const emailStatus = connectionStatus(integrations, "email", dbCreds);
   const smsStatus = connectionStatus(integrations, "sms", dbCreds);
   const stripeStatus = connectionStatus(integrations, "stripe", dbCreds);
@@ -375,6 +438,18 @@ export default function ConnectionsView() {
         </div>
       ) : (
         <div className={styles.cardGrid}>
+
+          {/* AI Intelligence — highest priority, powers the core differentiator */}
+          <ConnectionCard
+            title="AI Intelligence"
+            description="Powers advanced analysis, synthesis, and proactive recommendations across all 5 agents"
+            statusLabel={aiConnected ? "Connected ✓" : "Not connected"}
+            statusVariant={aiConnected ? "green" : "muted"}
+            connected={aiConnected}
+            defaultOpen={!aiConnected}
+          >
+            <AIProviderForm dbCreds={dbCreds} onSaved={handleSaved} />
+          </ConnectionCard>
 
           {/* Email */}
           <ConnectionCard

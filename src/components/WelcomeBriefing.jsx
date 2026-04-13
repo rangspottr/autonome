@@ -11,12 +11,16 @@ function $$(n) {
 export default function WelcomeBriefing({ onDismiss, onNavigate }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recentActions, setRecentActions] = useState([]);
 
   useEffect(() => {
     api.get("/metrics/summary")
       .then(setSummary)
       .catch(() => setSummary(null))
       .finally(() => setLoading(false));
+    api.get("/activity?limit=5")
+      .then((data) => setRecentActions(Array.isArray(data) ? data : (data?.activities || [])))
+      .catch(() => setRecentActions([]));
   }, []);
 
   const contacts = summary?.contacts?.total || 0;
@@ -167,6 +171,25 @@ export default function WelcomeBriefing({ onDismiss, onNavigate }) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Your AI Team's First Actions */}
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Your AI Team's First Actions</div>
+          {recentActions.length === 0 ? (
+            <div className={styles.emptyMsg}>
+              Your agents have started their first scan. Actions will appear here shortly.
+            </div>
+          ) : (
+            <div className={styles.actionsList}>
+              {recentActions.map((a, i) => (
+                <div key={i} className={styles.actionItem}>
+                  <span className={styles.actionIcon}>◎</span>
+                  <span className={styles.actionText}>{a.description || a.summary || a.text || "Agent action completed"}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
