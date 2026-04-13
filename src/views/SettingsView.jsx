@@ -1,14 +1,317 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
+import Select from "../components/Select.jsx";
 import Pill from "../components/Pill.jsx";
 import styles from "./SettingsView.module.css";
 
+// ─── Integration Setup Forms ─────────────────────────────────────────────────
+
+function IntegrationCard({ title, statusLabel, statusVariant, children, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <Card style={{ marginBottom: "var(--space-4)" }}>
+      <div className={styles.integrationCardHeader}>
+        <div className={styles.integrationCardTitle}>{title}</div>
+        <div className={styles.integrationCardActions}>
+          <Pill label={statusLabel} variant={statusVariant} />
+          <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)}>
+            {open ? "Hide" : "Edit"}
+          </Button>
+        </div>
+      </div>
+      {open && <div className={styles.integrationFormBody}>{children}</div>}
+    </Card>
+  );
+}
+
+function StatusMsg({ testing, result }) {
+  if (testing) return <div className={styles.testStatus} style={{ color: "var(--color-text-muted)" }}>Testing…</div>;
+  if (!result) return null;
+  return (
+    <div
+      className={styles.testStatus}
+      style={{ color: result.success ? "var(--color-success)" : "var(--color-danger)" }}
+    >
+      {result.success ? `✓ ${result.message}` : `✗ ${result.error}`}
+    </div>
+  );
+}
+
+// ─── AI Provider Form ─────────────────────────────────────────────────────────
+
+function AIProviderForm({ dbCreds, onSaved }) {
+  const [provider, setProvider] = useState("anthropic");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("claude-sonnet-4-20250514");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  const ANTHROPIC_MODELS = [
+    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 (claude-sonnet-4-20250514)" },
+    { value: "claude-opus-4-5", label: "Claude Opus 4.5" },
+    { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  ];
+  const OPENAI_MODELS = [
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+    { value: "gpt-4", label: "GPT-4" },
+    { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+  ];
+  const modelOptions = provider === "anthropic" ? ANTHROPIC_MODELS : OPENAI_MODELS;
+
+  async function handleSave() {
+    if (!apiKey.trim()) { setSaveError("API key is required."); return; }
+    setSaving(true); setSaveError(null);
+    try {
+      await api.put(`/credentials/${provider}`, { credentials: { api_key: apiKey, model } });
+      onSaved?.();
+      setApiKey("");
+    } catch (err) {
+      setSaveError(err.message || "Failed to save.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    if (!apiKey.trim()) { setSaveError("Enter an API key to test."); return; }
+    setTesting(true); setTestResult(null); setSaveError(null);
+    try {
+      const result = await api.post(`/credentials/${provider}/test`, { credentials: { api_key: apiKey, model } });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ success: false, error: err.message || "Test failed." });
+    } finally { setTesting(false); }
+  }
+
+  const existingKey = dbCreds?.[provider]?.credentials?.api_key;
+  const lastVerified = dbCreds?.[provider]?.last_verified_at;
+
+  return (
+    <div>
+      <Select
+        label="Provider"
+        value={provider}
+        onChange={(v) => { setProvider(v); setModel(v === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o"); }}
+        options={[{ value: "anthropic", label: "Anthropic" }, { value: "openai", label: "OpenAI" }]}
+        style={{ marginBottom: "var(--space-3)" }}
+      />
+      <Input
+        label="API Key"
+        type="password"
+        value={apiKey}
+        onChange={setApiKey}
+        placeholder={existingKey ? `Current: ${existingKey}` : provider === "anthropic" ? "sk-ant-api…" : "sk-…"}
+        style={{ marginBottom: "var(--space-3)" }}
+      />
+      <Select
+        label="Model"
+        value={model}
+        onChange={setModel}
+        options={modelOptions}
+        style={{ marginBottom: "var(--space-4)" }}
+      />
+      {saveError && <div className={styles.formError}>{saveError}</div>}
+      <StatusMsg testing={testing} result={testResult} />
+      <div className={styles.formActions}>
+        <Button size="sm" variant="secondary" onClick={handleTest} disabled={testing || saving}>
+          {testing ? "Testing…" : "Test Connection"}
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={saving || testing}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      {lastVerified && (
+        <div className={styles.lastVerified}>Last verified: {new Date(lastVerified).toLocaleString()}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Email (SMTP) Form ────────────────────────────────────────────────────────
+
+function EmailForm({ dbCreds, onSaved }) {
+  const existing = dbCreds?.smtp?.credentials || {};
+  const [host, setHost] = useState(existing.host || "");
+  const [port, setPort] = useState(existing.port || "587");
+  const [user, setUser] = useState(existing.user || "");
+  const [pass, setPass] = useState("");
+  const [from, setFrom] = useState(existing.from || "");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  async function handleSave() {
+    if (!host.trim() || !user.trim()) { setSaveError("Host and username are required."); return; }
+    setSaving(true); setSaveError(null);
+    try {
+      await api.put("/credentials/smtp", { credentials: { host, port, user, pass: pass || existing.pass, from } });
+      onSaved?.();
+      setPass("");
+    } catch (err) {
+      setSaveError(err.message || "Failed to save.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    setTesting(true); setTestResult(null); setSaveError(null);
+    try {
+      const result = await api.post("/credentials/smtp/test", { credentials: { host, port, user, pass: pass || existing.pass } });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ success: false, error: err.message || "Test failed." });
+    } finally { setTesting(false); }
+  }
+
+  return (
+    <div>
+      <div className={styles.formGrid}>
+        <Input label="SMTP Host" value={host} onChange={setHost} placeholder="smtp.example.com" />
+        <Input label="Port" type="number" value={port} onChange={setPort} placeholder="587" />
+      </div>
+      <div className={styles.formGrid} style={{ marginTop: "var(--space-3)" }}>
+        <Input label="Username" value={user} onChange={setUser} placeholder="user@example.com" />
+        <Input label="Password" type="password" value={pass} onChange={setPass} placeholder={existing.pass ? "••••••••" : "SMTP password"} />
+      </div>
+      <Input label="From Address" value={from} onChange={setFrom} placeholder="noreply@yourdomain.com" style={{ marginTop: "var(--space-3)" }} />
+      {saveError && <div className={styles.formError}>{saveError}</div>}
+      <StatusMsg testing={testing} result={testResult} />
+      <div className={styles.formActions} style={{ marginTop: "var(--space-4)" }}>
+        <Button size="sm" variant="secondary" onClick={handleTest} disabled={testing || saving}>
+          {testing ? "Testing…" : "Test Connection"}
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={saving || testing}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      {dbCreds?.smtp?.last_verified_at && (
+        <div className={styles.lastVerified}>Last verified: {new Date(dbCreds.smtp.last_verified_at).toLocaleString()}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── SMS (Twilio) Form ────────────────────────────────────────────────────────
+
+function SMSForm({ dbCreds, onSaved }) {
+  const existing = dbCreds?.twilio?.credentials || {};
+  const [accountSid, setAccountSid] = useState(existing.account_sid || "");
+  const [authToken, setAuthToken] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState(existing.phone_number || "");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  async function handleSave() {
+    if (!accountSid.trim()) { setSaveError("Account SID is required."); return; }
+    setSaving(true); setSaveError(null);
+    try {
+      await api.put("/credentials/twilio", { credentials: { account_sid: accountSid, auth_token: authToken || existing.auth_token, phone_number: phoneNumber } });
+      onSaved?.();
+      setAuthToken("");
+    } catch (err) {
+      setSaveError(err.message || "Failed to save.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    setTesting(true); setTestResult(null); setSaveError(null);
+    try {
+      const result = await api.post("/credentials/twilio/test", { credentials: { account_sid: accountSid, auth_token: authToken || existing.auth_token } });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ success: false, error: err.message || "Test failed." });
+    } finally { setTesting(false); }
+  }
+
+  return (
+    <div>
+      <Input label="Account SID" value={accountSid} onChange={setAccountSid} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style={{ marginBottom: "var(--space-3)" }} />
+      <Input label="Auth Token" type="password" value={authToken} onChange={setAuthToken} placeholder={existing.auth_token ? "••••••••" : "Auth token"} style={{ marginBottom: "var(--space-3)" }} />
+      <Input label="Twilio Phone Number" value={phoneNumber} onChange={setPhoneNumber} placeholder="+15550001234" style={{ marginBottom: "var(--space-4)" }} />
+      {saveError && <div className={styles.formError}>{saveError}</div>}
+      <StatusMsg testing={testing} result={testResult} />
+      <div className={styles.formActions}>
+        <Button size="sm" variant="secondary" onClick={handleTest} disabled={testing || saving}>
+          {testing ? "Testing…" : "Test Connection"}
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={saving || testing}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      {dbCreds?.twilio?.last_verified_at && (
+        <div className={styles.lastVerified}>Last verified: {new Date(dbCreds.twilio.last_verified_at).toLocaleString()}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Stripe Form ──────────────────────────────────────────────────────────────
+
+function StripeForm({ dbCreds, onSaved }) {
+  const existing = dbCreds?.stripe?.credentials || {};
+  const [secretKey, setSecretKey] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  async function handleSave() {
+    if (!secretKey.trim() && !existing.secret_key) { setSaveError("Secret key is required."); return; }
+    setSaving(true); setSaveError(null);
+    try {
+      await api.put("/credentials/stripe", { credentials: { secret_key: secretKey || existing.secret_key, webhook_secret: webhookSecret || existing.webhook_secret } });
+      onSaved?.();
+      setSecretKey(""); setWebhookSecret("");
+    } catch (err) {
+      setSaveError(err.message || "Failed to save.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    setTesting(true); setTestResult(null); setSaveError(null);
+    try {
+      const result = await api.post("/credentials/stripe/test", { credentials: { secret_key: secretKey || existing.secret_key } });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ success: false, error: err.message || "Test failed." });
+    } finally { setTesting(false); }
+  }
+
+  return (
+    <div>
+      <Input label="Secret Key" type="password" value={secretKey} onChange={setSecretKey} placeholder={existing.secret_key ? `Current: ${existing.secret_key}` : "sk_live_… or sk_test_…"} style={{ marginBottom: "var(--space-3)" }} />
+      <Input label="Webhook Secret" type="password" value={webhookSecret} onChange={setWebhookSecret} placeholder={existing.webhook_secret ? "••••••••" : "whsec_…"} style={{ marginBottom: "var(--space-4)" }} />
+      {saveError && <div className={styles.formError}>{saveError}</div>}
+      <StatusMsg testing={testing} result={testResult} />
+      <div className={styles.formActions}>
+        <Button size="sm" variant="secondary" onClick={handleTest} disabled={testing || saving}>
+          {testing ? "Testing…" : "Test Connection"}
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={saving || testing}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      {dbCreds?.stripe?.last_verified_at && (
+        <div className={styles.lastVerified}>Last verified: {new Date(dbCreds.stripe.last_verified_at).toLocaleString()}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Settings View ───────────────────────────────────────────────────────
+
 export default function SettingsView() {
   const { workspace } = useAuth();
+  const navigate = useNavigate();
 
   const [limits, setLimits] = useState({
     maxAutoSpend: 500,
@@ -24,7 +327,7 @@ export default function SettingsView() {
 
   const [integrations, setIntegrations] = useState(null);
   const [integrationsLoading, setIntegrationsLoading] = useState(true);
-  const [aiStatusData, setAiStatusData] = useState(null);
+  const [dbCreds, setDbCreds] = useState(null);
 
   const [webhookKey, setWebhookKey] = useState(null);
   const [webhookKeyLoading, setWebhookKeyLoading] = useState(true);
@@ -35,6 +338,11 @@ export default function SettingsView() {
   const [metricsLoading, setMetricsLoading] = useState(true);
 
   const [error, setError] = useState(null);
+
+  // Refs for scroll-to sections
+  const integrationsSectionRef = useRef(null);
+  const emailIntegrationRef = useRef(null);
+  const csvSectionRef = useRef(null);
 
   useEffect(() => {
     if (workspace?.settings?.riskLimits) {
@@ -48,15 +356,22 @@ export default function SettingsView() {
     }
   }, [workspace]);
 
-  useEffect(() => {
+  const loadIntegrations = useCallback(() => {
     api.get('/settings/integrations')
       .then(setIntegrations)
       .catch(() => setIntegrations(null))
       .finally(() => setIntegrationsLoading(false));
+  }, []);
 
-    api.get('/settings/ai-status')
-      .then(setAiStatusData)
-      .catch(() => setAiStatusData(null));
+  const loadDbCreds = useCallback(() => {
+    api.get('/credentials')
+      .then(setDbCreds)
+      .catch(() => setDbCreds(null));
+  }, []);
+
+  useEffect(() => {
+    loadIntegrations();
+    loadDbCreds();
 
     api.get('/webhooks/key')
       .then((data) => setWebhookKey(data.key))
@@ -67,7 +382,12 @@ export default function SettingsView() {
       .then(setMetrics)
       .catch(() => setMetrics(null))
       .finally(() => setMetricsLoading(false));
-  }, []);
+  }, [loadIntegrations, loadDbCreds]);
+
+  function handleCredentialSaved() {
+    loadIntegrations();
+    loadDbCreds();
+  }
 
   async function generateWebhookKey() {
     setWebhookKeyGenerating(true);
@@ -191,19 +511,62 @@ export default function SettingsView() {
     }
   }
 
+  const aiConfigured = !!(integrations?.ai?.configured);
+  const emailConfigured = !!(integrations?.email?.configured);
+
   const checks = metrics
     ? [
-        { label: "Business configured", done: !!metrics.businessConfigured },
-        { label: "Contacts added", done: (metrics.contactCount ?? 0) > 0 },
-        { label: "Transactions added", done: (metrics.transactionCount ?? 0) > 0 },
-        { label: "Deals in pipeline", done: (metrics.dealCount ?? 0) > 0 },
-        { label: "First cycle completed", done: !!metrics.firstCycleCompleted },
+        {
+          label: "Business configured",
+          done: !!metrics.businessConfigured,
+          action: () => resetSetup(),
+          actionLabel: "Set up",
+        },
+        {
+          label: "Contacts added",
+          done: (metrics.contactCount ?? 0) > 0,
+          action: () => csvSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
+          actionLabel: "Import",
+        },
+        {
+          label: "AI configured",
+          done: aiConfigured,
+          action: () => integrationsSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
+          actionLabel: "Configure",
+        },
+        {
+          label: "Email configured",
+          done: emailConfigured,
+          action: () => emailIntegrationRef.current?.scrollIntoView({ behavior: "smooth" }),
+          actionLabel: "Configure",
+        },
+        {
+          label: "Deals in pipeline",
+          done: (metrics.dealCount ?? 0) > 0,
+          action: () => navigate("/deals"),
+          actionLabel: "Add deal",
+        },
+        {
+          label: "First cycle completed",
+          done: !!metrics.firstCycleCompleted,
+          action: null,
+          actionLabel: null,
+        },
       ]
     : [];
   const checksDone = checks.filter((c) => c.done).length;
 
-  const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:3001/api';
-  const webhookBase = apiBase.replace(/\/api$/, '');
+  const webhookBase = window.location.origin;
+
+  // Determine integration status labels
+  function integrationStatus(key) {
+    const info = integrations?.[key];
+    if (!info) return { label: "Not configured", variant: "muted" };
+    if (info.verified) return { label: "Connected ●", variant: "green" };
+    if (info.configured && info.source === "env") return { label: "Via environment", variant: "amber" };
+    if (info.configured) return { label: "Configured", variant: "amber" };
+    return { label: "Not configured", variant: "muted" };
+  }
 
   return (
     <div className={styles.page}>
@@ -244,10 +607,13 @@ export default function SettingsView() {
                 </span>
                 <span
                   className={styles.checkLabel}
-                  style={{ color: c.done ? "var(--color-text-primary)" : "var(--color-text-muted)" }}
+                  style={{ color: c.done ? "var(--color-text-primary)" : "var(--color-text-muted)", flex: 1 }}
                 >
                   {c.label}
                 </span>
+                {!c.done && c.action && (
+                  <button className={styles.checkAction} onClick={c.action}>{c.actionLabel}</button>
+                )}
               </div>
             ))
           ) : (
@@ -256,71 +622,68 @@ export default function SettingsView() {
         </Card>
       </div>
 
-      {/* Integration Status */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Integration Status</h3>
+      {/* Integration Setup */}
+      <div className={styles.section} ref={integrationsSectionRef}>
+        <h3 className={styles.sectionTitle}>Integration Setup</h3>
         {integrationsLoading ? (
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading...</div>
-        ) : integrations ? (
-          <div className={styles.integrationGrid}>
-            {[
-              { label: "Email (SMTP)", key: "email" },
-              { label: "SMS (Twilio)", key: "sms" },
-              { label: "AI (Anthropic)", key: "ai" },
-              { label: "Stripe Billing", key: "stripe" },
-            ].map((item) => (
-              <div key={item.key} className={styles.integrationCard}>
-                <span className={styles.integrationName}>{item.label}</span>
-                <Pill
-                  label={integrations[item.key]?.configured ? "Configured" : "Not configured"}
-                  variant={integrations[item.key]?.configured ? "green" : "muted"}
-                />
-              </div>
-            ))}
-          </div>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading…</div>
         ) : (
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Unable to load integration status.</div>
-        )}
-      </div>
+          <>
+            {/* AI Provider */}
+            <IntegrationCard
+              title="AI Provider"
+              statusLabel={integrationStatus("ai").label}
+              statusVariant={integrationStatus("ai").variant}
+              defaultOpen={!aiConfigured}
+            >
+              {integrations?.ai?.source === "env" && (
+                <div className={styles.envNote}>✓ Configured via environment variable</div>
+              )}
+              <AIProviderForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+            </IntegrationCard>
 
-      {/* AI Provider Status */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>AI Provider</h3>
-        <Card>
-          {aiStatusData ? (
-            <div>
-              <div className={styles.integrationCard} style={{ marginBottom: "var(--space-3)" }}>
-                <span className={styles.integrationName}>Provider</span>
-                <Pill
-                  label={aiStatusData.provider === "anthropic" ? "Anthropic Claude" : "Not configured"}
-                  variant={aiStatusData.connected ? "green" : "muted"}
-                />
-              </div>
-              {aiStatusData.model && (
-                <div className={styles.integrationCard} style={{ marginBottom: "var(--space-3)" }}>
-                  <span className={styles.integrationName}>Model</span>
-                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-                    {aiStatusData.model}
-                  </span>
-                </div>
+            {/* Email (SMTP) */}
+            <div ref={emailIntegrationRef}>
+            <IntegrationCard
+              title="Email (SMTP)"
+              statusLabel={integrationStatus("email").label}
+              statusVariant={integrationStatus("email").variant}
+              defaultOpen={!emailConfigured}
+            >
+              {integrations?.email?.source === "env" && (
+                <div className={styles.envNote}>✓ Configured via environment variable</div>
               )}
-              <div className={styles.integrationCard} style={{ marginBottom: "var(--space-3)" }}>
-                <span className={styles.integrationName}>Connection</span>
-                <Pill
-                  label={aiStatusData.connected ? "Connected" : "Limited Mode"}
-                  variant={aiStatusData.connected ? "green" : "amber"}
-                />
-              </div>
-              {!aiStatusData.connected && (
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginTop: "var(--space-2)", padding: "var(--space-2) var(--space-3)", background: "rgba(245,158,11,0.07)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(245,158,11,0.2)" }}>
-                  Set the <code style={{ fontSize: "var(--text-xs)" }}>ANTHROPIC_API_KEY</code> environment variable to enable full AI responses.
-                </div>
-              )}
+              <EmailForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+            </IntegrationCard>
             </div>
-          ) : (
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading AI status…</div>
-          )}
-        </Card>
+
+            {/* SMS (Twilio) */}
+            <IntegrationCard
+              title="SMS (Twilio)"
+              statusLabel={integrationStatus("sms").label}
+              statusVariant={integrationStatus("sms").variant}
+              defaultOpen={!integrations?.sms?.configured}
+            >
+              {integrations?.sms?.source === "env" && (
+                <div className={styles.envNote}>✓ Configured via environment variable</div>
+              )}
+              <SMSForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+            </IntegrationCard>
+
+            {/* Stripe */}
+            <IntegrationCard
+              title="Stripe Billing"
+              statusLabel={integrationStatus("stripe").label}
+              statusVariant={integrationStatus("stripe").variant}
+              defaultOpen={!integrations?.stripe?.configured}
+            >
+              {integrations?.stripe?.source === "env" && (
+                <div className={styles.envNote}>✓ Configured via environment variable</div>
+              )}
+              <StripeForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+            </IntegrationCard>
+          </>
+        )}
       </div>
 
       {/* Webhook Integration */}
@@ -406,7 +769,7 @@ export default function SettingsView() {
       </div>
 
       {/* Data Import */}
-      <div className={styles.section}>
+      <div className={styles.section} ref={csvSectionRef}>
         <h3 className={styles.sectionTitle}>Data Import</h3>
         <Card>
           <p style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginBottom: "var(--space-3)" }}>
@@ -440,3 +803,4 @@ export default function SettingsView() {
     </div>
   );
 }
+

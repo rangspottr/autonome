@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { pool } from '../db/index.js';
-import { config } from '../config.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
 import { buildWorkspaceContext, buildLocalSummary, findEntityContext, buildRichLocalContext } from '../lib/ai-context.js';
+import { resolveCredentials } from '../lib/credential-resolver.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
@@ -65,7 +65,10 @@ router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
 
     const ctx = await buildWorkspaceContext(workspaceId);
 
-    if (!config.ANTHROPIC_API_KEY) {
+    // Resolve credentials: DB takes priority over env vars
+    const creds = await resolveCredentials(workspaceId);
+
+    if (!creds.ANTHROPIC_API_KEY) {
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
@@ -135,11 +138,11 @@ Provide concise, actionable answers grounded in this data.`;
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': config.ANTHROPIC_API_KEY,
+          'x-api-key': creds.ANTHROPIC_API_KEY,
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: config.AI_MODEL,
+          model: creds.AI_MODEL,
           max_tokens: 2048,
           system: systemPrompt,
           messages,

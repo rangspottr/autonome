@@ -40,6 +40,7 @@ import activityRoutes from './routes/activity.js';
 import notificationsRoutes from './routes/notifications.js';
 import autonomyRoutes from './routes/autonomy.js';
 import proactiveAlertsRoutes from './routes/proactive-alerts.js';
+import credentialsRoutes from './routes/credentials.js';
 import { startScheduler } from './engine/cycle.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
@@ -185,6 +186,7 @@ export function createApp() {
   app.use('/api/notifications', apiLimiter, notificationsRoutes);
   app.use('/api/autonomy-settings', apiLimiter, autonomyRoutes);
   app.use('/api/proactive-alerts', apiLimiter, proactiveAlertsRoutes);
+  app.use('/api/credentials', apiLimiter, credentialsRoutes);
 
   // In production, serve the Vite build
   if (process.env.NODE_ENV === 'production') {
