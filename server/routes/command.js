@@ -435,7 +435,7 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
     await saveCommandMessages(
       workspaceId, userId, resolvedSessionId, agent,
       trimmedMessage, responseText,
-      { hasPendingActions }
+      { source, hasPendingActions }
     );
 
     res.json({
@@ -674,7 +674,7 @@ Rules:
     await saveCommandMessages(
       workspaceId, userId, resolvedSessionId, 'boardroom',
       trimmedMessage, boardroomContent,
-      { synthesis, agentCount: selectedAgents.length }
+      { source: 'boardroom', synthesis, agentCount: selectedAgents.length }
     );
 
     res.json({
@@ -883,14 +883,24 @@ router.get('/briefing', ...guard, async (req, res, next) => {
     const workspaceId = req.workspace.id;
     const userId = req.user.id;
 
-    // Get user's last_active_at (falls back to 24h ago if not set)
+    // Get user's last_login_at and last_active_at (use GREATEST of both, fall back to 24h ago)
     const userResult = await pool.query(
-      `SELECT last_active_at FROM users WHERE id = $1`,
+      `SELECT last_login_at, last_active_at FROM users WHERE id = $1`,
       [userId]
     );
-    const lastActive = userResult.rows[0]?.last_active_at
+    const rawLastLogin = userResult.rows[0]?.last_login_at
+      ? new Date(userResult.rows[0].last_login_at)
+      : null;
+    const rawLastActive = userResult.rows[0]?.last_active_at
       ? new Date(userResult.rows[0].last_active_at)
-      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+      : null;
+    const fallback = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    let lastActive;
+    if (rawLastLogin && rawLastActive) {
+      lastActive = rawLastLogin > rawLastActive ? rawLastLogin : rawLastActive;
+    } else {
+      lastActive = rawLastLogin || rawLastActive || fallback;
+    }
 
     // Update last_active_at now
     await pool.query(
