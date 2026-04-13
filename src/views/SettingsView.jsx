@@ -629,59 +629,79 @@ export default function SettingsView() {
           <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading…</div>
         ) : (
           <>
-            {/* AI Provider */}
-            <IntegrationCard
-              title="AI Provider"
-              statusLabel={integrationStatus("ai").label}
-              statusVariant={integrationStatus("ai").variant}
-              defaultOpen={!aiConfigured}
-            >
+            {/* 🧠 AI Brain — prominently first */}
+            <div className={styles.aiBrainCard}>
+              <div className={styles.aiBrainHeader}>
+                <div className={styles.aiBrainTitleRow}>
+                  <span className={styles.aiBrainIcon}>🧠</span>
+                  <div>
+                    <div className={styles.aiBrainTitle}>AI Brain</div>
+                    <div className={styles.aiBrainSubtitle}>Connect your AI provider to power all agent intelligence</div>
+                  </div>
+                </div>
+                <div className={styles.aiBrainStatus}>
+                  {aiConfigured ? (
+                    <span className={styles.aiStatusActive}>● Active</span>
+                  ) : (
+                    <span className={styles.aiStatusInactive}>● Not Connected</span>
+                  )}
+                </div>
+              </div>
               {integrations?.ai?.source === "env" && (
                 <div className={styles.envNote}>✓ Configured via environment variable</div>
               )}
               <AIProviderForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
-            </IntegrationCard>
-
-            {/* Email (SMTP) */}
-            <div ref={emailIntegrationRef}>
-            <IntegrationCard
-              title="Email (SMTP)"
-              statusLabel={integrationStatus("email").label}
-              statusVariant={integrationStatus("email").variant}
-              defaultOpen={!emailConfigured}
-            >
-              {integrations?.email?.source === "env" && (
-                <div className={styles.envNote}>✓ Configured via environment variable</div>
-              )}
-              <EmailForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
-            </IntegrationCard>
             </div>
 
-            {/* SMS (Twilio) */}
-            <IntegrationCard
-              title="SMS (Twilio)"
-              statusLabel={integrationStatus("sms").label}
-              statusVariant={integrationStatus("sms").variant}
-              defaultOpen={!integrations?.sms?.configured}
-            >
-              {integrations?.sms?.source === "env" && (
-                <div className={styles.envNote}>✓ Configured via environment variable</div>
-              )}
-              <SMSForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
-            </IntegrationCard>
+            {/* Infrastructure Connections — collapsed by default */}
+            <details className={styles.infraDetails}>
+              <summary className={styles.infraSummary}>
+                <span>⚙️ Infrastructure Connections</span>
+                <span className={styles.infraSummaryHint}>Email, SMS, Payments</span>
+              </summary>
+              <div className={styles.infraBody}>
+                {/* Email (SMTP) */}
+                <div ref={emailIntegrationRef}>
+                <IntegrationCard
+                  title="Email (SMTP)"
+                  statusLabel={integrationStatus("email").label}
+                  statusVariant={integrationStatus("email").variant}
+                  defaultOpen={!emailConfigured}
+                >
+                  {integrations?.email?.source === "env" && (
+                    <div className={styles.envNote}>✓ Configured via environment variable</div>
+                  )}
+                  <EmailForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+                </IntegrationCard>
+                </div>
 
-            {/* Stripe */}
-            <IntegrationCard
-              title="Stripe Billing"
-              statusLabel={integrationStatus("stripe").label}
-              statusVariant={integrationStatus("stripe").variant}
-              defaultOpen={!integrations?.stripe?.configured}
-            >
-              {integrations?.stripe?.source === "env" && (
-                <div className={styles.envNote}>✓ Configured via environment variable</div>
-              )}
-              <StripeForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
-            </IntegrationCard>
+                {/* SMS (Twilio) */}
+                <IntegrationCard
+                  title="SMS (Twilio)"
+                  statusLabel={integrationStatus("sms").label}
+                  statusVariant={integrationStatus("sms").variant}
+                  defaultOpen={!integrations?.sms?.configured}
+                >
+                  {integrations?.sms?.source === "env" && (
+                    <div className={styles.envNote}>✓ Configured via environment variable</div>
+                  )}
+                  <SMSForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+                </IntegrationCard>
+
+                {/* Stripe */}
+                <IntegrationCard
+                  title="Stripe Billing"
+                  statusLabel={integrationStatus("stripe").label}
+                  statusVariant={integrationStatus("stripe").variant}
+                  defaultOpen={!integrations?.stripe?.configured}
+                >
+                  {integrations?.stripe?.source === "env" && (
+                    <div className={styles.envNote}>✓ Configured via environment variable</div>
+                  )}
+                  <StripeForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+                </IntegrationCard>
+              </div>
+            </details>
           </>
         )}
       </div>

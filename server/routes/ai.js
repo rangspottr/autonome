@@ -52,6 +52,31 @@ async function getOrCreateQuickSession(workspaceId, userId) {
   }
 }
 
+// GET /api/ai/status — returns whether AI is active and which provider/model is configured
+router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
+  try {
+    const creds = await resolveCredentials(req.workspace.id);
+    if (creds.ANTHROPIC_API_KEY) {
+      const source = creds._aiSource?.startsWith('db') ? 'db' : 'env';
+      return res.json({
+        active: true,
+        provider: 'anthropic',
+        model: creds.AI_MODEL || 'claude-sonnet-4-20250514',
+        source,
+      });
+    }
+    res.json({
+      active: false,
+      provider: null,
+      model: null,
+      source: null,
+      message: 'No AI provider configured. Go to Settings → AI Provider to connect Anthropic or OpenAI.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
   try {
     const { message } = req.body;

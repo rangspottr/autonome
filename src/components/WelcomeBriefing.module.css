@@ -1,0 +1,210 @@
+.wrapper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+  gap: var(--space-3);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.headerIcon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  font-size: var(--text-base);
+  font-weight: 800;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.headerSub {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.dismissBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-family);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dismissBtn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.cardTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.loading {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.emptyMsg {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* Scan list */
+.scanList { display: flex; flex-direction: column; gap: 6px; }
+.scanItem { display: flex; justify-content: space-between; align-items: center; }
+.scanLabel { font-size: var(--text-xs); color: var(--color-text-muted); }
+.scanValue { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-primary); }
+
+/* Risk / opp list */
+.riskList { display: flex; flex-direction: column; gap: 6px; }
+.riskItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-family);
+  transition: background 0.15s;
+}
+.riskItem:hover { background: var(--color-surface); }
+.riskIcon { font-size: 14px; flex-shrink: 0; }
+.riskText { flex: 1; font-size: var(--text-xs); color: var(--color-text-primary); line-height: 1.3; }
+.riskArrow { font-size: 11px; color: var(--color-text-muted); flex-shrink: 0; }
+
+/* Actions list */
+.actionsList { display: flex; flex-direction: column; gap: 4px; }
+.actionItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-family);
+  transition: background 0.15s;
+}
+.actionItem:hover { background: var(--color-surface); }
+.actionIcon { font-size: 14px; flex-shrink: 0; }
+.actionText { flex: 1; font-size: var(--text-xs); color: var(--color-text-primary); line-height: 1.3; }
+.actionArrow { font-size: 11px; color: var(--color-text-muted); flex-shrink: 0; }
+
+/* Agent section */
+.agentSection {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-4);
+}
+
+.agentSectionTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.agentGrid {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.agentCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  min-width: 80px;
+}
+
+.agentAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.agentName {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.agentStatus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agentPulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: agentPulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes agentPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.agentStatusText {
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
