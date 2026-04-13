@@ -219,7 +219,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
         type="password"
         value={apiKey}
         onChange={setApiKey}
-        placeholder={existing.api_key ? `Current: ${existing.api_key}` : "sk-ant-api…"}
+        placeholder={existing.api_key ? "Current key configured" : "sk-ant-api…"}
         style={{ marginBottom: "var(--space-3)" }}
       />
       {saveError && <div className={styles.formError}>{saveError}</div>}
@@ -415,7 +415,6 @@ export default function ConnectionsView() {
     e.target.value = "";
   }
 
-  const aiStatus = connectionStatus(integrations, "ai", dbCreds) || connectionStatus(null, null, dbCreds?.anthropic ? { anthropic: dbCreds.anthropic } : null);
   const aiConnected = !!(dbCreds?.anthropic?.credentials || integrations?.ai?.configured);
   const emailStatus = connectionStatus(integrations, "email", dbCreds);
   const smsStatus = connectionStatus(integrations, "sms", dbCreds);
