@@ -4,7 +4,7 @@
 }
 
 .pageHeader {
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-4);
 }
 
 .pageTitle {
@@ -18,4 +18,78 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.preamble {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-subtle, #F8FAFC);
+  border: 1px solid var(--color-border-subtle, #E2E8F0);
+  border-radius: var(--radius-lg);
+  min-height: 36px;
+}
+
+.preambleSkeletons {
+  display: flex;
+  align-items: center;
+}
+
+.statusBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+}
+
+.statusItem + .statusItem::before {
+  content: "·";
+  margin-right: var(--space-1);
+  color: var(--color-border-default, #CBD5E1);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: statusPulse 2s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.statusWarning {
+  color: var(--color-warning, #D97706);
+  font-weight: 600;
+}
+
+.statusDanger {
+  color: var(--color-danger, #DC2626);
+  font-weight: 600;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle, #E2E8F0);
+}
+
+.suggestion {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-brand, #2563EB);
+  cursor: default;
 }

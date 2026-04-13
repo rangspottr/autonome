@@ -260,8 +260,31 @@
   gap: var(--space-3);
 }
 
+.emptyIconWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .emptyIcon {
   font-size: 48px;
+}
+
+.emptyPulseDot {
+  position: absolute;
+  top: 2px;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: monitorPulse 2s infinite;
+}
+
+@keyframes monitorPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
 }
 
 .emptyTitle {

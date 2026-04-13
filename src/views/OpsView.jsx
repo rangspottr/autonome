@@ -147,8 +147,8 @@ export default function OpsView() {
           data={filtered}
           loading={loading}
           emptyIcon="○"
-          emptyTitle="No tasks"
-          emptyDescription="Add a task to get started."
+          emptyTitle="No tasks tracked yet"
+          emptyDescription="Your Operations agent will track tasks here. Add your first task or import data to get started."
           emptyAction={<Button size="sm" onClick={() => setShowForm(true)}>+ Add Task</Button>}
         />
       </Tabs>

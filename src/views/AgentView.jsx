@@ -527,7 +527,7 @@ export default function AgentView({ onRefreshMetrics }) {
 
       {/* Agent cards */}
       {agentStats.length === 0 ? (
-        <EmptyState icon="○" title="No agents configured" description="Agent metadata is not available." />
+        <EmptyState icon="○" title="Agent team unavailable" description="Something went wrong loading your AI team. Please refresh or contact support." />
       ) : (
         <div className={styles.agentsGrid}>
           {agentStats.map(({ agent, meta, decisions: decs, executions: _executions, activeWorkflows: awf, workstream }) => {
@@ -600,7 +600,7 @@ export default function AgentView({ onRefreshMetrics }) {
           loading={false}
           emptyIcon="○"
           emptyTitle="No active workflows"
-          emptyDescription="Workflows start automatically when agents detect issues requiring multi-step resolution."
+          emptyDescription="Your agents are monitoring for issues that require multi-step resolution. Workflows will appear here automatically."
         />
       </div>
     </div>
