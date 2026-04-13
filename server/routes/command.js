@@ -9,6 +9,8 @@ import rateLimit from 'express-rate-limit';
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 const commandLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 60,
@@ -605,7 +607,7 @@ router.post('/action', ...guard, async (req, res, next) => {
     }
 
     if (action === 'defer' && target_id) {
-      const reviewDate = metadata.review_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const reviewDate = metadata.review_date || new Date(Date.now() + ONE_DAY_MS).toISOString();
       await pool.query(
         `UPDATE agent_actions SET outcome = 'deferred', metadata = metadata || $1
          WHERE id = $2 AND workspace_id = $3`,

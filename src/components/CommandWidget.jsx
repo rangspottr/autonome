@@ -13,7 +13,7 @@ const TABS = [
   { id: "recent", label: "Recent" },
 ];
 
-export default function CommandWidget({ pendingApprovals = 0, workspace, user: _user }) {
+export default function CommandWidget({ pendingApprovals = 0, workspace }) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("quick");
   const [quickMessage, setQuickMessage] = useState("");

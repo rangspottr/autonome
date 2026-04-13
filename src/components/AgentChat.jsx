@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../lib/api.js";
-import AgentMeta from "./AgentMeta.js";
+import AgentMeta, { DEFAULT_AGENT_META } from "./AgentMeta.js";
 import styles from "./AgentChat.module.css";
 
 function relTime(ts) {
@@ -86,7 +86,7 @@ function InlineActions({ items, onAction, loading }) {
 }
 
 export default function AgentChat({ agent, sessionId: initialSessionId, onBack }) {
-  const meta = AgentMeta[agent] || { icon: agent.slice(0, 3).toUpperCase(), label: agent, color: "#64748B", bg: "#F1F5F9" };
+  const meta = AgentMeta[agent] || DEFAULT_AGENT_META;
   const [briefing, setBriefing] = useState(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [messages, setMessages] = useState([]);

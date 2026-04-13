@@ -6,4 +6,6 @@ const AGENT_META = {
   support: { icon: "SUP", label: "Support", color: "#0891B2", bg: "#ECFEFF" },
 };
 
+export const DEFAULT_AGENT_META = { icon: "AGT", label: "Agent", color: "#64748B", bg: "#F1F5F9" };
+
 export default AGENT_META;

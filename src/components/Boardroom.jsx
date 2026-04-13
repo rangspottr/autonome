@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "../lib/api.js";
-import AgentMeta from "./AgentMeta.js";
+import AgentMeta, { DEFAULT_AGENT_META } from "./AgentMeta.js";
 import styles from "./Boardroom.module.css";
 
 const ALL_AGENTS = Object.keys(AgentMeta);
@@ -217,7 +217,7 @@ export default function Boardroom({ sessionId: initialSessionId }) {
             {/* Agent responses */}
             <div className={styles.agentResponses}>
               {exchange.agentsResponses.map((ar) => {
-                const meta = AgentMeta[ar.agent] || { icon: ar.agent.slice(0, 3).toUpperCase(), label: ar.agent, color: "#64748B", bg: "#F1F5F9" };
+                const meta = AgentMeta[ar.agent] || DEFAULT_AGENT_META;
                 return (
                   <div key={ar.agent} className={styles.agentResponse}>
                     <div className={styles.agentResponseHeader} style={{ borderLeftColor: meta.color }}>
