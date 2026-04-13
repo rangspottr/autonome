@@ -43,6 +43,7 @@ import proactiveAlertsRoutes from './routes/proactive-alerts.js';
 import { startScheduler } from './engine/cycle.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
+import { startDailyDigestScheduler } from './jobs/daily-digest.js';
 
 export function createApp() {
   const app = express();
@@ -224,6 +225,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       startCleanupScheduler();
     } catch (err) {
       console.error('[Cleanup Scheduler] Failed to start:', err.message);
+    }
+    try {
+      startDailyDigestScheduler();
+    } catch (err) {
+      console.error('[Daily Digest Scheduler] Failed to start:', err.message);
     }
   });
 }

@@ -6,6 +6,55 @@ import { generateProactiveAlerts, generateApprovalNotifications, generateCritica
 
 const CYCLE_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
+// Valid blocked_reason categories
+const BLOCKED_REASONS = {
+  OWNER_ACTION_REQUIRED: 'owner_action_required',
+  CUSTOMER_RESPONSE_PENDING: 'customer_response_pending',
+  VENDOR_DEPENDENCY: 'vendor_dependency',
+  RESOURCE_CONSTRAINT: 'resource_constraint',
+  APPROVAL_HOLD: 'approval_hold',
+  EXTERNAL_DEPENDENCY: 'external_dependency',
+  UNKNOWN: 'unknown',
+};
+
+const BLOCKED_REASON_LABELS = {
+  owner_action_required: 'Awaiting owner action',
+  customer_response_pending: 'Waiting for customer response',
+  vendor_dependency: 'Blocked by vendor/external dependency',
+  resource_constraint: 'Resource constraint',
+  approval_hold: 'Approval required',
+  external_dependency: 'External dependency',
+  unknown: 'Reason unknown',
+};
+
+function inferBlockedReason(decision, errorMessage = '') {
+  const msg = (errorMessage + (decision.desc || '')).toLowerCase();
+  if (msg.includes('approval') || msg.includes('owner') || decision.needsApproval) {
+    return BLOCKED_REASONS.OWNER_ACTION_REQUIRED;
+  }
+  if (msg.includes('customer') || msg.includes('response') || msg.includes('waiting')) {
+    return BLOCKED_REASONS.CUSTOMER_RESPONSE_PENDING;
+  }
+  if (msg.includes('vendor') || msg.includes('supplier') || msg.includes('external')) {
+    return BLOCKED_REASONS.EXTERNAL_DEPENDENCY;
+  }
+  if (msg.includes('resource') || msg.includes('capacity') || msg.includes('limit')) {
+    return BLOCKED_REASONS.RESOURCE_CONSTRAINT;
+  }
+  return BLOCKED_REASONS.UNKNOWN;
+}
+
+function blockedReasonLabel(reason) {
+  return BLOCKED_REASON_LABELS[reason] || BLOCKED_REASON_LABELS.unknown;
+}
+
+function getEntityType(agent, action) {
+  if (agent === 'finance') return 'invoice';
+  if (agent === 'revenue') return action === 'qualify' ? 'contact' : 'deal';
+  if (agent === 'operations') return action === 'reorder' ? 'asset' : 'task';
+  return agent;
+}
+
 // Lazy-import engine modules to avoid circular deps at module load time
 async function getModules() {
   const { generateDecisions } = await import('./decisions.js');
@@ -192,6 +241,83 @@ export async function runAgentCycle(workspaceId) {
     } catch (execErr) {
       console.error(`Execution error for decision ${decision.id}:`, execErr);
       executionResults.push({ decision, result: { success: false, error: execErr.message } });
+
+      // Record a blocked agent_action when execution fails
+      const blockedReason = inferBlockedReason(decision, execErr.message);
+      try {
+        await pool.query(
+          `INSERT INTO agent_actions
+             (workspace_id, agent, action_type, entity_type, entity_id, description, outcome, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6, 'blocked', $7)`,
+          [
+            workspaceId,
+            decision.agent,
+            decision.action,
+            getEntityType(decision.agent, decision.action),
+            decision.target || null,
+            decision.desc || `${decision.agent}: ${decision.action} failed`,
+            JSON.stringify({
+              blocked_reason: blockedReason,
+              error: execErr.message,
+              impact: decision.impact || null,
+            }),
+          ]
+        );
+
+        // Create agent memory entry for the blocker
+        await pool.query(
+          `INSERT INTO agent_memory
+             (workspace_id, agent, memory_type, entity_type, entity_id, content, confidence)
+           VALUES ($1, $2, 'blocker', $3, $4, $5, 0.9)
+           ON CONFLICT DO NOTHING`,
+          [
+            workspaceId,
+            decision.agent,
+            getEntityType(decision.agent, decision.action),
+            decision.target || null,
+            `Blocked: ${decision.desc || decision.action} — ${blockedReasonLabel(blockedReason)}. Error: ${execErr.message.slice(0, 100)}`,
+          ]
+        );
+      } catch (recordErr) {
+        console.error('[Agent Cycle] Failed to record blocked action:', recordErr.message);
+      }
+    }
+  }
+
+  // Record pending (needs approval) decisions that are blocked pending owner action
+  for (const decision of needsApproval) {
+    try {
+      // Only create a new blocked record if one doesn't exist for this decision already
+      const existing = await pool.query(
+        `SELECT id FROM agent_actions
+         WHERE workspace_id = $1 AND agent = $2 AND action_type = $3
+           AND entity_id = $4 AND outcome IN ('blocked', 'pending')
+           AND created_at > NOW() - INTERVAL '1 hour'
+         LIMIT 1`,
+        [workspaceId, decision.agent, decision.action, decision.target || null]
+      );
+      if (existing.rows.length > 0) continue;
+
+      await pool.query(
+        `INSERT INTO agent_actions
+           (workspace_id, agent, action_type, entity_type, entity_id, description, outcome, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)`,
+        [
+          workspaceId,
+          decision.agent,
+          decision.action,
+          getEntityType(decision.agent, decision.action),
+          decision.target || null,
+          decision.desc || `${decision.agent}: ${decision.action} — awaiting approval`,
+          JSON.stringify({
+            blocked_reason: 'owner_action_required',
+            impact: decision.impact || null,
+            needsApproval: true,
+          }),
+        ]
+      );
+    } catch (pendingErr) {
+      console.error('[Agent Cycle] Failed to record pending decision:', pendingErr.message);
     }
   }
 

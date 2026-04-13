@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config.js';
 import { requireAuth, requireWorkspace } from '../middleware/auth.js';
+import { pool } from '../db/index.js';
 
 const router = Router();
 
@@ -40,6 +41,42 @@ router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
       stripe: !!config.STRIPE_SECRET_KEY,
       ai: !!config.ANTHROPIC_API_KEY,
       bypass_subscription: !!config.BYPASS_SUBSCRIPTION,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/settings/ai-status
+// Returns current AI provider status, model, connection health.
+router.get('/ai-status', requireAuth, requireWorkspace, async (req, res, next) => {
+  try {
+    const workspaceId = req.workspace.id;
+    const connected = !!config.ANTHROPIC_API_KEY;
+    const provider = connected ? 'anthropic' : 'none';
+    const model = config.AI_MODEL || null;
+
+    // Look up the most recent successful AI response (source = 'anthropic') in chat_messages
+    let lastSuccessful = null;
+    try {
+      const lastResult = await pool.query(
+        `SELECT created_at FROM chat_messages
+         WHERE workspace_id = $1
+           AND role = 'assistant'
+           AND metadata->>'source' = 'anthropic'
+         ORDER BY created_at DESC LIMIT 1`,
+        [workspaceId]
+      );
+      lastSuccessful = lastResult.rows[0]?.created_at || null;
+    } catch {
+      // metadata column may not track source; fall back gracefully
+    }
+
+    res.json({
+      provider,
+      model,
+      connected,
+      lastSuccessful,
     });
   } catch (err) {
     next(err);

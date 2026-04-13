@@ -197,7 +197,19 @@ export default function CommandWidget({ pendingApprovals = 0, workspace }) {
               {quickResponse && (
                 <div className={styles.quickResult}>
                   <div className={styles.quickResultMeta}>
-                    <span className={styles.quickSource}>{quickResponse.source}</span>
+                    <span
+                      className={styles.quickSource}
+                      style={{
+                        background: quickResponse.source === 'anthropic' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                        color: quickResponse.source === 'anthropic' ? 'var(--color-success)' : 'var(--color-warning)',
+                        padding: '2px 8px',
+                        borderRadius: 'var(--radius-full)',
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {quickResponse.source === 'anthropic' ? '✦ AI' : '⚡ Data-driven'}
+                    </span>
                   </div>
                   <div className={styles.quickText}>{quickResponse.response}</div>
                   <button

@@ -459,3 +459,34 @@
   color: var(--color-danger);
 }
 
+
+.aiFallbackBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+}
+
+.aiFallbackIcon { font-size: 14px; flex-shrink: 0; }
+
+.aiFallbackText { line-height: 1.4; }
+
+.aiResponseSource {
+  margin-bottom: var(--space-2);
+}
+
+.aiSourceBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.03em;
+}
