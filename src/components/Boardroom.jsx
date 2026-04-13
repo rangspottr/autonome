@@ -186,9 +186,11 @@ export default function Boardroom({ sessionId: initialSessionId }) {
                 className={[styles.agentChip, active ? styles.agentChipActive : ""].join(" ")}
                 onClick={() => toggleAgent(agent)}
                 style={active ? { background: meta.bg, color: meta.color, borderColor: meta.color } : {}}
+                title={meta.description}
               >
                 <span className={styles.chipIcon}>{meta.icon}</span>
-                {meta.label}
+                <span className={styles.chipLabel}>{meta.label}</span>
+                {meta.focus && <span className={styles.chipFocus}>{meta.focus}</span>}
               </button>
             );
           })}

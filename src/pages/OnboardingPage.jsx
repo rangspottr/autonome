@@ -45,10 +45,10 @@ function Step1({ workspace, formData, onChange, onNext }) {
       <ProgressBar step={1} total={3} />
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-          Welcome to your AI Operating Room
+          Help your AI team understand your business
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          Your five AI specialists are standing by. Let's connect them to your business.
+          Your five AI specialists are standing by. Tell them about your business so they can start working for you.
         </div>
       </div>
 
@@ -57,7 +57,7 @@ function Step1({ workspace, formData, onChange, onNext }) {
         {Object.entries(AgentMeta).map(([key, meta]) => (
           <div
             key={key}
-            title={meta.label}
+            title={`${meta.title} — ${meta.focus}`}
             style={{
               width: 44,
               height: 44,
@@ -103,7 +103,7 @@ function Step1({ workspace, formData, onChange, onNext }) {
         </select>
       </div>
 
-      <button onClick={onNext} style={primaryBtn(false)}>Next →</button>
+      <button onClick={onNext} style={primaryBtn(false)}>Meet Your AI Team →</button>
     </div>
   );
 }
@@ -120,10 +120,10 @@ function Step2({ connected, onToggle, onNext, onBack }) {
       <ProgressBar step={2} total={3} />
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-          Connect your business systems
+          Connect your business
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          Your agents need to see your business. Connect the tools you already use.
+          Your agents need to see your business to start working. Connect the tools you already use.
         </div>
       </div>
 
@@ -171,7 +171,7 @@ function Step2({ connected, onToggle, onNext, onBack }) {
         ))}
       </div>
 
-      <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Next →</button>
+      <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Connect & Continue →</button>
       <div style={{ textAlign: 'center' }}>
         <button onClick={onBack} style={secondaryBtn}>← Back</button>
       </div>
@@ -188,7 +188,7 @@ function Step3({ onSubmit, onSkip, loading, error, apiKey, onApiKeyChange, testR
           Activate your AI Brain
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          Connect an AI provider so your agents can think, analyze, and act.
+          Connect an AI provider so your specialists can think, analyze, and act on your behalf — not just report data.
         </div>
       </div>
 
@@ -255,13 +255,13 @@ function Step3({ onSubmit, onSkip, loading, error, apiKey, onApiKeyChange, testR
           {testing ? 'Testing…' : 'Test Key'}
         </button>
         <button onClick={onSubmit} disabled={loading} style={{ flex: 2, ...primaryBtn(loading) }}>
-          {loading ? 'Activating…' : 'Launch Autonome →'}
+          {loading ? 'Activating…' : 'Enter Your Operating Room →'}
         </button>
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 8 }}>
         <button onClick={onSkip} disabled={loading} style={secondaryBtn}>
-          Skip for now — set up later
+          Skip for now — I'll set this up later
         </button>
       </div>
     </div>

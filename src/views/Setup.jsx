@@ -188,8 +188,21 @@ const INDUSTRY_DEFAULTS = {
 };
 
 const INDUSTRY_ICONS = {
-  roofing: "🏠", hvac: "❄️", plumbing: "🔧", solar: "☀️", construction: "🏗️",
-  agency: "📢", ecommerce: "🛒", saas: "💻", services: "⚙️", other: "🏢",
+  roofing: "RFG", hvac: "HVC", plumbing: "PLB", solar: "SOL", construction: "CON",
+  agency: "AGY", ecommerce: "ECM", saas: "SAS", services: "SVC", other: "OTH",
+};
+
+const INDUSTRY_OPTIMIZED_FOR = {
+  roofing: "Job costing, project tracking, subcontractors",
+  hvac: "Service contracts, seasonal demand, technician scheduling",
+  plumbing: "Emergency dispatch, quote management, parts tracking",
+  solar: "Long sales cycles, permits, utility interconnects",
+  construction: "Large bids, subcontractors, project milestones",
+  agency: "Client retention, billable hours, pipeline management",
+  ecommerce: "Order volume, inventory, repeat purchase rate",
+  saas: "ARR, churn, trial conversions, renewal timing",
+  services: "Recurring revenue, client health, contract renewals",
+  other: "Contacts, deals, invoices, and task management",
 };
 
 const STEPS = [
@@ -309,7 +322,10 @@ export default function Setup({ onComplete }) {
       </p>
       <Input label="Business Name" value={form.name} onChange={set("name")} placeholder="e.g. ABC Roofing LLC" />
       <div style={{ marginBottom: "var(--space-4)" }}>
-        <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>Industry</div>
+        <div className={styles.industryHeader}>Industry</div>
+        <div className={styles.industryHelp}>
+          Your industry determines how your five AI specialists analyze your business — what they monitor, what they prioritize, and how they communicate.
+        </div>
         <div className={styles.industryGrid}>
           {Object.keys(INDUSTRY_DEFAULTS).map((k) => (
             <div
@@ -317,8 +333,11 @@ export default function Setup({ onComplete }) {
               className={`${styles.industryCard} ${form.type === k ? styles.industryCardActive : ""}`}
               onClick={() => applyIndustryDefaults(k)}
             >
-              <div className={styles.industryIcon}>{INDUSTRY_ICONS[k] || "🏢"}</div>
+              <div className={styles.industryIcon}>{INDUSTRY_ICONS[k] || "OTH"}</div>
               <div className={styles.industryLabel}>{k.charAt(0).toUpperCase() + k.slice(1)}</div>
+              {INDUSTRY_OPTIMIZED_FOR[k] && (
+                <div className={styles.industryOptimized}>{INDUSTRY_OPTIMIZED_FOR[k]}</div>
+              )}
             </div>
           ))}
         </div>
