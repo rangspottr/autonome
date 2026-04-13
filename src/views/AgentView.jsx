@@ -92,7 +92,7 @@ function AgentDetailPanel({ agent, meta, onClose }) {
           <div className={styles.detailSection}>
             <div className={styles.detailSectionTitle}>Active Work</div>
             {(workstream?.pendingDecisions || []).length === 0 && (workstream?.activeWorkflows || []).length === 0 ? (
-              <p className={styles.detailEmpty}>{meta.label} is monitoring your business. No actions needed right now.</p>
+              <p className={styles.detailEmpty}>{meta.monitoringStatement || `${meta.label} is monitoring your business`}. No actions needed right now.</p>
             ) : (
               <>
                 {(workstream?.pendingDecisions || []).map((d, i) => (
@@ -128,7 +128,7 @@ function AgentDetailPanel({ agent, meta, onClose }) {
           <div className={styles.detailSection}>
             <div className={styles.detailSectionTitle}>Action Timeline</div>
             {actions.length === 0 ? (
-              <p className={styles.detailEmpty}>{meta.label} agent has no recorded actions yet. Actions appear here as the agent processes decisions.</p>
+              <p className={styles.detailEmpty}>{meta.label} hasn't taken any actions yet. Actions will appear here as {meta.label} detects patterns and responds to business events.</p>
             ) : (
               actions.map((a) => (
                 <div key={a.id} className={styles.timelineItem} style={{ borderLeftColor: meta.color }}>
@@ -170,7 +170,7 @@ function AgentDetailPanel({ agent, meta, onClose }) {
           <div className={styles.detailSection}>
             <div className={styles.detailSectionTitle}>Agent Memory</div>
             {memory.length === 0 ? (
-              <p className={styles.detailEmpty}>{meta.label} agent hasn't accumulated memory yet. Memory builds as the agent processes patterns across cycles.</p>
+              <p className={styles.detailEmpty}>{meta.label} is building its understanding of your business. Observations and learned patterns will appear here over time.</p>
             ) : (
               Object.entries(memoryByType).map(([type, items]) => (
                 <div key={type} className={styles.memoryGroup}>
@@ -548,9 +548,15 @@ export default function AgentView({ onRefreshMetrics }) {
                   </div>
                   <div className={styles.agentInfo}>
                     <div className={styles.agentName}>{meta.label}</div>
-                    <div className={styles.agentDesc}>
+                    <div className={styles.agentSubtitle}>{meta.description}</div>
+                    <div className={styles.agentCardBadgeRow}>
+                      {meta.focus && (
+                        <span className={styles.agentFocusBadge} style={{ color: meta.color, borderColor: meta.color }}>
+                          {meta.focus}
+                        </span>
+                      )}
                       <Pill
-                        label={decs.length > 0 ? `${decs.length} pending` : "Idle"}
+                        label={decs.length > 0 ? `${decs.length} pending` : "Monitoring"}
                         variant={decs.length > 0 ? "blue" : "muted"}
                       />
                     </div>
