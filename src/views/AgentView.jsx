@@ -221,6 +221,134 @@ function AgentDetailPanel({ agent, meta, onClose }) {
   );
 }
 
+/**
+ * Render 2-3 domain-specific metric items for an agent card.
+ */
+function AgentDomainMetrics({ agent, workstream, decisions, activeWorkflows }) {
+  const blockerCount = workstream?.blockers?.length || 0;
+  const pendingCount = decisions?.length || 0;
+
+  if (agent === "finance") {
+    const overdueAmt = workstream?.summary?.overdueInvoices || 0;
+    const overdueCount = workstream?.summary?.overdueCount || 0;
+    return (
+      <>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Overdue</div>
+          <div className={styles.agentMetricVal} style={{ color: overdueAmt > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
+            {overdueAmt > 0 ? `$${Math.round(overdueAmt).toLocaleString()}` : "None"}
+          </div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Invoices</div>
+          <div className={styles.agentMetricVal} style={{ color: "var(--color-text-secondary)" }}>{overdueCount}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Pending</div>
+          <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+        </div>
+      </>
+    );
+  }
+
+  if (agent === "revenue") {
+    const pipelineVal = workstream?.summary?.pipelineValue || 0;
+    const staleCount = workstream?.summary?.staleDeals || 0;
+    return (
+      <>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Pipeline</div>
+          <div className={styles.agentMetricVal} style={{ color: "var(--color-brand)" }}>
+            {pipelineVal > 0 ? `$${Math.round(pipelineVal / 1000)}k` : "$0"}
+          </div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Stale Deals</div>
+          <div className={styles.agentMetricVal} style={{ color: staleCount > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{staleCount}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Pending</div>
+          <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+        </div>
+      </>
+    );
+  }
+
+  if (agent === "operations") {
+    const overdueTaskCount = workstream?.summary?.overdueTasks || 0;
+    return (
+      <>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Overdue Tasks</div>
+          <div className={styles.agentMetricVal} style={{ color: overdueTaskCount > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{overdueTaskCount}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Active WFs</div>
+          <div className={styles.agentMetricVal} style={{ color: "var(--color-brand)" }}>{activeWorkflows}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Blockers</div>
+          <div className={styles.agentMetricVal} style={{ color: blockerCount > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>{blockerCount}</div>
+        </div>
+      </>
+    );
+  }
+
+  if (agent === "support") {
+    const atRiskCount = workstream?.summary?.atRiskContacts || 0;
+    return (
+      <>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Blockers</div>
+          <div className={styles.agentMetricVal} style={{ color: blockerCount > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>{blockerCount}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>At Risk</div>
+          <div className={styles.agentMetricVal} style={{ color: atRiskCount > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{atRiskCount}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Pending</div>
+          <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+        </div>
+      </>
+    );
+  }
+
+  if (agent === "growth") {
+    const dormantLeads = workstream?.summary?.dormantLeads || 0;
+    return (
+      <>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Dormant Leads</div>
+          <div className={styles.agentMetricVal} style={{ color: dormantLeads > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{dormantLeads}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Active WFs</div>
+          <div className={styles.agentMetricVal} style={{ color: "var(--color-brand)" }}>{activeWorkflows}</div>
+        </div>
+        <div className={styles.agentMetric}>
+          <div className={styles.agentMetricLabel}>Pending</div>
+          <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+        </div>
+      </>
+    );
+  }
+
+  // Generic fallback
+  return (
+    <>
+      <div className={styles.agentMetric}>
+        <div className={styles.agentMetricLabel}>Active WFs</div>
+        <div className={styles.agentMetricVal} style={{ color: "var(--color-brand)" }}>{activeWorkflows}</div>
+      </div>
+      <div className={styles.agentMetric}>
+        <div className={styles.agentMetricLabel}>Pending</div>
+        <div className={styles.agentMetricVal} style={{ color: pendingCount > 0 ? "var(--color-brand)" : "var(--color-text-muted)" }}>{pendingCount}</div>
+      </div>
+    </>
+  );
+}
+
 export default function AgentView({ onRefreshMetrics }) {
   const [status, setStatus] = useState(null);
   const [decisions, setDecisions] = useState([]);
@@ -230,6 +358,7 @@ export default function AgentView({ onRefreshMetrics }) {
   const [error, setError] = useState(null);
   const [running, setRunning] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [agentWorkstreams, setAgentWorkstreams] = useState({});
 
   const fetchData = useCallback(async () => {
     try {
@@ -257,9 +386,26 @@ export default function AgentView({ onRefreshMetrics }) {
     }
   }, []);
 
+  // Fetch domain-specific workstream data for agent card metrics (non-blocking)
+  const fetchWorkstreams = useCallback(async () => {
+    const results = {};
+    await Promise.all(
+      Object.keys(AgentMeta).map(async (agent) => {
+        try {
+          const ws = await api.get(`/agents/${agent}/workstream`);
+          results[agent] = ws;
+        } catch {
+          // non-fatal
+        }
+      })
+    );
+    setAgentWorkstreams(results);
+  }, []);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchWorkstreams();
+  }, [fetchData, fetchWorkstreams]);
 
   const activeWf = workflows.filter((w) => w.status === "active");
 
@@ -272,6 +418,7 @@ export default function AgentView({ onRefreshMetrics }) {
       decisions: agentDecisions,
       executions: auditCounts[agent] || 0,
       activeWorkflows: agentActiveWf.length,
+      workstream: agentWorkstreams[agent] || null,
     };
   });
 
@@ -378,7 +525,7 @@ export default function AgentView({ onRefreshMetrics }) {
         <EmptyState icon="○" title="No agents configured" description="Agent metadata is not available." />
       ) : (
         <div className={styles.agentsGrid}>
-          {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows: awf }) => {
+          {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows: awf, workstream }) => {
             const isSelected = selectedAgent === agent;
             return (
               <div
@@ -405,14 +552,12 @@ export default function AgentView({ onRefreshMetrics }) {
                   </div>
                 </div>
                 <div className={styles.agentMetrics}>
-                  <div className={styles.agentMetric}>
-                    <div className={styles.agentMetricLabel}>Executions</div>
-                    <div className={styles.agentMetricVal} style={{ color: meta.color }}>{executions}</div>
-                  </div>
-                  <div className={styles.agentMetric}>
-                    <div className={styles.agentMetricLabel}>Active WFs</div>
-                    <div className={styles.agentMetricVal} style={{ color: 'var(--color-brand)' }}>{awf}</div>
-                  </div>
+                  <AgentDomainMetrics
+                    agent={agent}
+                    workstream={workstream}
+                    decisions={decs}
+                    activeWorkflows={awf}
+                  />
                 </div>
                 <div className={styles.agentCardCta} style={{ color: meta.color }}>
                   {isSelected ? "▲ Collapse" : "▼ View profile"}

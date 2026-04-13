@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/index.js';
 import { config } from '../config.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
-import { buildWorkspaceContext, findEntityContext } from '../lib/ai-context.js';
+import { buildWorkspaceContext, findEntityContext, buildRichLocalContext, buildLocalSummary } from '../lib/ai-context.js';
 import { executeAction } from '../engine/execution.js';
 import rateLimit from 'express-rate-limit';
 
@@ -112,7 +112,11 @@ function buildAgentSystemPrompt(agent, agentCtx, workspaceCtx) {
     .join('\n') || 'No recent business events';
 
   const blockers = agentCtx.blockers.length > 0
-    ? agentCtx.blockers.map((b) => `- ${b}`).join('\n')
+    ? agentCtx.blockers.map((b) => {
+        const reason = b.blocked_reason ? ` [reason: ${b.blocked_reason}]` : '';
+        const desc = typeof b === 'object' ? (b.description || b) : b;
+        return `- ${desc}${reason}`;
+      }).join('\n')
     : 'None';
 
   return `You are the ${agentLabels[agent] || agent} for ${workspaceCtx.businessName} (${workspaceCtx.industry}).
@@ -149,7 +153,7 @@ Respond as this specific agent. Be direct, data-driven, and actionable. When you
 /**
  * Call Anthropic or fall back to a local structured response.
  */
-async function callAI(systemPrompt, messages) {
+async function callAI(systemPrompt, messages, maxTokens = 2048) {
   if (!config.ANTHROPIC_API_KEY) return null;
 
   try {
@@ -162,7 +166,7 @@ async function callAI(systemPrompt, messages) {
       },
       body: JSON.stringify({
         model: config.AI_MODEL,
-        max_tokens: 1024,
+        max_tokens: maxTokens,
         system: systemPrompt,
         messages,
       }),
@@ -182,27 +186,142 @@ async function callAI(systemPrompt, messages) {
 }
 
 /**
- * Build a local fallback response for an agent when Anthropic is unavailable.
+ * Build a rich, role-specific local fallback response for an agent.
+ * Provides specialist reasoning, prioritized items, and recommended next actions.
  */
-function buildLocalAgentResponse(agent, agentCtx, workspaceCtx) {
-  const lines = [
-    `${agent.charAt(0).toUpperCase() + agent.slice(1)} Agent briefing for ${workspaceCtx.businessName}:`,
-    `- ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in the last 24h`,
-    `- ${agentCtx.pendingDecisions} pending decision${agentCtx.pendingDecisions !== 1 ? 's' : ''}`,
-    `- ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''}`,
-    `- ${agentCtx.memory.length} active memory item${agentCtx.memory.length !== 1 ? 's' : ''}`,
-  ];
+function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) {
+  const businessName = workspaceCtx.businessName;
+  const lines = [];
 
-  if (agentCtx.blockers.length > 0) {
-    lines.push(`[BLOCKER] Current blockers: ${agentCtx.blockers.join(', ')}`);
+  if (agent === 'finance') {
+    lines.push(`Finance Agent briefing for ${businessName}:`);
+    const overdueAmt = workspaceCtx.invoices.overdueAmount;
+    if (overdueAmt > 0) {
+      lines.push(`\n🔴 CASH FLOW PRESSURE: $${Math.round(overdueAmt).toLocaleString()} outstanding in overdue invoices`);
+      if (richCtx?.overdueInvoices?.length > 0) {
+        lines.push('Priority collection targets:');
+        richCtx.overdueInvoices.forEach((inv) => {
+          const days = Math.round(inv.days_overdue || 0);
+          lines.push(`  • ${inv.contact_name || 'Unknown'} — $${Math.round(inv.amount).toLocaleString()} (${days} days overdue)`);
+        });
+        lines.push('\n[ACTION] Send payment reminders to top 3 overdue accounts immediately.');
+        if (richCtx.overdueInvoices.some((inv) => (inv.days_overdue || 0) > 30)) {
+          lines.push('[APPROVAL NEEDED] One or more invoices are 30+ days overdue — consider escalation to collections.');
+        }
+      }
+    } else {
+      lines.push(`\n✅ No overdue invoices — $${Math.round(workspaceCtx.invoices.paidAmount).toLocaleString()} collected`);
+    }
+    if (agentCtx.pendingDecisions > 0) {
+      lines.push(`\n[APPROVAL NEEDED] ${agentCtx.pendingDecisions} pending financial decision${agentCtx.pendingDecisions !== 1 ? 's' : ''} awaiting your review`);
+    }
+    if (agentCtx.blockers.length > 0) {
+      lines.push(`\n[BLOCKER] ${agentCtx.blockers.length} blocked action${agentCtx.blockers.length !== 1 ? 's' : ''}: ${agentCtx.blockers.slice(0, 2).join('; ')}`);
+    }
+    lines.push(`\nFinance activity: ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in last 24h, ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''}`);
+
+  } else if (agent === 'revenue') {
+    lines.push(`Revenue Agent briefing for ${businessName}:`);
+    const pipelineValue = workspaceCtx.deals.totalValue;
+    lines.push(`\n📊 PIPELINE: ${workspaceCtx.deals.count} deal${workspaceCtx.deals.count !== 1 ? 's' : ''} — $${Math.round(pipelineValue).toLocaleString()} total value`);
+    if (richCtx?.staleDeals?.length > 0) {
+      lines.push('\nStale deals requiring follow-up:');
+      richCtx.staleDeals.forEach((deal) => {
+        const days = Math.round(deal.days_stale || 0);
+        lines.push(`  • "${deal.title}" — $${Math.round(deal.value || 0).toLocaleString()} (${days}d stale, stage: ${deal.stage})`);
+      });
+      lines.push('\n[ACTION] Re-engage top stale deals before pipeline value bleeds out.');
+      if (richCtx.staleDeals.some((d) => (d.days_stale || 0) > 14)) {
+        lines.push('[APPROVAL NEEDED] Deals stale 14+ days may need re-pricing or closure — review required.');
+      }
+    }
+    if (agentCtx.pendingDecisions > 0) {
+      lines.push(`\n[APPROVAL NEEDED] ${agentCtx.pendingDecisions} pending revenue decision${agentCtx.pendingDecisions !== 1 ? 's' : ''} awaiting your review`);
+    }
+    if (agentCtx.blockers.length > 0) {
+      lines.push(`\n[BLOCKER] ${agentCtx.blockers.length} blocked deal action${agentCtx.blockers.length !== 1 ? 's' : ''}: ${agentCtx.blockers.slice(0, 2).join('; ')}`);
+    }
+    lines.push(`\nRevenue activity: ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in last 24h, ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''}`);
+
+  } else if (agent === 'operations') {
+    lines.push(`Operations Agent briefing for ${businessName}:`);
+    lines.push(`\n📋 TASKS: ${workspaceCtx.tasks.openCount} open task${workspaceCtx.tasks.openCount !== 1 ? 's' : ''} of ${workspaceCtx.tasks.count} total`);
+    if (richCtx?.blockedTasks?.length > 0) {
+      lines.push('\nOverdue tasks (workflow bottlenecks):');
+      richCtx.blockedTasks.forEach((task) => {
+        const days = Math.round(task.days_overdue || 0);
+        lines.push(`  • ${task.title} (${task.priority} priority, ${days}d overdue)`);
+      });
+      lines.push('\n[ACTION] Review and reassign or close overdue high-priority tasks immediately.');
+    }
+    if (agentCtx.activeWorkflows > 0) {
+      lines.push(`\n[ACTION] ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''} in progress — check for stalled steps.`);
+    }
+    if (agentCtx.blockers.length > 0) {
+      lines.push(`\n[BLOCKER] ${agentCtx.blockers.length} blocked operation${agentCtx.blockers.length !== 1 ? 's' : ''}: ${agentCtx.blockers.slice(0, 2).join('; ')}`);
+    }
+    if (agentCtx.pendingDecisions > 0) {
+      lines.push(`\n[APPROVAL NEEDED] ${agentCtx.pendingDecisions} operational decision${agentCtx.pendingDecisions !== 1 ? 's' : ''} awaiting your review`);
+    }
+    lines.push(`\nOperations activity: ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in last 24h`);
+
+  } else if (agent === 'support') {
+    lines.push(`Support Agent briefing for ${businessName}:`);
+    lines.push(`\n👥 CUSTOMER BASE: ${workspaceCtx.contacts} contact${workspaceCtx.contacts !== 1 ? 's' : ''} in workspace`);
+    if (agentCtx.actions.length > 0) {
+      const recentCustomerActions = agentCtx.actions.slice(0, 3);
+      lines.push('\nRecent customer interactions:');
+      recentCustomerActions.forEach((a) => {
+        lines.push(`  • [${a.outcome}] ${a.description}${a.entity_name ? ` (${a.entity_name})` : ''}`);
+      });
+    }
+    if (agentCtx.blockers.length > 0) {
+      lines.push(`\n[BLOCKER] ${agentCtx.blockers.length} unresolved customer issue${agentCtx.blockers.length !== 1 ? 's' : ''}: ${agentCtx.blockers.slice(0, 2).join('; ')}`);
+      lines.push('[APPROVAL NEEDED] Blocked customer issues need your intervention.');
+    }
+    if (agentCtx.pendingDecisions > 0) {
+      lines.push(`\n[APPROVAL NEEDED] ${agentCtx.pendingDecisions} support decision${agentCtx.pendingDecisions !== 1 ? 's' : ''} awaiting your review`);
+    }
+    if (agentCtx.memory.length > 0) {
+      const atRisk = agentCtx.memory.filter((m) => m.memory_type === 'blocker' || m.content?.toLowerCase().includes('risk'));
+      if (atRisk.length > 0) {
+        lines.push('\nAt-risk customer signals:');
+        atRisk.slice(0, 2).forEach((m) => lines.push(`  • ${m.content}`));
+      }
+    }
+    lines.push(`\nSupport activity: ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in last 24h, ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''}`);
+
+  } else if (agent === 'growth') {
+    lines.push(`Growth Agent briefing for ${businessName}:`);
+    lines.push(`\n🚀 GROWTH SIGNALS: ${workspaceCtx.contacts} total contacts, ${workspaceCtx.deals.count} deal${workspaceCtx.deals.count !== 1 ? 's' : ''} in pipeline`);
+    if (agentCtx.memory.length > 0) {
+      const opportunities = agentCtx.memory.filter((m) => m.memory_type === 'observation' || m.memory_type === 'entity_note');
+      if (opportunities.length > 0) {
+        lines.push('\nExpansion signals:');
+        opportunities.slice(0, 3).forEach((m) => lines.push(`  • ${m.content}`));
+      }
+    }
+    if (agentCtx.blockers.length > 0) {
+      lines.push(`\n[BLOCKER] ${agentCtx.blockers.length} growth initiative${agentCtx.blockers.length !== 1 ? 's' : ''} stalled: ${agentCtx.blockers.slice(0, 2).join('; ')}`);
+    }
+    if (agentCtx.pendingDecisions > 0) {
+      lines.push(`\n[APPROVAL NEEDED] ${agentCtx.pendingDecisions} growth opportunity${agentCtx.pendingDecisions !== 1 ? 's' : ''} awaiting your review`);
+    }
+    lines.push('\n[ACTION] Review dormant leads for reactivation opportunities.');
+    lines.push(`\nGrowth activity: ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in last 24h, ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''}`);
+
+  } else {
+    // Generic fallback
+    lines.push(`${agent.charAt(0).toUpperCase() + agent.slice(1)} Agent briefing for ${businessName}:`);
+    lines.push(`- ${agentCtx.actions.length} action${agentCtx.actions.length !== 1 ? 's' : ''} in last 24h`);
+    lines.push(`- ${agentCtx.pendingDecisions} pending decision${agentCtx.pendingDecisions !== 1 ? 's' : ''}`);
+    lines.push(`- ${agentCtx.activeWorkflows} active workflow${agentCtx.activeWorkflows !== 1 ? 's' : ''}`);
+    if (agentCtx.blockers.length > 0) {
+      lines.push(`[BLOCKER] ${agentCtx.blockers.join(', ')}`);
+    }
   }
 
-  if (agentCtx.actions.length > 0) {
-    const recent = agentCtx.actions[0];
-    lines.push(`Most recent action: ${recent.description}`);
-  }
-
-  lines.push('Connect an Anthropic API key for full AI-powered responses.');
+  lines.push('\n⚠️ Connect an Anthropic API key in Settings for full AI-powered specialist responses.');
   return lines.join('\n');
 }
 
@@ -296,7 +415,9 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
     let responseText = await callAI(systemPrompt, messages);
     const source = responseText ? 'anthropic' : 'local';
     if (!responseText) {
-      responseText = buildLocalAgentResponse(agent, agentCtx, workspaceCtx);
+      let richCtx = null;
+      try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
+      responseText = buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx);
     }
 
     const hasPendingActions = responseText.includes('[APPROVAL NEEDED]') || responseText.includes('[ACTION]');
@@ -388,6 +509,9 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
     const historyMessages = conversationHistory.map((m) => ({ role: m.role, content: m.content }));
 
     // Call each agent in parallel
+    let richCtx = null;
+    try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
+
     const agentResponses = await Promise.all(
       agentContexts.map(async ({ agent, ctx }) => {
         const systemPrompt = buildAgentSystemPrompt(agent, ctx, workspaceCtx) + entityContext;
@@ -399,7 +523,7 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
         let responseText = await callAI(systemPrompt, messages);
         const source = responseText ? 'anthropic' : 'local';
         if (!responseText) {
-          responseText = buildLocalAgentResponse(agent, ctx, workspaceCtx);
+          responseText = buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx);
         }
 
         return {
@@ -425,39 +549,111 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
 
 The owner asked: "${trimmedMessage}"
 
-Here are responses from each agent:
+Here are responses from each specialized agent:
 ${agentResponses.map((r) => `--- ${r.agent.toUpperCase()} AGENT ---\n${r.response}`).join('\n\n')}
 
-Produce a JSON object with exactly these fields:
+Analyze these responses and produce a JSON object with exactly these fields:
 {
-  "recommendation": "unified recommendation text",
-  "conflicts": ["list of areas where agents disagree"],
-  "suggested_actions": [{"action": "description", "agent": "assigned agent", "priority": "high|medium|low"}],
-  "approval_needed": [{"item": "description", "agent": "responsible agent", "impact": "impact description"}]
+  "recommendation": "A unified, prioritized recommendation that combines the most important insights from all agents. Be specific about what to do first.",
+  "conflicts": ["List specific areas where agents recommend contradictory actions or disagree on priority. If none, use empty array."],
+  "suggested_actions": [{"action": "Specific actionable step", "agent": "responsible agent name", "priority": "high|medium|low"}],
+  "approval_needed": [{"item": "Description of what needs approval", "agent": "responsible agent", "impact": "Business impact if approved or rejected"}]
 }
 
-Return only valid JSON. No markdown, no explanation.`;
+Rules:
+- A conflict exists when one agent says pursue/escalate and another says hold/defer on the same entity
+- Overlapping entity references across agents should be noted
+- Priority disagreements (one agent marks high, another marks low for related work) are conflicts
+- Return ONLY valid JSON. No markdown code fences, no explanation text before or after.`;
 
-      let synthesisText = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses.' }]);
+      let synthesisText = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048);
 
-      try {
-        synthesis = synthesisText ? JSON.parse(synthesisText) : null;
-      } catch {
-        synthesis = null;
+      if (synthesisText) {
+        // Try direct JSON parse first
+        try {
+          synthesis = JSON.parse(synthesisText);
+        } catch {
+          // Try extracting JSON from text (handles cases where model adds prose)
+          const jsonMatch = synthesisText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              synthesis = JSON.parse(jsonMatch[0]);
+            } catch {
+              synthesis = null;
+            }
+          }
+        }
+
+        // If still null, retry with a simpler structured-text prompt
+        if (!synthesis) {
+          const retryText = await callAI(
+            'You must output only a valid JSON object, no other text.',
+            [{ role: 'user', content: `Return this as valid JSON only:\n${synthesisText}` }],
+            1024
+          );
+          if (retryText) {
+            try { synthesis = JSON.parse(retryText); } catch { synthesis = null; }
+          }
+        }
       }
     }
 
     if (!synthesis) {
+      // Strengthened fallback synthesis — analyze actual response texts
       const approvalItems = agentResponses
         .filter((r) => r.response.includes('[APPROVAL NEEDED]'))
-        .map((r) => ({ item: `Review ${r.agent} agent recommendations`, agent: r.agent, impact: 'Requires owner decision' }));
+        .flatMap((r) => {
+          const matches = r.response.match(/\[APPROVAL NEEDED\][^\n]*/g) || [];
+          return matches.map((m) => ({
+            item: m.replace('[APPROVAL NEEDED]', '').trim() || `Review ${r.agent} agent recommendations`,
+            agent: r.agent,
+            impact: 'Requires owner decision',
+          }));
+        });
+
+      const actionItems = agentResponses
+        .filter((r) => r.response.includes('[ACTION]'))
+        .flatMap((r) => {
+          const matches = r.response.match(/\[ACTION\][^\n]*/g) || [];
+          return matches.map((m) => ({
+            action: m.replace('[ACTION]', '').trim() || `Follow up on ${r.agent} agent recommendations`,
+            agent: r.agent,
+            priority: r.response.includes('🔴') ? 'high' : r.response.includes('🟡') ? 'medium' : 'low',
+          }));
+        });
+
+      // Detect conflicts: agents referencing same entity with different urgency signals
+      const conflictSignals = [];
+      const agentResponseTexts = agentResponses.map((r) => ({ agent: r.agent, text: r.response.toLowerCase() }));
+      const urgencyPairs = [
+        ['escalate', 'hold'],
+        ['immediate', 'defer'],
+        ['urgent', 'low priority'],
+        ['overdue', 'paid'],
+      ];
+      for (const [urgentWord, calmWord] of urgencyPairs) {
+        const urgentAgents = agentResponseTexts.filter((r) => r.text.includes(urgentWord)).map((r) => r.agent);
+        const calmAgents = agentResponseTexts.filter((r) => r.text.includes(calmWord)).map((r) => r.agent);
+        if (urgentAgents.length > 0 && calmAgents.length > 0) {
+          conflictSignals.push(`${urgentAgents.join(', ')} signal urgency (${urgentWord}) while ${calmAgents.join(', ')} signal calm (${calmWord})`);
+        }
+      }
+
+      // Build recommendation from highest-priority signals
+      const hasBlocking = agentResponses.some((r) => r.response.includes('[BLOCKER]'));
+      const hasCashPressure = agentResponses.some((r) => r.response.includes('🔴'));
+      let recommendation = '';
+      if (hasCashPressure) recommendation += 'Immediate attention required on cash flow and overdue accounts. ';
+      if (hasBlocking) recommendation += 'Active blockers need resolution before work can advance. ';
+      if (approvalItems.length > 0) recommendation += `${approvalItems.length} item${approvalItems.length !== 1 ? 's' : ''} pending your approval. `;
+      if (!recommendation) recommendation = `${selectedAgents.length} agents have responded. Review each perspective and the suggested actions below.`;
 
       synthesis = {
-        recommendation: `${selectedAgents.length} agents have responded to your query. Review each perspective and the suggested actions below.`,
-        conflicts: [],
-        suggested_actions: agentResponses
+        recommendation: recommendation.trim(),
+        conflicts: conflictSignals,
+        suggested_actions: actionItems.length > 0 ? actionItems : agentResponses
           .filter((r) => r.response.includes('[ACTION]'))
-          .map((r) => ({ action: `Follow up on ${r.agent} agent recommendations`, agent: r.agent, priority: 'medium' })),
+          .map((r) => ({ action: `Follow up on ${r.agent} recommendations`, agent: r.agent, priority: 'medium' })),
         approval_needed: approvalItems,
       };
     }
@@ -675,6 +871,119 @@ router.post('/action', ...guard, async (req, res, next) => {
     }
 
     res.json({ success: true, result, next_steps: nextSteps });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /api/command/briefing — "since last login" operator briefing ──────────
+
+router.get('/briefing', ...guard, async (req, res, next) => {
+  try {
+    const workspaceId = req.workspace.id;
+    const userId = req.user.id;
+
+    // Get user's last_active_at (falls back to 24h ago if not set)
+    const userResult = await pool.query(
+      `SELECT last_active_at FROM users WHERE id = $1`,
+      [userId]
+    );
+    const lastActive = userResult.rows[0]?.last_active_at
+      ? new Date(userResult.rows[0].last_active_at)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // Update last_active_at now
+    await pool.query(
+      `UPDATE users SET last_active_at = NOW() WHERE id = $1`,
+      [userId]
+    ).catch(() => { /* non-fatal if column doesn't exist yet */ });
+
+    const [agentActions, pendingDecisions, businessEvents, metricsNow] = await Promise.all([
+      pool.query(
+        `SELECT aa.*,
+                CASE aa.entity_type
+                  WHEN 'invoice' THEN (SELECT description FROM invoices WHERE id = aa.entity_id LIMIT 1)
+                  WHEN 'deal'    THEN (SELECT title FROM deals WHERE id = aa.entity_id LIMIT 1)
+                  WHEN 'contact' THEN (SELECT name FROM contacts WHERE id = aa.entity_id LIMIT 1)
+                  WHEN 'task'    THEN (SELECT title FROM tasks WHERE id = aa.entity_id LIMIT 1)
+                  ELSE NULL
+                END AS entity_name
+         FROM agent_actions aa
+         WHERE aa.workspace_id = $1
+           AND aa.created_at > $2
+         ORDER BY aa.created_at DESC LIMIT 50`,
+        [workspaceId, lastActive.toISOString()]
+      ),
+      pool.query(
+        `SELECT aa.*,
+                CASE aa.entity_type
+                  WHEN 'invoice' THEN (SELECT description FROM invoices WHERE id = aa.entity_id LIMIT 1)
+                  WHEN 'deal'    THEN (SELECT title FROM deals WHERE id = aa.entity_id LIMIT 1)
+                  WHEN 'contact' THEN (SELECT name FROM contacts WHERE id = aa.entity_id LIMIT 1)
+                  WHEN 'task'    THEN (SELECT title FROM tasks WHERE id = aa.entity_id LIMIT 1)
+                  ELSE NULL
+                END AS entity_name
+         FROM agent_actions aa
+         WHERE aa.workspace_id = $1 AND aa.outcome = 'pending'
+         ORDER BY aa.created_at DESC LIMIT 20`,
+        [workspaceId]
+      ),
+      pool.query(
+        `SELECT * FROM business_events
+         WHERE workspace_id = $1
+           AND created_at > $2
+         ORDER BY created_at DESC LIMIT 20`,
+        [workspaceId, lastActive.toISOString()]
+      ),
+      pool.query(
+        `SELECT
+           (SELECT COUNT(*) FROM invoices WHERE workspace_id = $1 AND status = 'overdue') AS overdue_invoices,
+           (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE workspace_id = $1 AND status = 'overdue') AS overdue_amount,
+           (SELECT COUNT(*) FROM deals WHERE workspace_id = $1 AND stage NOT IN ('won','lost')) AS active_deals,
+           (SELECT COUNT(*) FROM tasks WHERE workspace_id = $1 AND status = 'pending') AS open_tasks,
+           (SELECT COUNT(*) FROM agent_actions WHERE workspace_id = $1 AND outcome = 'blocked') AS blockers`,
+        [workspaceId]
+      ),
+    ]);
+
+    const metrics = metricsNow.rows[0] || {};
+    const actionsByAgent = {};
+    for (const a of agentActions.rows) {
+      if (!actionsByAgent[a.agent]) actionsByAgent[a.agent] = [];
+      actionsByAgent[a.agent].push(a);
+    }
+
+    // Upcoming deadlines
+    const upcomingDeadlines = await pool.query(
+      `SELECT title, due_date, priority FROM tasks
+       WHERE workspace_id = $1
+         AND status = 'pending'
+         AND due_date BETWEEN NOW() AND NOW() + INTERVAL '48 hours'
+       ORDER BY due_date ASC LIMIT 5`,
+      [workspaceId]
+    );
+
+    res.json({
+      since: lastActive.toISOString(),
+      agent_actions: agentActions.rows,
+      agent_actions_by_agent: actionsByAgent,
+      pending_decisions: pendingDecisions.rows,
+      new_business_events: businessEvents.rows,
+      upcoming_deadlines: upcomingDeadlines.rows,
+      current_metrics: {
+        overdue_invoices: parseInt(metrics.overdue_invoices) || 0,
+        overdue_amount: parseFloat(metrics.overdue_amount) || 0,
+        active_deals: parseInt(metrics.active_deals) || 0,
+        open_tasks: parseInt(metrics.open_tasks) || 0,
+        blockers: parseInt(metrics.blockers) || 0,
+      },
+      summary: {
+        total_actions: agentActions.rows.length,
+        total_pending: pendingDecisions.rows.length,
+        total_events: businessEvents.rows.length,
+        needs_attention: pendingDecisions.rows.length > 0 || parseInt(metrics.overdue_invoices) > 0,
+      },
+    });
   } catch (err) {
     next(err);
   }

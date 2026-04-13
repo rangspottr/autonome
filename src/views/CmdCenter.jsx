@@ -70,6 +70,7 @@ export default function CmdCenter({ onRefreshMetrics }) {
   const [activityFeed, setActivityFeed] = useState([]);
   const [insights, setInsights] = useState([]);
   const [agentMemory, setAgentMemory] = useState([]);
+  const [aiStatus, setAiStatus] = useState(null);
 
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState(null);
@@ -86,12 +87,14 @@ export default function CmdCenter({ onRefreshMetrics }) {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const [decisionsRes, summaryRes] = await Promise.all([
+      const [decisionsRes, summaryRes, aiStatusRes] = await Promise.all([
         api.get("/agent/decisions"),
         api.get("/metrics/summary"),
+        api.get("/settings/ai-status").catch(() => null),
       ]);
       setDecisions(decisionsRes.pendingDecisions || []);
       setSummary(summaryRes);
+      if (aiStatusRes) setAiStatus(aiStatusRes);
     } catch (err) {
       setError(err.message || "Failed to load dashboard data");
     } finally {
@@ -196,9 +199,9 @@ export default function CmdCenter({ onRefreshMetrics }) {
 
     try {
       const data = await api.post("/ai/query", { message: aiQuery.trim() });
-      setAiResponse(data.response || "No response received.");
+      setAiResponse(data);
     } catch (err) {
-      setAiResponse(`Error: ${err.message}`);
+      setAiResponse({ response: `Error: ${err.message}`, source: "error" });
     } finally {
       setAiLoading(false);
     }
@@ -273,6 +276,17 @@ export default function CmdCenter({ onRefreshMetrics }) {
         <div className={styles.errorBanner}>
           <span>{error}</span>
           <Button size="sm" variant="secondary" onClick={() => setError(null)}>Dismiss</Button>
+        </div>
+      )}
+
+      {/* AI Fallback Banner */}
+      {aiStatus && !aiStatus.connected && (
+        <div className={styles.aiFallbackBanner}>
+          <span className={styles.aiFallbackIcon}>⚡</span>
+          <span className={styles.aiFallbackText}>
+            <strong>AI provider not connected</strong> — showing data-driven briefing.{" "}
+            <span style={{ opacity: 0.8 }}>Connect your API key in Settings for full AI responses.</span>
+          </span>
         </div>
       )}
 
@@ -509,7 +523,22 @@ export default function CmdCenter({ onRefreshMetrics }) {
           </Button>
         </div>
         {aiResponse && (
-          <div className={styles.aiResponse}>{aiResponse}</div>
+          <div className={styles.aiResponse}>
+            {aiResponse.source && aiResponse.source !== 'error' && (
+              <div className={styles.aiResponseSource}>
+                <span
+                  className={styles.aiSourceBadge}
+                  style={{
+                    background: aiResponse.source === 'anthropic' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                    color: aiResponse.source === 'anthropic' ? 'var(--color-success)' : 'var(--color-warning)',
+                  }}
+                >
+                  {aiResponse.source === 'anthropic' ? '✦ AI' : '⚡ Data-driven'}
+                </span>
+              </div>
+            )}
+            {aiResponse.response || aiResponse}
+          </div>
         )}
       </div>
 

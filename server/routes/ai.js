@@ -3,7 +3,7 @@ import { pool } from '../db/index.js';
 import { config } from '../config.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
-import { buildWorkspaceContext, buildLocalSummary, findEntityContext } from '../lib/ai-context.js';
+import { buildWorkspaceContext, buildLocalSummary, findEntityContext, buildRichLocalContext } from '../lib/ai-context.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
@@ -17,6 +17,42 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'AI query rate limit exceeded. Max 20 requests per hour per workspace.' },
 });
+
+// Session window: continue same session within 30 minutes
+const SESSION_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * Get or create a quick-query session for this user (continuing if within window).
+ */
+async function getOrCreateQuickSession(workspaceId, userId) {
+  try {
+    // Look for a recent session within the window
+    const existing = await pool.query(
+      `SELECT id FROM conversation_sessions
+       WHERE workspace_id = $1 AND user_id = $2 AND mode = 'quick'
+         AND updated_at > NOW() - INTERVAL '30 minutes'
+       ORDER BY updated_at DESC LIMIT 1`,
+      [workspaceId, userId]
+    );
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE conversation_sessions SET updated_at = NOW() WHERE id = $1`,
+        [existing.rows[0].id]
+      );
+      return existing.rows[0].id;
+    }
+    // Create new session
+    const created = await pool.query(
+      `INSERT INTO conversation_sessions (workspace_id, user_id, mode, title, has_pending_actions)
+       VALUES ($1, $2, 'quick', 'AI Query', false)
+       RETURNING id`,
+      [workspaceId, userId]
+    );
+    return created.rows[0].id;
+  } catch {
+    return null;
+  }
+}
 
 router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
   try {
@@ -32,18 +68,24 @@ router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
     const ctx = await buildWorkspaceContext(workspaceId);
 
     if (!config.ANTHROPIC_API_KEY) {
-      const summary = buildLocalSummary(ctx);
-      // Save to chat history even for local responses
+      let richCtx = null;
+      try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
+      const summary = buildLocalSummary(ctx, richCtx);
       await saveChatMessages(workspaceId, userId, trimmedMessage, summary);
       return res.json({ response: summary, source: 'local' });
     }
 
-    // Fetch last 5 chat messages for multi-turn context
+    // Get or create a session for this user (scoped to user, continued within 30min window)
+    const sessionId = await getOrCreateQuickSession(workspaceId, userId);
+
+    // Fetch last 5 chat messages scoped to THIS USER's session
     const historyResult = await pool.query(
       `SELECT role, content FROM chat_messages
        WHERE workspace_id = $1
+         AND user_id = $2
+         ${sessionId ? 'AND session_id = $3' : ''}
        ORDER BY created_at DESC LIMIT 5`,
-      [workspaceId]
+      sessionId ? [workspaceId, userId, sessionId] : [workspaceId, userId]
     );
     const conversationHistory = historyResult.rows.reverse(); // oldest first
 
@@ -84,47 +126,53 @@ Provide concise, actionable answers grounded in this data.`;
         },
         body: JSON.stringify({
           model: config.AI_MODEL,
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: systemPrompt,
           messages,
         }),
       });
     } catch (fetchErr) {
       console.error('[AI] Anthropic fetch error:', fetchErr.message);
-      const summary = buildLocalSummary(ctx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary);
+      let richCtx = null;
+      try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
+      const summary = buildLocalSummary(ctx, richCtx);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId);
       return res.json({ response: summary, source: 'local' });
     }
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
       console.error('[AI] Anthropic API error:', anthropicRes.status, errText);
-      const summary = buildLocalSummary(ctx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary);
+      let richCtx = null;
+      try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
+      const summary = buildLocalSummary(ctx, richCtx);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId);
       return res.json({ response: summary, source: 'local' });
     }
 
     const data = await anthropicRes.json();
     const text = data.content?.[0]?.text;
     if (!text) {
-      const summary = buildLocalSummary(ctx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary);
+      let richCtx = null;
+      try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
+      const summary = buildLocalSummary(ctx, richCtx);
+      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId);
       return res.json({ response: summary, source: 'local' });
     }
 
-    await saveChatMessages(workspaceId, userId, trimmedMessage, text);
+    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId);
     res.json({ response: text, source: 'anthropic' });
   } catch (err) {
     next(err);
   }
 });
 
-async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage) {
+async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null) {
   try {
     await pool.query(
-      `INSERT INTO chat_messages (workspace_id, user_id, role, content)
-       VALUES ($1, $2, 'user', $3), ($1, $2, 'assistant', $4)`,
-      [workspaceId, userId, userMessage, assistantMessage]
+      `INSERT INTO chat_messages (workspace_id, user_id, role, content, session_id)
+       VALUES ($1, $2, 'user', $3, $4), ($1, $2, 'assistant', $5, $4)`,
+      [workspaceId, userId, userMessage, sessionId, assistantMessage]
     );
   } catch (err) {
     console.error('[AI] Failed to save chat messages:', err.message);

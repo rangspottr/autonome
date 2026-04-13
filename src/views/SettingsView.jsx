@@ -24,6 +24,7 @@ export default function SettingsView() {
 
   const [integrations, setIntegrations] = useState(null);
   const [integrationsLoading, setIntegrationsLoading] = useState(true);
+  const [aiStatusData, setAiStatusData] = useState(null);
 
   const [webhookKey, setWebhookKey] = useState(null);
   const [webhookKeyLoading, setWebhookKeyLoading] = useState(true);
@@ -52,6 +53,10 @@ export default function SettingsView() {
       .then(setIntegrations)
       .catch(() => setIntegrations(null))
       .finally(() => setIntegrationsLoading(false));
+
+    api.get('/settings/ai-status')
+      .then(setAiStatusData)
+      .catch(() => setAiStatusData(null));
 
     api.get('/webhooks/key')
       .then((data) => setWebhookKey(data.key))
@@ -276,6 +281,46 @@ export default function SettingsView() {
         ) : (
           <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Unable to load integration status.</div>
         )}
+      </div>
+
+      {/* AI Provider Status */}
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>AI Provider</h3>
+        <Card>
+          {aiStatusData ? (
+            <div>
+              <div className={styles.integrationCard} style={{ marginBottom: "var(--space-3)" }}>
+                <span className={styles.integrationName}>Provider</span>
+                <Pill
+                  label={aiStatusData.provider === "anthropic" ? "Anthropic Claude" : "Not configured"}
+                  variant={aiStatusData.connected ? "green" : "muted"}
+                />
+              </div>
+              {aiStatusData.model && (
+                <div className={styles.integrationCard} style={{ marginBottom: "var(--space-3)" }}>
+                  <span className={styles.integrationName}>Model</span>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
+                    {aiStatusData.model}
+                  </span>
+                </div>
+              )}
+              <div className={styles.integrationCard} style={{ marginBottom: "var(--space-3)" }}>
+                <span className={styles.integrationName}>Connection</span>
+                <Pill
+                  label={aiStatusData.connected ? "Connected" : "Limited Mode"}
+                  variant={aiStatusData.connected ? "green" : "amber"}
+                />
+              </div>
+              {!aiStatusData.connected && (
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginTop: "var(--space-2)", padding: "var(--space-2) var(--space-3)", background: "rgba(245,158,11,0.07)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                  Set the <code style={{ fontSize: "var(--text-xs)" }}>ANTHROPIC_API_KEY</code> environment variable to enable full AI responses.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading AI status…</div>
+          )}
+        </Card>
       </div>
 
       {/* Webhook Integration */}

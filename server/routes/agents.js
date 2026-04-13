@@ -135,7 +135,9 @@ router.get('/:agent/workstream', ...guard, async (req, res, next) => {
           [wsId, agent]
         ),
         pool.query(
-          `SELECT * FROM agent_actions
+          `SELECT aa.*,
+                  aa.metadata->>'blocked_reason' AS blocked_reason
+           FROM agent_actions aa
            WHERE workspace_id = $1 AND agent = $2 AND outcome = 'blocked'
            ORDER BY created_at DESC
            LIMIT 10`,
@@ -154,11 +156,76 @@ router.get('/:agent/workstream', ...guard, async (req, res, next) => {
       (d) => d.agent === agent
     );
 
+    // Build domain-specific summary for agent card metrics
+    let summary = {};
+    try {
+      if (agent === 'finance') {
+        const invResult = await pool.query(
+          `SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total
+           FROM invoices WHERE workspace_id = $1 AND status = 'overdue'`,
+          [wsId]
+        );
+        summary = {
+          overdueCount: parseInt(invResult.rows[0]?.count) || 0,
+          overdueInvoices: parseFloat(invResult.rows[0]?.total) || 0,
+        };
+      } else if (agent === 'revenue') {
+        const dealResult = await pool.query(
+          `SELECT COALESCE(SUM(value), 0) AS pipeline,
+                  COUNT(CASE WHEN updated_at < NOW() - INTERVAL '7 days' THEN 1 END) AS stale
+           FROM deals WHERE workspace_id = $1 AND stage NOT IN ('won','lost')`,
+          [wsId]
+        );
+        summary = {
+          pipelineValue: parseFloat(dealResult.rows[0]?.pipeline) || 0,
+          staleDeals: parseInt(dealResult.rows[0]?.stale) || 0,
+        };
+      } else if (agent === 'operations') {
+        const taskResult = await pool.query(
+          `SELECT COUNT(*) AS overdue_tasks
+           FROM tasks WHERE workspace_id = $1 AND status = 'pending' AND due_date < NOW()`,
+          [wsId]
+        );
+        summary = {
+          overdueTasks: parseInt(taskResult.rows[0]?.overdue_tasks) || 0,
+        };
+      } else if (agent === 'support') {
+        const riskResult = await pool.query(
+          `SELECT COUNT(*) AS at_risk
+           FROM agent_memory
+           WHERE workspace_id = $1 AND agent = 'support' AND memory_type = 'blocker'`,
+          [wsId]
+        );
+        summary = {
+          atRiskContacts: parseInt(riskResult.rows[0]?.at_risk) || 0,
+        };
+      } else if (agent === 'growth') {
+        const dormantResult = await pool.query(
+          `SELECT COUNT(*) AS dormant
+           FROM contacts c
+           WHERE c.workspace_id = $1
+             AND c.type IN ('lead', 'prospect')
+             AND NOT EXISTS (
+               SELECT 1 FROM agent_actions aa
+               WHERE aa.entity_id = c.id AND aa.agent = 'growth'
+                 AND aa.created_at > NOW() - INTERVAL '30 days'
+             )`,
+          [wsId]
+        );
+        summary = {
+          dormantLeads: parseInt(dormantResult.rows[0]?.dormant) || 0,
+        };
+      }
+    } catch (summaryErr) {
+      console.error('[Agents] Domain summary error:', summaryErr.message);
+    }
+
     res.json({
       pendingDecisions,
       activeWorkflows: activeWorkflowsResult.rows,
       recentActions: recentActionsResult.rows,
       blockers: blockersResult.rows,
+      summary,
     });
   } catch (err) {
     next(err);

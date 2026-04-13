@@ -79,3 +79,88 @@
   font-weight: 700;
   font-size: var(--text-sm);
 }
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.triggerContext {
+  background: rgba(245,158,11,0.07);
+  border-left: 3px solid var(--color-warning);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+}
+
+.triggerLabel {
+  font-weight: 600;
+  color: var(--color-warning);
+  margin-right: var(--space-1);
+}
+
+.impactRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.impactLabel {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.impactValue {
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+
+.entityRef {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.reasoningToggle {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  font-family: var(--font-family);
+  margin-top: var(--space-2);
+}
+
+.reasoningBox {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.reasoningLabel {
+  font-weight: 700;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
+}
+
+.reasoningText {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.reasoningMeta {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

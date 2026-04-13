@@ -240,6 +240,19 @@
 
 .signOutBtn:hover { color: var(--color-text-primary); }
 
+.aiStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.02em;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+
 .content {
   flex: 1;
   overflow: auto;
