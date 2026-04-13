@@ -45,6 +45,7 @@ export async function generateDecisions(workspaceId) {
         desc: `Send reminder for $${impact.toFixed(2)} — ${daysPast}d overdue`,
         auto: impact <= (limits.maxAutoSpend || 500) * 10,
         needsApproval: false,
+        reasoning: `Invoice for $${impact.toFixed(2)} is ${daysPast} ${daysPast === 1 ? 'day' : 'days'} overdue. A friendly reminder at this stage has the highest collection success rate before escalation becomes necessary.`,
       });
     } else if (overdue && daysPast > 3 && daysPast <= 7) {
       if (has('finance', 'urgent', inv.id)) continue;
@@ -59,6 +60,7 @@ export async function generateDecisions(workspaceId) {
         desc: `URGENT: $${impact.toFixed(2)} is ${daysPast}d overdue — escalate`,
         auto: true,
         needsApproval: false,
+        reasoning: `$${impact.toFixed(2)} has been overdue for ${daysPast} ${daysPast === 1 ? 'day' : 'days'}. The payment window is closing — an urgent follow-up is needed before this moves to the collections escalation tier.`,
       });
     } else if (overdue && daysPast > 7) {
       if (has('finance', 'escalate', inv.id)) continue;
@@ -73,6 +75,7 @@ export async function generateDecisions(workspaceId) {
         desc: `CRITICAL: $${impact.toFixed(2)} is ${daysPast}d overdue — collections`,
         auto: false,
         needsApproval: true,
+        reasoning: `This invoice has been overdue for ${daysPast} ${daysPast === 1 ? 'day' : 'days'} with $${impact.toFixed(2)} outstanding. Previous reminder stages have not resulted in payment. Escalating to collections is recommended to prevent further aging and potential write-off.`,
       });
     } else if (!overdue) {
       if (has('finance', 'pre', inv.id)) continue;
@@ -87,6 +90,7 @@ export async function generateDecisions(workspaceId) {
         desc: `Pre-due reminder for $${impact.toFixed(2)}`,
         auto: true,
         needsApproval: false,
+        reasoning: `Invoice for $${impact.toFixed(2)} is approaching its due date. A proactive pre-due reminder reduces late payments and maintains positive client relationships.`,
       });
     }
   }
@@ -124,6 +128,7 @@ export async function generateDecisions(workspaceId) {
         auto: true,
         needsApproval: dealValue > (limits.approvalAbove || 5000),
         contactId: deal.contact_id,
+        reasoning: `${contactName}'s $${dealValue.toFixed(2)} deal has had no activity for ${stale} ${stale === 1 ? 'day' : 'days'}. At ${prob}% probability, the expected value is $${expectedValue.toFixed(2)}. Re-engagement now prevents the deal from going cold permanently.`,
       });
     } else if (stale >= 3) {
       if (has('revenue', 'followup', deal.id)) continue;
@@ -139,6 +144,7 @@ export async function generateDecisions(workspaceId) {
         auto: true,
         needsApproval: false,
         contactId: deal.contact_id,
+        reasoning: `${contactName}'s $${dealValue.toFixed(2)} deal has been inactive for ${stale} ${stale === 1 ? 'day' : 'days'}. At ${prob}% probability, a timely follow-up keeps momentum and improves close likelihood.`,
       });
     }
 
@@ -156,6 +162,7 @@ export async function generateDecisions(workspaceId) {
         auto: false,
         needsApproval: true,
         contactId: deal.contact_id,
+        reasoning: `${contactName} is at ${prob}% close probability in the negotiation stage with $${dealValue.toFixed(2)} on the line. This is a high-confidence close opportunity — delaying risks losing momentum.`,
       });
     }
   }
@@ -185,6 +192,7 @@ export async function generateDecisions(workspaceId) {
       auto: true,
       needsApproval: false,
       contactId: contact.id,
+      reasoning: `${contact.name} was added as a lead but has no deal attached yet. Qualifying leads into the pipeline ensures no revenue opportunity is missed.`,
     });
   }
 
@@ -209,6 +217,7 @@ export async function generateDecisions(workspaceId) {
       desc: `Escalate: "${task.title}" is overdue`,
       auto: true,
       needsApproval: false,
+      reasoning: `Task "${task.title}" is past its due date. Overdue tasks create downstream bottlenecks and signal operational drag. Escalation ensures visibility and reassignment.`,
     });
   }
 
@@ -240,6 +249,7 @@ export async function generateDecisions(workspaceId) {
       desc: `Reorder ${asset.name} — ${asset.quantity}/${reorderPoint} units`,
       auto: true,
       needsApproval: reorderCost > (limits.maxAutoSpend || 500),
+      reasoning: `${asset.name} is at ${asset.quantity} units, below the reorder point of ${reorderPoint}. Running out would disrupt operations. Reorder cost: ~$${reorderCost.toFixed(2)}.`,
     });
   }
 

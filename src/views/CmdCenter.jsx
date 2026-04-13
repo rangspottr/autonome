@@ -627,6 +627,19 @@ export default function CmdCenter({ onRefreshMetrics }) {
                         <Pill label="Needs Approval" variant="amber" />
                       )}
                     </div>
+                    {decision.reasoning && (
+                      <div>
+                        <button
+                          className={styles.reasoningToggle}
+                          onClick={() => setExpandedReasoning(expandedReasoning === decision.id ? null : decision.id)}
+                        >
+                          {expandedReasoning === decision.id ? "▲ Hide reasoning" : "▼ Why?"}
+                        </button>
+                        {expandedReasoning === decision.id && (
+                          <div className={styles.reasoningBox}>{decision.reasoning}</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <Button
                     size="sm"
