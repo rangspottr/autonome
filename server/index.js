@@ -36,6 +36,10 @@ import ingestRoutes from './routes/ingest.js';
 import operatorInstructionsRoutes from './routes/operator-instructions.js';
 import companiesRoutes from './routes/companies.js';
 import commandRoutes from './routes/command.js';
+import activityRoutes from './routes/activity.js';
+import notificationsRoutes from './routes/notifications.js';
+import autonomyRoutes from './routes/autonomy.js';
+import proactiveAlertsRoutes from './routes/proactive-alerts.js';
 import { startScheduler } from './engine/cycle.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
@@ -176,6 +180,10 @@ export function createApp() {
   app.use('/api/operator-instructions', apiLimiter, operatorInstructionsRoutes);
   app.use('/api/companies', apiLimiter, companiesRoutes);
   app.use('/api/command', apiLimiter, commandRoutes);
+  app.use('/api/activity', apiLimiter, activityRoutes);
+  app.use('/api/notifications', apiLimiter, notificationsRoutes);
+  app.use('/api/autonomy-settings', apiLimiter, autonomyRoutes);
+  app.use('/api/proactive-alerts', apiLimiter, proactiveAlertsRoutes);
 
   // In production, serve the Vite build
   if (process.env.NODE_ENV === 'production') {

@@ -1,0 +1,232 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-md);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  background: linear-gradient(135deg, #EFF6FF, #F0FDF4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.headerIcon {
+  font-size: 20px;
+}
+
+.headerTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.headerSub {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-top: 1px;
+}
+
+.dismissBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.dismissBtn:hover {
+  background: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.alertsBanner {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-danger-light);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.alertsIcon {
+  font-size: 14px;
+}
+
+.alertsBanner > span {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-danger);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.alertsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.alertItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.alertSeverity {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.alertSeverity[data-severity="critical"] {
+  background: var(--color-danger);
+  color: white;
+}
+
+.alertSeverity[data-severity="high"] {
+  background: #FEF3C7;
+  color: var(--color-warning);
+}
+
+.alertSeverity[data-severity="medium"] {
+  background: var(--color-border-subtle);
+  color: var(--color-text-secondary);
+}
+
+.alertSeverity[data-severity="low"] {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.agents {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.agentRow {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.agentRow:last-child {
+  border-bottom: none;
+}
+
+.agentHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.agentHeader:hover {
+  background: var(--color-bg);
+}
+
+.agentAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.agentInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.agentLabel {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.agentStats {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.chevron {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.agentAlerts {
+  padding: var(--space-2) var(--space-4) var(--space-3) calc(var(--space-4) + 28px + var(--space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.agentAlertItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.pending {
+  padding: var(--space-3) var(--space-4);
+}
+
+.pendingTitle {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-warning);
+  margin-bottom: var(--space-2);
+}
+
+.pendingItem {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  padding: var(--space-1) 0;
+  padding-left: var(--space-4);
+  position: relative;
+}
+
+.pendingItem::before {
+  content: "•";
+  position: absolute;
+  left: var(--space-2);
+  color: var(--color-text-muted);
+}

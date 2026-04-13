@@ -2,6 +2,7 @@ import { pool } from '../db/index.js';
 import { processEmailQueue } from '../services/email.js';
 import { processSMSQueue } from '../services/sms.js';
 import { processBusinessEvent } from './intake.js';
+import { generateProactiveAlerts, generateApprovalNotifications, generateCriticalRiskNotifications } from './notifications.js';
 
 const CYCLE_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -11,6 +12,45 @@ async function getModules() {
   const { executeAction } = await import('./execution.js');
   const { advanceWorkflows } = await import('./workflows.js');
   return { generateDecisions, executeAction, advanceWorkflows };
+}
+
+/**
+ * Load autonomy settings for a workspace (global + per-agent merged).
+ * Returns settings keyed by agent (null key = global).
+ */
+async function loadAutonomySettings(workspaceId) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM autonomy_settings WHERE workspace_id = $1`,
+      [workspaceId]
+    );
+    const settings = { global: null };
+    for (const row of result.rows) {
+      const key = row.agent || 'global';
+      settings[key] = row;
+    }
+    return settings;
+  } catch {
+    return { global: null };
+  }
+}
+
+/**
+ * Check if current time is within quiet hours.
+ */
+function isQuietHours(setting) {
+  if (!setting?.quiet_hours_start || !setting?.quiet_hours_end) return false;
+  try {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const start = setting.quiet_hours_start.slice(0, 5);
+    const end = setting.quiet_hours_end.slice(0, 5);
+    if (start <= end) return currentTime >= start && currentTime < end;
+    return currentTime >= start || currentTime < end;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -116,13 +156,32 @@ export async function runAgentCycle(workspaceId) {
   const settings = wsResult.rows[0]?.settings || {};
   const limits = settings.riskLimits || {};
 
+  // Load autonomy settings from DB (overrides workspace settings if present)
+  const autonomy = await loadAutonomySettings(workspaceId);
+  const globalAutonomy = autonomy.global;
+
+  // Respect global quiet hours for communications
+  const quietNow = isQuietHours(globalAutonomy);
+
   const decisions = await generateDecisions(workspaceId);
 
-  const autoExecutable = decisions.filter((d) => d.auto === true && d.needsApproval === false);
+  const autoExecutable = decisions.filter((d) => {
+    if (d.needsApproval) return false;
+    if (!d.auto) return false;
+    // Check per-agent autonomy settings
+    const agentSetting = autonomy[d.agent] || globalAutonomy;
+    if (agentSetting && agentSetting.enabled === false) return false;
+    const threshold = agentSetting?.auto_execute_threshold ?? limits.maxAutoSpend ?? 500;
+    if (d.impact && parseFloat(d.impact) > threshold) {
+      d.needsApproval = true;
+      return false;
+    }
+    return true;
+  });
   const needsApproval = decisions.filter((d) => d.needsApproval === true || d.auto === false);
 
-  // Apply per-cycle auto-execute cap if configured
-  const maxAutoPerCycle = limits.maxAutoPerCycle || 20;
+  // Apply per-cycle auto-execute cap
+  const maxAutoPerCycle = globalAutonomy?.max_auto_actions_per_cycle ?? limits.maxAutoPerCycle ?? 20;
   const toExecute = autoExecutable.slice(0, maxAutoPerCycle);
 
   const executionResults = [];
@@ -139,18 +198,21 @@ export async function runAgentCycle(workspaceId) {
   // Advance workflows
   const wfResult = await advanceWorkflows(workspaceId);
 
-  // Process queued email and SMS communications
+  // Process queued email and SMS communications (respect quiet hours)
   let emailsSent = 0;
   let smsSent = 0;
-  try {
-    emailsSent = await processEmailQueue(workspaceId);
-  } catch (emailErr) {
-    console.error(`[Agent Cycle] Email queue error for workspace ${workspaceId}:`, emailErr);
-  }
-  try {
-    smsSent = await processSMSQueue(workspaceId);
-  } catch (smsErr) {
-    console.error(`[Agent Cycle] SMS queue error for workspace ${workspaceId}:`, smsErr);
+  if (!quietNow) {
+    try {
+      const maxEmails = globalAutonomy?.max_daily_emails ?? limits.dailyEmailLimit ?? 50;
+      emailsSent = await processEmailQueue(workspaceId, maxEmails);
+    } catch (emailErr) {
+      console.error(`[Agent Cycle] Email queue error for workspace ${workspaceId}:`, emailErr);
+    }
+    try {
+      smsSent = await processSMSQueue(workspaceId);
+    } catch (smsErr) {
+      console.error(`[Agent Cycle] SMS queue error for workspace ${workspaceId}:`, smsErr);
+    }
   }
 
   // Build pending decisions list with stable IDs
@@ -170,6 +232,7 @@ export async function runAgentCycle(workspaceId) {
     emailsSent,
     smsSent,
     pendingDecisions,
+    quietHoursActive: quietNow,
   };
 
   // Record the cycle in agent_runs
@@ -191,6 +254,26 @@ export async function runAgentCycle(workspaceId) {
     console.error(`[Agent Cycle] Memory write error for workspace ${workspaceId}:`, memErr);
   }
 
+  // Generate proactive alerts
+  let newAlerts = [];
+  try {
+    newAlerts = await generateProactiveAlerts(workspaceId);
+  } catch (alertErr) {
+    console.error(`[Agent Cycle] Proactive alerts error for workspace ${workspaceId}:`, alertErr.message);
+  }
+
+  // Generate notifications
+  try {
+    if (pendingDecisions.length > 0) {
+      await generateApprovalNotifications(workspaceId, pendingDecisions);
+    }
+    if (newAlerts.length > 0) {
+      await generateCriticalRiskNotifications(workspaceId, newAlerts);
+    }
+  } catch (notifErr) {
+    console.error(`[Agent Cycle] Notification error for workspace ${workspaceId}:`, notifErr.message);
+  }
+
   // Process any pending/classified business events
   try {
     const pendingEvents = await pool.query(
@@ -208,7 +291,7 @@ export async function runAgentCycle(workspaceId) {
     console.error(`[Agent Cycle] Business events processing error for workspace ${workspaceId}:`, eventsErr.message);
   }
 
-  return { ...summary, runId: runResult.rows[0]?.id };
+  return { ...summary, runId: runResult.rows[0]?.id, newAlerts: newAlerts.length };
 }
 
 /**
