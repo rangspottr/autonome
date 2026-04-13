@@ -12,7 +12,7 @@ function classifyEvent(event) {
   let summary = '';
 
   // Determine category from event_type
-  if (['inbound_email', 'form_submission', 'new_lead'].includes(event_type)) {
+  if (['inbound_email', 'inbound_sms', 'form_submission', 'new_lead'].includes(event_type)) {
     category = 'communication';
   } else if (['payment_received', 'payment_failed', 'invoice_event'].includes(event_type)) {
     category = 'financial';
@@ -58,6 +58,16 @@ function classifyEvent(event) {
       sentiment = 'positive';
     }
     summary = `Email from ${data.from || 'unknown'}: ${data.subject || '(no subject)'}`;
+  } else if (event_type === 'inbound_sms') {
+    const body = (data.body || '').toLowerCase();
+    if (/urgent|asap|immediately|critical/.test(body)) urgency = 'high';
+    if (/complaint|frustrated|unhappy|refund/.test(body)) {
+      sentiment = 'negative';
+      urgency = 'high';
+    } else if (/thank|great|excellent|happy/.test(body)) {
+      sentiment = 'positive';
+    }
+    summary = `SMS from ${data.from || 'unknown'}: ${(data.body || '').substring(0, 100)}`;
   } else if (event_type === 'form_submission') {
     urgency = 'medium';
     summary = `Form submission: ${data.form_type || 'unknown'} from ${data.fields?.email || data.fields?.name || 'unknown'}`;
@@ -217,20 +227,20 @@ function routeToAgents(event, entityLinks) {
     if (hasOpenDeal) {
       routing.push({ agent: 'operations', role: 'informed', priority: 2, reason: 'Linked to active job/task' });
     }
-  } else if (event_type === 'inbound_email') {
+  } else if (['inbound_email', 'inbound_sms'].includes(event_type)) {
     const data = event.raw_data || {};
     const text = `${data.subject || ''} ${data.body || ''}`.toLowerCase();
     if (/invoice|payment|billing|charge|refund/.test(text)) {
-      routing.push({ agent: 'finance', role: 'primary', priority: 1, reason: 'Email contains billing/payment content' });
+      routing.push({ agent: 'finance', role: 'primary', priority: 1, reason: 'Message contains billing/payment content' });
     } else if (/proposal|quote|pricing|contract|deal|buy|purchase/.test(text)) {
-      routing.push({ agent: 'revenue', role: 'primary', priority: 1, reason: 'Email contains sales/deal content' });
+      routing.push({ agent: 'revenue', role: 'primary', priority: 1, reason: 'Message contains sales/deal content' });
     } else if (/help|support|issue|problem|broken|error|ticket/.test(text)) {
-      routing.push({ agent: 'support', role: 'primary', priority: 1, reason: 'Email contains support request content' });
+      routing.push({ agent: 'support', role: 'primary', priority: 1, reason: 'Message contains support request content' });
     } else {
-      routing.push({ agent: 'revenue', role: 'primary', priority: 1, reason: 'Inbound email routed to revenue by default' });
+      routing.push({ agent: 'revenue', role: 'primary', priority: 1, reason: 'Inbound message routed to revenue by default' });
     }
     if (hasOpenDeal) {
-      routing.push({ agent: 'revenue', role: hasOpenDeal ? 'coordinator' : 'informed', priority: 2, reason: 'Open deal found for sender' });
+      routing.push({ agent: 'revenue', role: 'coordinator', priority: 2, reason: 'Open deal found for sender' });
     }
   } else if (['form_submission', 'new_lead'].includes(event_type)) {
     const data = event.raw_data || {};

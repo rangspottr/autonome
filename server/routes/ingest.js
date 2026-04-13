@@ -109,7 +109,7 @@ router.post('/sms', apiKeyOrAuth, async (req, res, next) => {
     const event = await ingestBusinessEvent(
       req.workspace.id,
       'sms',
-      'inbound_email',
+      'inbound_sms',
       { from, to, body, direction }
     );
     res.status(201).json(event);
