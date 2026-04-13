@@ -12,18 +12,22 @@ import styles from "./App.module.css";
 import Setup from "./views/Setup.jsx";
 import CmdCenter from "./views/CmdCenter.jsx";
 import AgentView from "./views/AgentView.jsx";
+import BoardroomView from "./views/BoardroomView.jsx";
 import ApprovalView from "./views/ApprovalView.jsx";
 import AlertsView from "./views/AlertsView.jsx";
-import AutonomyView from "./views/AutonomyView.jsx";
 import FinanceView from "./views/FinanceView.jsx";
 import SalesView from "./views/SalesView.jsx";
 import OpsView from "./views/OpsView.jsx";
+import SupportView from "./views/SupportView.jsx";
+import GrowthView from "./views/GrowthView.jsx";
 import InventoryView from "./views/InventoryView.jsx";
 import ROIView from "./views/ROIView.jsx";
 import AuditView from "./views/AuditView.jsx";
-import SettingsView from "./views/SettingsView.jsx";
 import ProcessView from "./views/ProcessView.jsx";
 import KnowledgeView from "./views/KnowledgeView.jsx";
+import ConnectionsView from "./views/ConnectionsView.jsx";
+import AutonomyRulesView from "./views/AutonomyRulesView.jsx";
+import WorkspaceSettingsView from "./views/WorkspaceSettingsView.jsx";
 
 import CommandWidget from "./components/CommandWidget.jsx";
 
@@ -39,25 +43,33 @@ import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
 
 const NAV_GROUPS = [
   {
-    label: "Main",
+    label: "HOME",
     items: [
       { id: "cmd", icon: "CMD", label: "Command Center" },
+    ],
+  },
+  {
+    label: "AI TEAM",
+    items: [
       { id: "agents", icon: "AGT", label: "Agents" },
+      { id: "boardroom", icon: "BRD", label: "Boardroom" },
       { id: "approvals", icon: "APR", label: "Approvals" },
       { id: "alerts", icon: "ALT", label: "Alerts" },
     ],
   },
   {
-    label: "Business",
+    label: "BUSINESS",
     items: [
+      { id: "sales", icon: "REV", label: "Revenue" },
       { id: "finance", icon: "FIN", label: "Finance" },
-      { id: "sales", icon: "REV", label: "Sales" },
       { id: "ops", icon: "OPS", label: "Operations" },
+      { id: "support", icon: "SUP", label: "Support" },
+      { id: "growth", icon: "GRW", label: "Growth" },
       { id: "inventory", icon: "INV", label: "Inventory" },
     ],
   },
   {
-    label: "Intelligence",
+    label: "INTELLIGENCE",
     items: [
       { id: "roi", icon: "ROI", label: "ROI" },
       { id: "process", icon: "PRC", label: "Process" },
@@ -66,10 +78,11 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "System",
+    label: "SETUP",
     items: [
-      { id: "autonomy", icon: "AUT", label: "Autonomy" },
-      { id: "settings", icon: "SET", label: "Settings" },
+      { id: "connections", icon: "CON", label: "Connections" },
+      { id: "autonomy-rules", icon: "AUT", label: "Autonomy Rules" },
+      { id: "workspace", icon: "WSP", label: "Workspace" },
     ],
   },
 ];
@@ -188,18 +201,22 @@ function MainApp() {
       </>
     ),
     agents: <AgentView onRefreshMetrics={refreshMetrics} />,
+    boardroom: <BoardroomView />,
     approvals: <ApprovalView onRefreshMetrics={refreshMetrics} />,
     alerts: <AlertsView />,
-    finance: <FinanceView />,
     sales: <SalesView />,
+    finance: <FinanceView />,
     ops: <OpsView />,
+    support: <SupportView />,
+    growth: <GrowthView />,
     inventory: <InventoryView />,
     roi: <ROIView />,
     process: <ProcessView />,
     knowledge: <KnowledgeView />,
     audit: <AuditView />,
-    autonomy: <AutonomyView />,
-    settings: <SettingsView />,
+    connections: <ConnectionsView />,
+    "autonomy-rules": <AutonomyRulesView />,
+    workspace: <WorkspaceSettingsView />,
   };
 
   const healthColor =
