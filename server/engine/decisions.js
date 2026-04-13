@@ -97,7 +97,7 @@ export async function generateDecisions(workspaceId) {
             c.name AS contact_name
      FROM deals d
      LEFT JOIN contacts c ON c.id = d.contact_id
-     WHERE d.workspace_id = $1 AND d.stage != 'closed'`,
+     WHERE d.workspace_id = $1 AND d.stage NOT IN ('won', 'lost')`,
     [workspaceId]
   );
 
@@ -192,7 +192,7 @@ export async function generateDecisions(workspaceId) {
   const taskResult = await pool.query(
     `SELECT id, title
      FROM tasks
-     WHERE workspace_id = $1 AND status != 'done' AND due_date < NOW()`,
+     WHERE workspace_id = $1 AND status NOT IN ('completed', 'cancelled') AND due_date < NOW()`,
     [workspaceId]
   );
 

@@ -7,7 +7,7 @@ import { validate } from '../middleware/validate.js';
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
 
-const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue', 'cancelled'];
+const INVOICE_STATUSES = ['draft', 'pending', 'sent', 'paid', 'overdue', 'escalated', 'cancelled'];
 
 const invoiceCreateRules = [
   body('amount').isFloat({ gt: 0 }),

@@ -209,7 +209,7 @@ export async function executeAction(workspaceId, decision, options = {}) {
       const deal = dealResult.rows[0];
       if (deal) {
         await pool.query(
-          `UPDATE deals SET stage = 'closed', updated_at = NOW() WHERE id = $1 AND workspace_id = $2`,
+          `UPDATE deals SET stage = 'won', updated_at = NOW() WHERE id = $1 AND workspace_id = $2`,
           [deal.id, workspaceId]
         );
         description = `Closed deal: ${deal.title} ($${parseFloat(deal.value || 0).toFixed(2)})`;

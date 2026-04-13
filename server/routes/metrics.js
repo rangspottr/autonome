@@ -45,8 +45,8 @@ router.get('/summary', ...guard, async (req, res, next) => {
       pool.query('SELECT COUNT(*) AS total FROM contacts WHERE workspace_id = $1', [wsId]),
       pool.query(
         `SELECT COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE stage != 'closed') AS open,
-                COALESCE(SUM(value) FILTER (WHERE stage != 'closed'), 0) AS pipeline_value
+                COUNT(*) FILTER (WHERE stage NOT IN ('won', 'lost')) AS open,
+                COALESCE(SUM(value) FILTER (WHERE stage NOT IN ('won', 'lost')), 0) AS pipeline_value
          FROM deals WHERE workspace_id = $1`,
         [wsId]
       ),
@@ -60,8 +60,8 @@ router.get('/summary', ...guard, async (req, res, next) => {
       ),
       pool.query(
         `SELECT COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE status = 'done') AS done,
-                COUNT(*) FILTER (WHERE status != 'done' AND due_date IS NOT NULL AND due_date < NOW()) AS overdue
+                COUNT(*) FILTER (WHERE status = 'completed') AS done,
+                COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled') AND due_date IS NOT NULL AND due_date < NOW()) AS overdue
          FROM tasks WHERE workspace_id = $1`,
         [wsId]
       ),

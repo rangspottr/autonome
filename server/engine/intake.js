@@ -130,7 +130,7 @@ async function identifyEntities(workspaceId, event) {
 
         // Find open deals for this contact
         const dealRes = await pool.query(
-          `SELECT id, title FROM deals WHERE workspace_id = $1 AND contact_id = $2 AND stage NOT IN ('closed', 'lost') LIMIT 5`,
+          `SELECT id, title FROM deals WHERE workspace_id = $1 AND contact_id = $2 AND stage NOT IN ('won', 'lost') LIMIT 5`,
           [workspaceId, res.rows[0].id]
         );
         for (const deal of dealRes.rows) {

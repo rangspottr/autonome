@@ -89,7 +89,7 @@ async function writeAgentMemory(workspaceId) {
             EXTRACT(EPOCH FROM (NOW() - d.updated_at)) / 86400 AS days_stale
      FROM deals d
      WHERE d.workspace_id = $1
-       AND d.stage NOT IN ('closed', 'lost')
+       AND d.stage NOT IN ('won', 'lost')
        AND d.updated_at < NOW() - INTERVAL '7 days'
        AND EXISTS (
          SELECT 1 FROM agent_actions aa
