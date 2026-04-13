@@ -21,6 +21,8 @@ import SettingsView from "./views/SettingsView.jsx";
 import ProcessView from "./views/ProcessView.jsx";
 import KnowledgeView from "./views/KnowledgeView.jsx";
 
+import CommandWidget from "./components/CommandWidget.jsx";
+
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
 import CreateWorkspacePage from "./pages/CreateWorkspacePage.jsx";
@@ -325,6 +327,13 @@ function MainApp() {
           </ErrorBoundary>
         </main>
       </div>
+
+      {/* Command widget — persists across all views */}
+      <CommandWidget
+        pendingApprovals={pendingApprovals}
+        workspace={workspace}
+        user={user}
+      />
     </div>
   );
 }
