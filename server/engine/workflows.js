@@ -1,5 +1,75 @@
 import { pool } from '../db/index.js';
 
+/**
+ * Map a business event type to a workflow template and entity details.
+ * Returns { template, entityType, entityId } or null if no mapping.
+ */
+export function mapEventToWorkflow(event) {
+  if (!event) return null;
+  const type = event.event_type || '';
+  const entityType = event.entity_type || null;
+  const entityId = event.entity_id || null;
+
+  if (type === 'invoice_created' || type === 'invoice_overdue') {
+    return { template: 'invoice_collection', entityType: 'invoice', entityId };
+  }
+  if (type === 'deal_stale' || type === 'deal_created') {
+    return { template: 'deal_followup', entityType: 'deal', entityId };
+  }
+  if (type === 'task_overdue' || type === 'task_blocked') {
+    return { template: 'task_escalation', entityType: 'task', entityId };
+  }
+  if (type === 'support_ticket_created' || type === 'support_issue_opened') {
+    return { template: 'issue_resolution', entityType: entityType || 'ticket', entityId };
+  }
+  if (type === 'lead_created' || type === 'contact_signed_up') {
+    return { template: 'lead_nurture', entityType: 'contact', entityId };
+  }
+  return null;
+}
+
+/**
+ * Pause a workflow. Returns the updated workflow row or null if not found.
+ */
+export async function pauseWorkflow(workspaceId, workflowId, reason = null) {
+  const result = await pool.query(
+    `UPDATE workflows
+     SET status = 'paused', paused_at = NOW(), pause_reason = $1, updated_at = NOW()
+     WHERE id = $2 AND workspace_id = $3 AND status = 'active'
+     RETURNING *`,
+    [reason, workflowId, workspaceId]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Resume a paused workflow. Returns the updated workflow row or null.
+ */
+export async function resumeWorkflow(workspaceId, workflowId) {
+  const result = await pool.query(
+    `UPDATE workflows
+     SET status = 'active', paused_at = NULL, pause_reason = NULL, updated_at = NOW()
+     WHERE id = $1 AND workspace_id = $2 AND status = 'paused'
+     RETURNING *`,
+    [workflowId, workspaceId]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Reassign workflow ownership to another agent.
+ */
+export async function reassignWorkflow(workspaceId, workflowId, newAgent) {
+  const result = await pool.query(
+    `UPDATE workflows
+     SET context = context || jsonb_build_object('assigned_agent', $1), updated_at = NOW()
+     WHERE id = $2 AND workspace_id = $3
+     RETURNING *`,
+    [newAgent, workflowId, workspaceId]
+  );
+  return result.rows[0] || null;
+}
+
 export const WF_TEMPLATES = {
   invoice_collection: {
     agent: 'finance',
@@ -110,6 +180,19 @@ export async function startWorkflow(workspaceId, template, entityType, entityId,
 export async function advanceWorkflows(workspaceId) {
   let advanced = 0;
   let completed = 0;
+
+  // Check SLA breaches on all active workflows
+  try {
+    await pool.query(
+      `UPDATE workflows SET sla_breached = true, updated_at = NOW()
+       WHERE workspace_id = $1 AND status = 'active'
+         AND sla_deadline IS NOT NULL AND sla_deadline < NOW()
+         AND (sla_breached IS NULL OR sla_breached = false)`,
+      [workspaceId]
+    );
+  } catch {
+    // non-fatal
+  }
 
   const wfResult = await pool.query(
     `SELECT * FROM workflows

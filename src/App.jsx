@@ -5,12 +5,16 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import { ToastProvider } from "./components/Toast.jsx";
 import Avatar from "./components/Avatar.jsx";
+import NotificationBell from "./components/NotificationBell.jsx";
+import SinceLastLogin from "./components/SinceLastLogin.jsx";
 import styles from "./App.module.css";
 
 import Setup from "./views/Setup.jsx";
 import CmdCenter from "./views/CmdCenter.jsx";
 import AgentView from "./views/AgentView.jsx";
 import ApprovalView from "./views/ApprovalView.jsx";
+import AlertsView from "./views/AlertsView.jsx";
+import AutonomyView from "./views/AutonomyView.jsx";
 import FinanceView from "./views/FinanceView.jsx";
 import SalesView from "./views/SalesView.jsx";
 import OpsView from "./views/OpsView.jsx";
@@ -40,6 +44,7 @@ const NAV_GROUPS = [
       { id: "cmd", icon: "CMD", label: "Command Center" },
       { id: "agents", icon: "AGT", label: "Agents" },
       { id: "approvals", icon: "APR", label: "Approvals" },
+      { id: "alerts", icon: "ALT", label: "Alerts" },
     ],
   },
   {
@@ -62,7 +67,10 @@ const NAV_GROUPS = [
   },
   {
     label: "System",
-    items: [{ id: "settings", icon: "SET", label: "Settings" }],
+    items: [
+      { id: "autonomy", icon: "AUT", label: "Autonomy" },
+      { id: "settings", icon: "SET", label: "Settings" },
+    ],
   },
 ];
 
@@ -103,18 +111,22 @@ function MainApp() {
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [healthScore, setHealthScore] = useState(50);
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [activeAlerts, setActiveAlerts] = useState(0);
   const [devStatus, setDevStatus] = useState(null);
+  const [showSinceLogin, setShowSinceLogin] = useState(true);
 
   useEffect(() => {
     async function init() {
       try {
-        const [healthData, agentStatus, statusData] = await Promise.all([
+        const [healthData, agentStatus, statusData, alertsData] = await Promise.all([
           api.get("/metrics/health").catch(() => ({ score: 50 })),
           api.get("/agent/status").catch(() => ({ pendingDecisions: 0 })),
           api.get("/settings/status").catch(() => null),
+          api.get("/proactive-alerts?limit=1").catch(() => ({ total: 0 })),
         ]);
         setHealthScore(healthData.score || 50);
         setPendingApprovals(agentStatus.pendingDecisions || 0);
+        setActiveAlerts(alertsData.total || 0);
         if (statusData) setDevStatus(statusData);
         const wsSettings = workspace?.settings || {};
         if (!wsSettings.setupCompleted) setSetupNeeded(true);
@@ -131,12 +143,14 @@ function MainApp() {
 
   const refreshMetrics = useCallback(async () => {
     try {
-      const [healthData, agentStatus] = await Promise.all([
+      const [healthData, agentStatus, alertsData] = await Promise.all([
         api.get("/metrics/health").catch(() => ({ score: 50 })),
         api.get("/agent/status").catch(() => ({ pendingDecisions: 0 })),
+        api.get("/proactive-alerts?limit=1").catch(() => ({ total: 0 })),
       ]);
       setHealthScore(healthData.score || 50);
       setPendingApprovals(agentStatus.pendingDecisions || 0);
+      setActiveAlerts(alertsData.total || 0);
     } catch {
       // ignore
     }
@@ -162,9 +176,17 @@ function MainApp() {
   }
 
   const VIEWS = {
-    cmd: <CmdCenter onRefreshMetrics={refreshMetrics} />,
+    cmd: (
+      <>
+        {showSinceLogin && (
+          <SinceLastLogin onDismiss={() => setShowSinceLogin(false)} />
+        )}
+        <CmdCenter onRefreshMetrics={refreshMetrics} />
+      </>
+    ),
     agents: <AgentView onRefreshMetrics={refreshMetrics} />,
     approvals: <ApprovalView onRefreshMetrics={refreshMetrics} />,
+    alerts: <AlertsView />,
     finance: <FinanceView />,
     sales: <SalesView />,
     ops: <OpsView />,
@@ -173,6 +195,7 @@ function MainApp() {
     process: <ProcessView />,
     knowledge: <KnowledgeView />,
     audit: <AuditView />,
+    autonomy: <AutonomyView />,
     settings: <SettingsView />,
   };
 
@@ -223,7 +246,9 @@ function MainApp() {
               {group.items.map((item) => {
                 const isActive = view === item.id;
                 const badge =
-                  item.id === "approvals" && pendingApprovals > 0 ? pendingApprovals : null;
+                  item.id === "approvals" && pendingApprovals > 0 ? pendingApprovals :
+                  item.id === "alerts" && activeAlerts > 0 ? activeAlerts :
+                  null;
                 return (
                   <button
                     key={item.id}
@@ -309,6 +334,7 @@ function MainApp() {
               {workspace?.name}
               {workspace?.industry ? ` · ${workspace.industry}` : ""}
             </span>
+            <NotificationBell />
             {user && <Avatar name={user.full_name || user.email} size="sm" />}
             {user && (
               <button className={styles.signOutBtn} onClick={logout}>
