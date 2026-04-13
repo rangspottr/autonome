@@ -28,8 +28,10 @@ import KnowledgeView from "./views/KnowledgeView.jsx";
 import ConnectionsView from "./views/ConnectionsView.jsx";
 import AutonomyRulesView from "./views/AutonomyRulesView.jsx";
 import WorkspaceSettingsView from "./views/WorkspaceSettingsView.jsx";
+import SettingsView from "./views/SettingsView.jsx";
 
 import CommandWidget from "./components/CommandWidget.jsx";
+import AIStatusBanner from "./components/AIStatusBanner.jsx";
 
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
@@ -81,6 +83,7 @@ const NAV_GROUPS = [
     label: "SETUP",
     items: [
       { id: "connections", icon: "CON", label: "Connections" },
+      { id: "settings", icon: "SET", label: "Settings" },
       { id: "autonomy-rules", icon: "AUT", label: "Autonomy Rules" },
       { id: "workspace", icon: "WSP", label: "Workspace" },
     ],
@@ -197,7 +200,7 @@ function MainApp() {
         {showSinceLogin && (
           <SinceLastLogin onDismiss={() => setShowSinceLogin(false)} />
         )}
-        <CmdCenter onRefreshMetrics={refreshMetrics} />
+        <CmdCenter onRefreshMetrics={refreshMetrics} onNavigate={setView} />
       </>
     ),
     agents: <AgentView onRefreshMetrics={refreshMetrics} />,
@@ -215,6 +218,7 @@ function MainApp() {
     knowledge: <KnowledgeView />,
     audit: <AuditView />,
     connections: <ConnectionsView />,
+    settings: <SettingsView />,
     "autonomy-rules": <AutonomyRulesView />,
     workspace: <WorkspaceSettingsView />,
   };
@@ -382,6 +386,7 @@ function MainApp() {
 
         {/* Content */}
         <main className={styles.content}>
+          <AIStatusBanner onNavigateToSettings={() => setView("settings")} />
           <ErrorBoundary key={view}>
             {VIEWS[view] || (
               <div style={{ color: "var(--color-text-muted)" }}>View not found.</div>

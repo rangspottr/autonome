@@ -8,6 +8,7 @@ import AgentMeta from "../components/AgentMeta.js";
 import Input from "../components/Input.jsx";
 import Stat from "../components/Stat.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+import WelcomeBriefing from "../components/WelcomeBriefing.jsx";
 import styles from "./CmdCenter.module.css";
 import { T } from "../lib/theme.js";
 
@@ -62,7 +63,7 @@ function buildSinceLoginSummary(events) {
   };
 }
 
-export default function CmdCenter({ onRefreshMetrics }) {
+export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
   const [decisions, setDecisions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,9 @@ export default function CmdCenter({ onRefreshMetrics }) {
   const [insights, setInsights] = useState([]);
   const [agentMemory, setAgentMemory] = useState([]);
   const [aiStatus, setAiStatus] = useState(null);
+  const [showWelcome, setShowWelcome] = useState(
+    () => localStorage.getItem("autonome_welcome_dismissed") !== "1"
+  );
 
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState(null);
@@ -273,6 +277,17 @@ export default function CmdCenter({ onRefreshMetrics }) {
 
   return (
     <div className={styles.page}>
+      {/* Welcome Briefing — shown for first-time users until dismissed */}
+      {showWelcome && !loading && (
+        <WelcomeBriefing
+          onDismiss={() => {
+            localStorage.setItem("autonome_welcome_dismissed", "1");
+            setShowWelcome(false);
+          }}
+          onNavigate={onNavigate}
+        />
+      )}
+
       {/* Inline error banner for non-fatal errors */}
       {error && summary && (
         <div className={styles.errorBanner}>
