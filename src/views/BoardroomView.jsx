@@ -43,8 +43,8 @@ function BoardroomPreamble() {
 
   const suggestions = [];
   if (status?.criticalAlerts > 0 || status?.highAlerts > 0) {
-    const count = (status.criticalAlerts || 0) + (status.highAlerts || 0);
-    suggestions.push(`Ask about your ${count} critical alert${count !== 1 ? "s" : ""}`);
+    const totalHighPriorityAlerts = (status.criticalAlerts || 0) + (status.highAlerts || 0);
+    suggestions.push(`Ask about your ${totalHighPriorityAlerts} critical alert${totalHighPriorityAlerts !== 1 ? "s" : ""}`);
   }
   if (status?.pendingDecisions > 0) {
     suggestions.push(`Review ${status.pendingDecisions} pending decision${status.pendingDecisions !== 1 ? "s" : ""} with your team`);
