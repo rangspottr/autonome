@@ -21,7 +21,7 @@ export async function buildWorkspaceContext(workspaceId) {
       [workspaceId]
     ),
     pool.query(
-      `SELECT summary FROM agent_runs WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT 3`,
+      `SELECT summary FROM agent_runs WHERE workspace_id = $1 ORDER BY started_at DESC LIMIT 3`,
       [workspaceId]
     ),
     pool.query(

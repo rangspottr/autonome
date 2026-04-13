@@ -144,7 +144,7 @@ router.get('/:agent/workstream', ...guard, async (req, res, next) => {
         pool.query(
           `SELECT summary FROM agent_runs
            WHERE workspace_id = $1
-           ORDER BY created_at DESC LIMIT 1`,
+           ORDER BY started_at DESC LIMIT 1`,
           [wsId]
         ),
       ]);
