@@ -88,15 +88,30 @@ router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
     const conversationHistory = historyResult.rows.reverse(); // oldest first
 
     // Entity-aware context injection
-    let entityContext = '';
+    let entityResult = { matches: [], tokens_consumed: 0 };
     try {
-      const found = await findEntityContext(workspaceId, trimmedMessage);
-      if (found) entityContext = `\n\nEntity context for this query:\n${found}`;
+      entityResult = await findEntityContext(workspaceId, trimmedMessage);
     } catch (entityErr) {
       console.error('[AI] Entity context lookup failed:', entityErr.message);
     }
 
-    const systemPrompt = `You are Autonome, an AI business operator assistant for ${ctx.businessName} (${ctx.industry}).
+    const hasEntityMatches = entityResult.matches.length > 0;
+
+    let systemPrompt;
+    if (hasEntityMatches) {
+      const entityBlocks = entityResult.matches.map((m) => m.l1).join('\n\n---\n\n');
+      systemPrompt = `You are Autonome, an AI business operator assistant for ${ctx.businessName} (${ctx.industry}).
+
+Entity context (directly relevant to this query):
+${entityBlocks}
+
+Business overview:
+- ${ctx.contacts} contacts, ${ctx.deals.count} deals ($${Math.round(ctx.deals.totalValue / 1000)}k pipeline), ${ctx.invoices.count} invoices ($${Math.round(ctx.invoices.overdueAmount / 1000)}k overdue)
+- Open tasks: ${ctx.tasks.openCount} | Agent actions today: ${ctx.agentActionsToday}
+
+Provide concise, actionable answers grounded in the entity context above.`;
+    } else {
+      systemPrompt = `You are Autonome, an AI business operator assistant for ${ctx.businessName} (${ctx.industry}).
 
 Current business context:
 - Contacts: ${ctx.contacts}
@@ -104,9 +119,10 @@ Current business context:
 - Invoices: ${ctx.invoices.count} total — $${Math.round(ctx.invoices.paidAmount).toLocaleString()} paid, $${Math.round(ctx.invoices.overdueAmount).toLocaleString()} overdue
 - Tasks: ${ctx.tasks.openCount} open tasks
 - Agent actions today: ${ctx.agentActionsToday}
-${ctx.recentAgentActivity.length > 0 ? `- Recent agent activity: ${ctx.recentAgentActivity.join(' | ')}` : ''}${entityContext}
+${ctx.recentAgentActivity.length > 0 ? `- Recent agent activity: ${ctx.recentAgentActivity.join(' | ')}` : ''}
 
 Provide concise, actionable answers grounded in this data.`;
+    }
 
     const messages = [
       ...conversationHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -158,19 +174,28 @@ Provide concise, actionable answers grounded in this data.`;
       return res.json({ response: summary, source: 'local' });
     }
 
-    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, 'anthropic');
+    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, 'anthropic', entityResult);
     res.json({ response: text, source: 'anthropic' });
   } catch (err) {
     next(err);
   }
 });
 
-async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null, source = 'local') {
+async function saveChatMessages(workspaceId, userId, userMessage, assistantMessage, sessionId = null, source = 'local', entityResult = null) {
   try {
+    const metadata = { source };
+    if (entityResult && entityResult.matches.length > 0) {
+      metadata.context_trace = {
+        entities_matched: entityResult.matches.map((m) => ({ type: m.type, id: m.id, name: m.name, score: m.score })),
+        entity_context_tier: 'L1',
+        entity_tokens: entityResult.tokens_consumed,
+        match_method: entityResult.matches[0]?.score >= 1.0 ? 'exact_name' : 'partial_match',
+      };
+    }
     await pool.query(
       `INSERT INTO chat_messages (workspace_id, user_id, role, content, session_id, metadata)
        VALUES ($1, $2, 'user', $3, $4, NULL), ($1, $2, 'assistant', $5, $4, $6)`,
-      [workspaceId, userId, userMessage, sessionId, assistantMessage, JSON.stringify({ source })]
+      [workspaceId, userId, userMessage, sessionId, assistantMessage, JSON.stringify(metadata)]
     );
   } catch (err) {
     console.error('[AI] Failed to save chat messages:', err.message);

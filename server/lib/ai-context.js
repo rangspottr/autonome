@@ -225,137 +225,581 @@ export function extractEntityNames(message) {
 }
 
 /**
- * Format a contact entity for context injection.
+ * Score an entity candidate against search tokens.
+ * Returns a score 0–1: exact name (1.0) > partial name (0.7) > exact company (0.6) >
+ * partial company (0.5) > partial description (0.3).
  */
-function formatContactContext(c) {
-  const parts = [`Contact: ${c.name} (${c.company || 'no company'}), ${c.type}`];
-  if (c.deals?.length) {
-    parts.push(`Deals: ${c.deals.map((d) => `${d.title} — $${Math.round(d.value || 0).toLocaleString()} (${d.stage})`).join('; ')}`);
+function scoreEntity(entityType, entity, tokensLower) {
+  const nameLower = ((entityType === 'deal' || entityType === 'task')
+    ? entity.title
+    : entityType === 'invoice'
+      ? entity.description
+      : entity.name) || '';
+  const nameL = nameLower.toLowerCase();
+  const companyL = (entity.company || '').toLowerCase();
+
+  let maxScore = 0;
+  for (const t of tokensLower) {
+    if (t.length < 2) continue;
+    if (nameL === t) return 1.0;
+    if (nameL.includes(t) && t.length >= 3) maxScore = Math.max(maxScore, 0.7);
+    if (companyL && companyL === t) maxScore = Math.max(maxScore, 0.6);
+    if (companyL && companyL.includes(t) && t.length >= 3) maxScore = Math.max(maxScore, 0.5);
+    // Description match (invoices/tasks) already covered by name above
+    if (!nameL.includes(t) && !companyL.includes(t) && nameL.includes(t.slice(0, 4))) {
+      maxScore = Math.max(maxScore, 0.3);
+    }
   }
-  if (c.invoices?.length) {
-    parts.push(`Invoices: ${c.invoices.map((i) => `${i.description} — $${Math.round(i.amount || 0).toLocaleString()} (${i.status})`).join('; ')}`);
-  }
-  if (c.recent_actions?.length) {
-    parts.push(`Recent agent actions: ${c.recent_actions.map((a) => `${a.agent}: ${a.description}`).join('; ')}`);
-  }
-  if (c.memory?.length) {
-    parts.push(`Agent memory: ${c.memory.map((m) => m.content).join('; ')}`);
-  }
-  return parts.join('\n');
+  return maxScore;
 }
 
 /**
- * Format a deal entity for context injection.
+ * Walk the relational graph for a matched entity in batched queries (not N+1).
+ * Returns a structured object with all relationship data, or null if not found.
  */
-function formatDealContext(d) {
-  const parts = [`Deal: "${d.title}" — $${Math.round(d.value || 0).toLocaleString()}, stage: ${d.stage}, contact: ${d.contact_name || 'N/A'}`];
-  if (d.recent_actions?.length) {
-    parts.push(`Recent agent actions: ${d.recent_actions.map((a) => `${a.agent}: ${a.description}`).join('; ')}`);
+export async function resolveEntityGraph(workspaceId, entityType, entityId) {
+  if (entityType === 'contact') {
+    const [contactRes, dealsRes, invoicesRes, workflowsRes, actionsRes, memoryRes] = await Promise.all([
+      pool.query(
+        'SELECT * FROM contacts WHERE id = $1 AND workspace_id = $2',
+        [entityId, workspaceId]
+      ),
+      pool.query(
+        'SELECT * FROM deals WHERE contact_id = $1 AND workspace_id = $2 ORDER BY value DESC NULLS LAST',
+        [entityId, workspaceId]
+      ),
+      pool.query(
+        'SELECT * FROM invoices WHERE contact_id = $1 AND workspace_id = $2 ORDER BY amount DESC NULLS LAST',
+        [entityId, workspaceId]
+      ),
+      pool.query(
+        `SELECT * FROM workflows WHERE workspace_id = $1 AND trigger_entity_type = 'contact' AND trigger_entity_id = $2`,
+        [workspaceId, entityId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_actions
+         WHERE workspace_id = $1 AND entity_type = 'contact' AND entity_id = $2
+         ORDER BY created_at DESC LIMIT 5`,
+        [workspaceId, entityId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_memory
+         WHERE workspace_id = $1 AND entity_type = 'contact' AND entity_id = $2
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [workspaceId, entityId]
+      ),
+    ]);
+
+    const contact = contactRes.rows[0];
+    if (!contact) return null;
+    return {
+      type: 'contact',
+      id: entityId,
+      contact,
+      deals: dealsRes.rows,
+      invoices: invoicesRes.rows,
+      workflows: workflowsRes.rows,
+      actions: actionsRes.rows,
+      memory: memoryRes.rows,
+    };
   }
-  return parts.join('\n');
+
+  if (entityType === 'deal') {
+    const [dealRes, actionsRes, memoryRes, workflowsRes] = await Promise.all([
+      pool.query(
+        'SELECT * FROM deals WHERE id = $1 AND workspace_id = $2',
+        [entityId, workspaceId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_actions
+         WHERE workspace_id = $1 AND entity_type = 'deal' AND entity_id = $2
+         ORDER BY created_at DESC LIMIT 5`,
+        [workspaceId, entityId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_memory
+         WHERE workspace_id = $1 AND entity_type = 'deal' AND entity_id = $2
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [workspaceId, entityId]
+      ),
+      pool.query(
+        `SELECT * FROM workflows WHERE workspace_id = $1 AND trigger_entity_type = 'deal' AND trigger_entity_id = $2`,
+        [workspaceId, entityId]
+      ),
+    ]);
+
+    const deal = dealRes.rows[0];
+    if (!deal) return null;
+
+    // Walk contact → invoices if contact exists
+    let contact = null;
+    let contactInvoices = [];
+    if (deal.contact_id) {
+      const [contactRes, invoicesRes] = await Promise.all([
+        pool.query(
+          'SELECT id, name, company, type, email FROM contacts WHERE id = $1',
+          [deal.contact_id]
+        ),
+        pool.query(
+          'SELECT * FROM invoices WHERE contact_id = $1 AND workspace_id = $2 ORDER BY amount DESC NULLS LAST',
+          [deal.contact_id, workspaceId]
+        ),
+      ]);
+      contact = contactRes.rows[0] || null;
+      contactInvoices = invoicesRes.rows;
+    }
+
+    return {
+      type: 'deal',
+      id: entityId,
+      deal,
+      contact,
+      invoices: contactInvoices,
+      workflows: workflowsRes.rows,
+      actions: actionsRes.rows,
+      memory: memoryRes.rows,
+    };
+  }
+
+  if (entityType === 'invoice') {
+    const [invoiceRes, actionsRes, memoryRes] = await Promise.all([
+      pool.query(
+        'SELECT * FROM invoices WHERE id = $1 AND workspace_id = $2',
+        [entityId, workspaceId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_actions
+         WHERE workspace_id = $1 AND entity_type = 'invoice' AND entity_id = $2
+         ORDER BY created_at DESC LIMIT 5`,
+        [workspaceId, entityId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_memory
+         WHERE workspace_id = $1 AND entity_type = 'invoice' AND entity_id = $2
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [workspaceId, entityId]
+      ),
+    ]);
+
+    const invoice = invoiceRes.rows[0];
+    if (!invoice) return null;
+
+    let contact = null;
+    if (invoice.contact_id) {
+      const contactRes = await pool.query(
+        'SELECT id, name, company, type FROM contacts WHERE id = $1',
+        [invoice.contact_id]
+      );
+      contact = contactRes.rows[0] || null;
+    }
+
+    return {
+      type: 'invoice',
+      id: entityId,
+      invoice,
+      contact,
+      actions: actionsRes.rows,
+      memory: memoryRes.rows,
+    };
+  }
+
+  if (entityType === 'task') {
+    const [taskRes, actionsRes, memoryRes] = await Promise.all([
+      pool.query(
+        'SELECT * FROM tasks WHERE id = $1 AND workspace_id = $2',
+        [entityId, workspaceId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_actions
+         WHERE workspace_id = $1 AND entity_type = 'task' AND entity_id = $2
+         ORDER BY created_at DESC LIMIT 5`,
+        [workspaceId, entityId]
+      ),
+      pool.query(
+        `SELECT * FROM agent_memory
+         WHERE workspace_id = $1 AND entity_type = 'task' AND entity_id = $2
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [workspaceId, entityId]
+      ),
+    ]);
+
+    const task = taskRes.rows[0];
+    if (!task) return null;
+    return {
+      type: 'task',
+      id: entityId,
+      task,
+      actions: actionsRes.rows,
+      memory: memoryRes.rows,
+    };
+  }
+
+  return null;
 }
 
 /**
- * Search for named entities in the workspace and return their context strings.
- * Supports multiple entity matches across contacts, deals, invoices, companies, and tasks.
+ * Build a one-line (~50-100 token) summary for a resolved entity graph.
+ */
+export function buildEntityL0(entityGraph) {
+  if (!entityGraph) return '';
+
+  if (entityGraph.type === 'contact') {
+    const c = entityGraph.contact;
+    const activeDeals = (entityGraph.deals || []).filter((d) => !['won', 'lost'].includes(d.stage));
+    const paidAmt = (entityGraph.invoices || [])
+      .filter((i) => i.status === 'paid')
+      .reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+    const overdueAmt = (entityGraph.invoices || [])
+      .filter((i) => i.status === 'overdue')
+      .reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+
+    const parts = [`${c.company || c.name} (${c.name}) — ${c.type}`];
+    if (paidAmt > 0) parts.push(`$${Math.round(paidAmt).toLocaleString()} paid`);
+    if (overdueAmt > 0) parts.push(`$${Math.round(overdueAmt).toLocaleString()} overdue`);
+    if (activeDeals.length > 0) parts.push(`${activeDeals.length} active deal${activeDeals.length !== 1 ? 's' : ''}`);
+    return parts.join(', ');
+  }
+
+  if (entityGraph.type === 'deal') {
+    const d = entityGraph.deal;
+    const daysSince = d.updated_at
+      ? Math.round((Date.now() - new Date(d.updated_at).getTime()) / 86400000)
+      : 0;
+    const parts = [
+      `"${d.title}" — $${Math.round(parseFloat(d.value) || 0).toLocaleString()}, ${d.stage} stage, ${d.probability || 0}% probability`,
+    ];
+    if (daysSince > 1) parts.push(`stale ${daysSince}d`);
+    if (entityGraph.contact?.name) parts.push(`contact: ${entityGraph.contact.company || entityGraph.contact.name}`);
+    return parts.join(', ');
+  }
+
+  if (entityGraph.type === 'invoice') {
+    const inv = entityGraph.invoice;
+    let statusStr = inv.status;
+    if (inv.status === 'overdue' && inv.due_date) {
+      const daysOverdue = Math.round((Date.now() - new Date(inv.due_date).getTime()) / 86400000);
+      statusStr = `overdue ${daysOverdue}d`;
+    }
+    const parts = [`"${inv.description}" — $${Math.round(parseFloat(inv.amount) || 0).toLocaleString()}, ${statusStr}`];
+    if (entityGraph.contact?.name) parts.push(`contact: ${entityGraph.contact.company || entityGraph.contact.name}`);
+    return parts.join(', ');
+  }
+
+  if (entityGraph.type === 'task') {
+    const t = entityGraph.task;
+    const parts = [`"${t.title}" — ${t.priority} priority`];
+    if (t.due_date && new Date(t.due_date) < new Date()) {
+      const daysOverdue = Math.round((Date.now() - new Date(t.due_date).getTime()) / 86400000);
+      parts.push(`overdue ${daysOverdue}d`);
+    } else {
+      parts.push(t.status);
+    }
+    return parts.join(', ');
+  }
+
+  return '';
+}
+
+/**
+ * Build a full context block (~500-1500 tokens) for a resolved entity graph.
+ */
+export function buildEntityL1(entityGraph) {
+  if (!entityGraph) return '';
+  const lines = [];
+
+  if (entityGraph.type === 'contact') {
+    const c = entityGraph.contact;
+    lines.push(`## ${c.company || c.name} (${c.name})`);
+    lines.push(`Type: ${c.type} | Company: ${c.company || 'N/A'} | Email: ${c.email || 'N/A'}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+
+    const activeDeals = (entityGraph.deals || []).filter((d) => !['won', 'lost'].includes(d.stage));
+    if (activeDeals.length > 0) {
+      lines.push(`\n### Deals (${activeDeals.length} active)`);
+      activeDeals.slice(0, 5).forEach((d) => {
+        const daysSince = d.updated_at
+          ? Math.round((Date.now() - new Date(d.updated_at).getTime()) / 86400000)
+          : 0;
+        lines.push(`- "${d.title}" — $${Math.round(parseFloat(d.value) || 0).toLocaleString()} at ${d.stage} (${d.probability || 0}%)${daysSince > 1 ? ` — stale ${daysSince} days` : ''}`);
+      });
+    }
+    const wonLostDeals = (entityGraph.deals || []).filter((d) => ['won', 'lost'].includes(d.stage));
+    if (wonLostDeals.length > 0) {
+      lines.push(`\n### Closed Deals`);
+      wonLostDeals.slice(0, 3).forEach((d) => {
+        lines.push(`- "${d.title}" — $${Math.round(parseFloat(d.value) || 0).toLocaleString()} (${d.stage})`);
+      });
+    }
+
+    if ((entityGraph.invoices || []).length > 0) {
+      lines.push(`\n### Invoices`);
+      entityGraph.invoices.slice(0, 6).forEach((inv) => {
+        let statusStr = inv.status;
+        if (inv.status === 'overdue' && inv.due_date) {
+          const daysOverdue = Math.round((Date.now() - new Date(inv.due_date).getTime()) / 86400000);
+          statusStr = `OVERDUE (${daysOverdue} days)`;
+        }
+        lines.push(`- "${inv.description}" — $${Math.round(parseFloat(inv.amount) || 0).toLocaleString()} ${statusStr}`);
+      });
+    }
+
+    if ((entityGraph.actions || []).length > 0) {
+      lines.push(`\n### Recent Agent Activity`);
+      entityGraph.actions.slice(0, 5).forEach((a) => {
+        const daysAgo = Math.round((Date.now() - new Date(a.created_at).getTime()) / 86400000);
+        lines.push(`- [${a.agent}] ${a.description}${daysAgo > 0 ? ` (${daysAgo}d ago)` : ' (today)'}`);
+      });
+    }
+
+    if ((entityGraph.memory || []).length > 0) {
+      lines.push(`\n### Agent Memory`);
+      entityGraph.memory.slice(0, 5).forEach((m) => {
+        lines.push(`- [${m.agent}] "${m.content}"`);
+      });
+    }
+
+    if ((entityGraph.workflows || []).length > 0) {
+      lines.push(`\n### Active Workflows`);
+      entityGraph.workflows.slice(0, 3).forEach((w) => {
+        const totalSteps = Array.isArray(w.steps) ? w.steps.length : '?';
+        lines.push(`- ${w.template}: Step ${w.current_step}/${totalSteps} (${w.status})`);
+      });
+    }
+  }
+
+  if (entityGraph.type === 'deal') {
+    const d = entityGraph.deal;
+    const daysSince = d.updated_at
+      ? Math.round((Date.now() - new Date(d.updated_at).getTime()) / 86400000)
+      : 0;
+    lines.push(`## Deal: "${d.title}"`);
+    lines.push(`Value: $${Math.round(parseFloat(d.value) || 0).toLocaleString()} | Stage: ${d.stage} | Probability: ${d.probability || 0}%${daysSince > 1 ? ` | Last updated: ${daysSince}d ago` : ''}`);
+
+    if (entityGraph.contact) {
+      const ct = entityGraph.contact;
+      lines.push(`\n### Contact`);
+      lines.push(`- ${ct.company || ct.name} (${ct.name}) — ${ct.type}${ct.email ? `, ${ct.email}` : ''}`);
+    }
+
+    if ((entityGraph.invoices || []).length > 0) {
+      lines.push(`\n### Contact's Invoices`);
+      entityGraph.invoices.slice(0, 5).forEach((inv) => {
+        let statusStr = inv.status;
+        if (inv.status === 'overdue' && inv.due_date) {
+          const daysOverdue = Math.round((Date.now() - new Date(inv.due_date).getTime()) / 86400000);
+          statusStr = `OVERDUE (${daysOverdue} days)`;
+        }
+        lines.push(`- "${inv.description}" — $${Math.round(parseFloat(inv.amount) || 0).toLocaleString()} ${statusStr}`);
+      });
+    }
+
+    if ((entityGraph.actions || []).length > 0) {
+      lines.push(`\n### Recent Agent Activity`);
+      entityGraph.actions.slice(0, 5).forEach((a) => {
+        const daysAgo = Math.round((Date.now() - new Date(a.created_at).getTime()) / 86400000);
+        lines.push(`- [${a.agent}] ${a.description}${daysAgo > 0 ? ` (${daysAgo}d ago)` : ' (today)'}`);
+      });
+    }
+
+    if ((entityGraph.memory || []).length > 0) {
+      lines.push(`\n### Agent Memory`);
+      entityGraph.memory.slice(0, 5).forEach((m) => {
+        lines.push(`- [${m.agent}] "${m.content}"`);
+      });
+    }
+
+    if ((entityGraph.workflows || []).length > 0) {
+      lines.push(`\n### Active Workflows`);
+      entityGraph.workflows.slice(0, 3).forEach((w) => {
+        const totalSteps = Array.isArray(w.steps) ? w.steps.length : '?';
+        lines.push(`- ${w.template}: Step ${w.current_step}/${totalSteps} (${w.status})`);
+      });
+    }
+  }
+
+  if (entityGraph.type === 'invoice') {
+    const inv = entityGraph.invoice;
+    let statusStr = inv.status;
+    if (inv.status === 'overdue' && inv.due_date) {
+      const daysOverdue = Math.round((Date.now() - new Date(inv.due_date).getTime()) / 86400000);
+      statusStr = `OVERDUE (${daysOverdue} days)`;
+    }
+    lines.push(`## Invoice: "${inv.description}"`);
+    lines.push(`Amount: $${Math.round(parseFloat(inv.amount) || 0).toLocaleString()} | Status: ${statusStr}${inv.due_date ? ` | Due: ${new Date(inv.due_date).toLocaleDateString()}` : ''}`);
+
+    if (entityGraph.contact) {
+      const ct = entityGraph.contact;
+      lines.push(`Contact: ${ct.company || ct.name} (${ct.name}) — ${ct.type}`);
+    }
+
+    if ((entityGraph.actions || []).length > 0) {
+      lines.push(`\n### Recent Agent Activity`);
+      entityGraph.actions.slice(0, 5).forEach((a) => {
+        const daysAgo = Math.round((Date.now() - new Date(a.created_at).getTime()) / 86400000);
+        lines.push(`- [${a.agent}] ${a.description}${daysAgo > 0 ? ` (${daysAgo}d ago)` : ' (today)'}`);
+      });
+    }
+
+    if ((entityGraph.memory || []).length > 0) {
+      lines.push(`\n### Agent Memory`);
+      entityGraph.memory.slice(0, 5).forEach((m) => {
+        lines.push(`- [${m.agent}] "${m.content}"`);
+      });
+    }
+  }
+
+  if (entityGraph.type === 'task') {
+    const t = entityGraph.task;
+    let dueStr = '';
+    if (t.due_date) {
+      const daysOverdue = Math.round((Date.now() - new Date(t.due_date).getTime()) / 86400000);
+      dueStr = daysOverdue > 0 ? ` | OVERDUE ${daysOverdue} days` : ` | Due: ${new Date(t.due_date).toLocaleDateString()}`;
+    }
+    lines.push(`## Task: "${t.title}"`);
+    lines.push(`Status: ${t.status} | Priority: ${t.priority}${dueStr}`);
+
+    if ((entityGraph.actions || []).length > 0) {
+      lines.push(`\n### Recent Agent Activity`);
+      entityGraph.actions.slice(0, 5).forEach((a) => {
+        const daysAgo = Math.round((Date.now() - new Date(a.created_at).getTime()) / 86400000);
+        lines.push(`- [${a.agent}] ${a.description}${daysAgo > 0 ? ` (${daysAgo}d ago)` : ' (today)'}`);
+      });
+    }
+
+    if ((entityGraph.memory || []).length > 0) {
+      lines.push(`\n### Agent Memory`);
+      entityGraph.memory.slice(0, 5).forEach((m) => {
+        lines.push(`- [${m.agent}] "${m.content}"`);
+      });
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Search for named entities in the workspace.
+ * Uses batch queries (one per entity type) with scoring.
+ *
+ * Returns { matches: [{type, id, name, score, l0, l1, graph}], tokens_consumed }
  */
 export async function findEntityContext(workspaceId, message) {
   const tokens = extractEntityNames(message);
-  if (tokens.length === 0) return null;
+  if (tokens.length === 0) return { matches: [], tokens_consumed: 0 };
 
-  const found = [];
-  const seenIds = new Set();
+  const tokensLower = [...new Set(tokens.slice(0, 10).map((t) => t.toLowerCase()))];
 
-  for (const token of tokens.slice(0, 10)) {
-    const pattern = `%${token.toLowerCase()}%`;
-
-    // Search contacts
-    const contactResult = await pool.query(
-      `SELECT c.*,
-              (SELECT json_agg(d ORDER BY d.value DESC NULLS LAST) FROM deals d WHERE d.contact_id = c.id AND d.workspace_id = $1) AS deals,
-              (SELECT json_agg(i ORDER BY i.amount DESC NULLS LAST) FROM invoices i WHERE i.contact_id = c.id AND i.workspace_id = $1) AS invoices,
-              (SELECT json_agg(aa ORDER BY aa.created_at DESC) FROM (
-                SELECT * FROM agent_actions aa2
-                WHERE aa2.workspace_id = $1
-                  AND (aa2.entity_id = c.id OR aa2.entity_id IN (
-                    SELECT id FROM deals WHERE contact_id = c.id AND workspace_id = $1
-                  ))
-                ORDER BY aa2.created_at DESC LIMIT 5
-              ) aa) AS recent_actions,
-              (SELECT json_agg(am) FROM agent_memory am WHERE am.entity_id = c.id AND am.workspace_id = $1) AS memory
-       FROM contacts c
-       WHERE c.workspace_id = $1
-         AND (LOWER(c.name) ILIKE $2 OR LOWER(c.company) ILIKE $2)
-       LIMIT 3`,
-      [workspaceId, pattern]
-    );
-
-    for (const c of contactResult.rows) {
-      if (!seenIds.has(`contact:${c.id}`)) {
-        seenIds.add(`contact:${c.id}`);
-        found.push(formatContactContext(c));
-      }
-    }
-
-    // Search deals
-    const dealResult = await pool.query(
-      `SELECT d.*, c.name AS contact_name,
-              (SELECT json_agg(aa ORDER BY aa.created_at DESC) FROM (
-                SELECT * FROM agent_actions aa2
-                WHERE aa2.entity_id = d.id AND aa2.workspace_id = $1
-                ORDER BY aa2.created_at DESC LIMIT 5
-              ) aa) AS recent_actions
+  // Batch search: one query per entity type using unnest + ILIKE
+  const [contactRows, dealRows, invoiceRows, taskRows] = await Promise.all([
+    pool.query(
+      `SELECT id, name, company, type, email, phone
+       FROM contacts
+       WHERE workspace_id = $1
+         AND EXISTS (
+           SELECT 1 FROM unnest($2::text[]) t(token)
+           WHERE LOWER(contacts.name) ILIKE '%' || t.token || '%'
+              OR LOWER(contacts.company) ILIKE '%' || t.token || '%'
+         )
+       LIMIT 10`,
+      [workspaceId, tokensLower]
+    ),
+    pool.query(
+      `SELECT d.id, d.title, d.value, d.stage, d.probability, d.updated_at, d.contact_id
        FROM deals d
-       LEFT JOIN contacts c ON c.id = d.contact_id
-       WHERE d.workspace_id = $1 AND LOWER(d.title) ILIKE $2
-       LIMIT 2`,
-      [workspaceId, pattern]
-    );
-
-    for (const d of dealResult.rows) {
-      if (!seenIds.has(`deal:${d.id}`)) {
-        seenIds.add(`deal:${d.id}`);
-        found.push(formatDealContext(d));
-      }
-    }
-
-    // Search invoices
-    const invoiceResult = await pool.query(
-      `SELECT i.*, c.name AS contact_name
+       WHERE d.workspace_id = $1
+         AND EXISTS (
+           SELECT 1 FROM unnest($2::text[]) t(token)
+           WHERE LOWER(d.title) ILIKE '%' || t.token || '%'
+         )
+       LIMIT 10`,
+      [workspaceId, tokensLower]
+    ),
+    pool.query(
+      `SELECT i.id, i.description, i.amount, i.status, i.due_date, i.contact_id
        FROM invoices i
-       LEFT JOIN contacts c ON c.id = i.contact_id
-       WHERE i.workspace_id = $1 AND LOWER(i.description) ILIKE $2
-       LIMIT 2`,
-      [workspaceId, pattern]
-    );
-
-    for (const inv of invoiceResult.rows) {
-      if (!seenIds.has(`invoice:${inv.id}`)) {
-        seenIds.add(`invoice:${inv.id}`);
-        found.push(`Invoice: "${inv.description}" — $${Math.round(inv.amount || 0).toLocaleString()} (${inv.status}), contact: ${inv.contact_name || 'N/A'}`);
-      }
-    }
-
-    // Search tasks
-    const taskResult = await pool.query(
+       WHERE i.workspace_id = $1
+         AND EXISTS (
+           SELECT 1 FROM unnest($2::text[]) t(token)
+           WHERE LOWER(i.description) ILIKE '%' || t.token || '%'
+         )
+       LIMIT 10`,
+      [workspaceId, tokensLower]
+    ),
+    pool.query(
       `SELECT id, title, status, priority, due_date
        FROM tasks
-       WHERE workspace_id = $1 AND LOWER(title) ILIKE $2
-       LIMIT 2`,
-      [workspaceId, pattern]
-    );
+       WHERE workspace_id = $1
+         AND EXISTS (
+           SELECT 1 FROM unnest($2::text[]) t(token)
+           WHERE LOWER(tasks.title) ILIKE '%' || t.token || '%'
+         )
+       LIMIT 10`,
+      [workspaceId, tokensLower]
+    ),
+  ]);
 
-    for (const t of taskResult.rows) {
-      if (!seenIds.has(`task:${t.id}`)) {
-        seenIds.add(`task:${t.id}`);
-        found.push(`Task: "${t.title}" — status: ${t.status}, priority: ${t.priority}${t.due_date ? `, due: ${new Date(t.due_date).toLocaleDateString()}` : ''}`);
-      }
+  // Score all candidates and deduplicate
+  const seenIds = new Set();
+  const candidates = [];
+  for (const r of contactRows.rows) {
+    const key = `contact:${r.id}`;
+    if (!seenIds.has(key)) {
+      seenIds.add(key);
+      const score = scoreEntity('contact', r, tokensLower);
+      if (score > 0) candidates.push({ type: 'contact', id: r.id, name: r.name, entity: r, score });
     }
-
-    // Stop searching more tokens if we have enough context
-    if (found.length >= 5) break;
+  }
+  for (const r of dealRows.rows) {
+    const key = `deal:${r.id}`;
+    if (!seenIds.has(key)) {
+      seenIds.add(key);
+      const score = scoreEntity('deal', r, tokensLower);
+      if (score > 0) candidates.push({ type: 'deal', id: r.id, name: r.title, entity: r, score });
+    }
+  }
+  for (const r of invoiceRows.rows) {
+    const key = `invoice:${r.id}`;
+    if (!seenIds.has(key)) {
+      seenIds.add(key);
+      const score = scoreEntity('invoice', r, tokensLower);
+      if (score > 0) candidates.push({ type: 'invoice', id: r.id, name: r.description, entity: r, score });
+    }
+  }
+  for (const r of taskRows.rows) {
+    const key = `task:${r.id}`;
+    if (!seenIds.has(key)) {
+      seenIds.add(key);
+      const score = scoreEntity('task', r, tokensLower);
+      if (score > 0) candidates.push({ type: 'task', id: r.id, name: r.title, entity: r, score });
+    }
   }
 
-  if (found.length === 0) return null;
-  return found.join('\n\n');
+  if (candidates.length === 0) {
+    console.log(`[CONTEXT] workspace=${workspaceId} query="${message.slice(0, 60)}" entities=0 tier=aggregate tokens=0`);
+    return { matches: [], tokens_consumed: 0 };
+  }
+
+  // Sort by score descending, resolve graph for top 3
+  candidates.sort((a, b) => b.score - a.score);
+  const top3 = candidates.slice(0, 3);
+
+  const graphs = await Promise.all(top3.map((c) => resolveEntityGraph(workspaceId, c.type, c.id)));
+
+  let totalTokens = 0;
+  const matches = top3
+    .map((c, i) => {
+      const graph = graphs[i];
+      if (!graph) return null;
+      const l0 = buildEntityL0(graph);
+      const l1 = buildEntityL1(graph);
+      const approxTokens = Math.round(l1.length / 4);
+      totalTokens += approxTokens;
+      return { type: c.type, id: c.id, name: c.name, score: c.score, l0, l1, graph };
+    })
+    .filter(Boolean);
+
+  // Structured context log
+  const entitySummary = matches.map((m) => `${m.type}:${m.name} (score=${m.score.toFixed(2)})`).join(', ');
+  console.log(`[CONTEXT] workspace=${workspaceId} query="${message.slice(0, 60)}" entities=${matches.length} [${entitySummary}] tier=L1 tokens=${totalTokens}`);
+
+  return { matches, tokens_consumed: totalTokens };
 }
