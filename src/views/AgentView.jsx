@@ -92,7 +92,7 @@ function AgentDetailPanel({ agent, meta, onClose }) {
           <div className={styles.detailSection}>
             <div className={styles.detailSectionTitle}>Active Work</div>
             {(workstream?.pendingDecisions || []).length === 0 && (workstream?.activeWorkflows || []).length === 0 ? (
-              <p className={styles.detailEmpty}>{meta.label} agent is idle — no pending decisions or active workflows.</p>
+              <p className={styles.detailEmpty}>{meta.label} is monitoring your business. No actions needed right now.</p>
             ) : (
               <>
                 {(workstream?.pendingDecisions || []).map((d, i) => (
@@ -519,7 +519,7 @@ export default function AgentView({ onRefreshMetrics }) {
         <div>
           <h2 className={styles.title}>Agent Dashboard</h2>
           <div className={styles.headerSubtitle}>
-            Last cycle: {status?.lastRunAt ? new Date(status.lastRunAt).toLocaleTimeString() : "Never"}
+            Last cycle: {status?.lastRunAt ? new Date(status.lastRunAt).toLocaleTimeString() : "Initializing — first scan in progress…"}
           </div>
         </div>
         <Button onClick={runCycle} disabled={running}>{running ? "Running…" : "▶ Run Cycle"}</Button>

@@ -49,13 +49,12 @@ export default function AIStatusBanner({ onNavigateToConnections }) {
   return (
     <div className={styles.offlineBanner}>
       <div className={styles.offlineIconWrap}>
-        <span className={styles.offlineIcon}>!</span>
+        <span className={styles.offlineIcon}>◉</span>
       </div>
       <div className={styles.offlineBody}>
-        <div className={styles.offlineHeadline}>Your AI team is running in limited mode</div>
+        <div className={styles.offlineHeadline}>Your AI team is operating on business data</div>
         <div className={styles.offlineText}>
-          Activate full intelligence in Connections to power all 5 specialist agents.
-          Until then, agents operate in data-driven mode only.
+          Connect an AI provider to unlock advanced analysis, synthesis, and proactive recommendations. Your agents are already monitoring your business.
         </div>
       </div>
       <button
@@ -63,7 +62,7 @@ export default function AIStatusBanner({ onNavigateToConnections }) {
         onClick={onNavigateToConnections}
         type="button"
       >
-        Activate AI →
+        Upgrade Intelligence →
       </button>
     </div>
   );
