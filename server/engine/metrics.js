@@ -42,7 +42,7 @@ export async function calculateROI(workspaceId) {
     `SELECT COUNT(*) AS deals_closed,
             COALESCE(SUM(value), 0) AS deals_value
      FROM deals
-     WHERE workspace_id = $1 AND stage = 'closed'`,
+     WHERE workspace_id = $1 AND stage = 'won'`,
     [workspaceId]
   );
   const dealsClosed = parseInt(dealsResult.rows[0].deals_closed, 10) || 0;
@@ -130,7 +130,7 @@ export async function calculateHealth(workspaceId) {
 
   // Deals pipeline
   const dealResult = await pool.query(
-    `SELECT COUNT(*) AS open_deals FROM deals WHERE workspace_id = $1 AND stage != 'closed'`,
+    `SELECT COUNT(*) AS open_deals FROM deals WHERE workspace_id = $1 AND stage NOT IN ('won', 'lost')`,
     [workspaceId]
   );
   const openDeals = parseInt(dealResult.rows[0].open_deals, 10) || 0;
@@ -140,8 +140,8 @@ export async function calculateHealth(workspaceId) {
   const taskResult = await pool.query(
     `SELECT
        COUNT(*) AS total,
-       COUNT(*) FILTER (WHERE status = 'done') AS done,
-       COUNT(*) FILTER (WHERE status != 'done' AND due_date IS NOT NULL AND due_date < NOW()) AS overdue
+       COUNT(*) FILTER (WHERE status = 'completed') AS done,
+       COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled') AND due_date IS NOT NULL AND due_date < NOW()) AS overdue
      FROM tasks
      WHERE workspace_id = $1`,
     [workspaceId]

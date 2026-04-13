@@ -54,7 +54,7 @@ export async function seedScenario(workspaceId) {
       { title: 'Summit Logistics Integration',contact_id: priyaId,  stage: 'qualified',   value: 15000, probability: 40,  expected_close_date: daysFromNow(21) },
       { title: 'Vertex Systems Upgrade',      contact_id: jamesId,  stage: 'new',         value: 9800,  probability: 25,  expected_close_date: daysFromNow(30) },
       { title: 'Cascade Brand Campaign',      contact_id: aliciaId, stage: 'qualified',   value: 6500,  probability: 35,  expected_close_date: daysFromNow(18) },
-      { title: 'NovaTech Enterprise License', contact_id: derekId,  stage: 'closed',      value: 2500,  probability: 100, expected_close_date: daysAgo(3)      },
+      { title: 'NovaTech Enterprise License', contact_id: derekId,  stage: 'won',         value: 2500,  probability: 100, expected_close_date: daysAgo(3)      },
     ];
 
     const dealIds = [];
@@ -98,26 +98,26 @@ export async function seedScenario(workspaceId) {
 
     // ── Tasks ─────────────────────────────────────────────────────────────────
     const taskRows = [
-      { title: 'Follow up with Meridian on Q2 contract',          status: 'done',        priority: 'high',   due_date: daysAgo(5),    contact_id: sarahId  },
-      { title: 'Review Apex Digital proposal terms',              status: 'done',        priority: 'medium', due_date: daysAgo(3),    contact_id: marcusId },
-      { title: 'Send Summit Logistics integration spec',          status: 'done',        priority: 'medium', due_date: daysAgo(1),    contact_id: priyaId  },
-      { title: 'Prepare Vertex Systems demo environment',         status: 'done',        priority: 'low',    due_date: daysAgo(7),    contact_id: jamesId  },
+      { title: 'Follow up with Meridian on Q2 contract',          status: 'completed',   priority: 'high',   due_date: daysAgo(5),    contact_id: sarahId  },
+      { title: 'Review Apex Digital proposal terms',              status: 'completed',   priority: 'medium', due_date: daysAgo(3),    contact_id: marcusId },
+      { title: 'Send Summit Logistics integration spec',          status: 'completed',   priority: 'medium', due_date: daysAgo(1),    contact_id: priyaId  },
+      { title: 'Prepare Vertex Systems demo environment',         status: 'completed',   priority: 'low',    due_date: daysAgo(7),    contact_id: jamesId  },
       { title: 'Draft Cascade campaign brief',                    status: 'pending',     priority: 'high',   due_date: daysFromNow(2),contact_id: aliciaId },
       { title: 'Call Derek Fong re: NovaTech renewal',            status: 'pending',     priority: 'medium', due_date: daysFromNow(3),contact_id: derekId  },
       { title: 'Research BluePeak Solutions competitors',         status: 'pending',     priority: 'low',    due_date: daysFromNow(7),contact_id: rachelId },
       { title: 'Invoice Ironclad for overdue balance',            status: 'in_progress', priority: 'high',   due_date: daysAgo(1),    contact_id: omarId   },
       { title: 'Onboard Brightline Media account',                status: 'in_progress', priority: 'medium', due_date: daysFromNow(5),contact_id: ninaId   },
-      { title: 'Collect final sign-off from Meridian',            status: 'open',        priority: 'high',   due_date: daysAgo(4),    contact_id: sarahId  },
-      { title: 'Prepare Q2 performance report for Apex',         status: 'open',        priority: 'medium', due_date: daysAgo(2),    contact_id: marcusId },
-      { title: 'Escalate Elevate Brands payment reminder',        status: 'open',        priority: 'high',   due_date: daysAgo(8),    contact_id: carlosId },
+      { title: 'Collect final sign-off from Meridian',            status: 'pending',     priority: 'high',   due_date: daysAgo(4),    contact_id: sarahId  },
+      { title: 'Prepare Q2 performance report for Apex',         status: 'pending',     priority: 'medium', due_date: daysAgo(2),    contact_id: marcusId },
+      { title: 'Escalate Elevate Brands payment reminder',        status: 'pending',     priority: 'high',   due_date: daysAgo(8),    contact_id: carlosId },
     ];
 
     const taskIds = [];
     for (const t of taskRows) {
       const r = await client.query(
-        `INSERT INTO tasks (workspace_id, title, status, priority, due_date, contact_id)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [workspaceId, t.title, t.status, t.priority, t.due_date, t.contact_id]
+        `INSERT INTO tasks (workspace_id, title, status, priority, due_date, related_entity_type, related_entity_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [workspaceId, t.title, t.status, t.priority, t.due_date, t.contact_id ? 'contact' : null, t.contact_id || null]
       );
       taskIds.push(r.rows[0].id);
     }

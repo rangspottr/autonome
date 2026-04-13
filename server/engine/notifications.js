@@ -116,7 +116,7 @@ export async function generateProactiveAlerts(workspaceId) {
               COALESCE(SUM(value),0) AS stale_value
        FROM deals
        WHERE workspace_id = $1
-         AND stage NOT IN ('closed','lost')
+         AND stage NOT IN ('won','lost')
          AND updated_at < NOW() - INTERVAL '14 days'`,
       [workspaceId]
     );
@@ -143,7 +143,7 @@ export async function generateProactiveAlerts(workspaceId) {
     const taskResult = await pool.query(
       `SELECT COUNT(*) AS overdue_count
        FROM tasks
-       WHERE workspace_id = $1 AND status != 'done'
+       WHERE workspace_id = $1 AND status NOT IN ('completed', 'cancelled')
          AND due_date < NOW() - INTERVAL '3 days'`,
       [workspaceId]
     );

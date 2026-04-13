@@ -232,7 +232,7 @@ router.get('/since-last-login', ...guard, async (req, res, next) => {
     // Business events processed
     const eventsResult = await pool.query(
       `SELECT COUNT(*) AS event_count FROM business_events
-       WHERE workspace_id = $1 AND created_at > $2 AND status = 'processed'`,
+       WHERE workspace_id = $1 AND created_at > $2 AND status = 'acted'`,
       [wsId, since]
     );
 

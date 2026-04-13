@@ -16,7 +16,7 @@ export async function buildWorkspaceContext(workspaceId) {
     ),
     pool.query(
       `SELECT COUNT(*) AS count,
-              SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_count
+              SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS open_count
        FROM tasks WHERE workspace_id = $1`,
       [workspaceId]
     ),

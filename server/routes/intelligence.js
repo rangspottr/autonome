@@ -25,7 +25,7 @@ router.get('/summary', ...guard, async (req, res, next) => {
        JOIN invoices i ON i.contact_id = c.id AND i.workspace_id = $1
          AND i.status IN ('overdue', 'escalated')
        JOIN deals d ON d.contact_id = c.id AND d.workspace_id = $1
-         AND d.stage NOT IN ('closed', 'lost')
+         AND d.stage NOT IN ('won', 'lost')
        WHERE c.workspace_id = $1
        GROUP BY c.id, c.name
        ORDER BY overdue_amount DESC
@@ -52,7 +52,7 @@ router.get('/summary', ...guard, async (req, res, next) => {
        FROM tasks t
        JOIN workflows w ON w.trigger_entity_id = t.id AND w.status = 'active'
        WHERE t.workspace_id = $1
-         AND t.status NOT IN ('done', 'completed')
+         AND t.status NOT IN ('completed', 'cancelled')
          AND t.due_date < NOW()
        ORDER BY days_overdue DESC
        LIMIT 5`,
@@ -80,7 +80,7 @@ router.get('/summary', ...guard, async (req, res, next) => {
        FROM deals d
        LEFT JOIN contacts c ON c.id = d.contact_id
        WHERE d.workspace_id = $1
-         AND d.stage NOT IN ('closed', 'lost')
+         AND d.stage NOT IN ('won', 'lost')
          AND d.expected_close_date BETWEEN NOW() AND NOW() + INTERVAL '7 days'
          AND NOT EXISTS (
            SELECT 1 FROM invoices i
