@@ -13,6 +13,7 @@ const inputStyle = { width: '100%', padding: '10px 12px', border: '1px solid var
 const labelStyle = { display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6 };
 const primaryBtn = (disabled) => ({ width: '100%', padding: '12px', background: 'var(--color-brand)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: 'var(--font-family)' });
 const secondaryBtn = { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 13, cursor: 'pointer', padding: '8px 0', fontFamily: 'var(--font-family)' };
+const systemIconBadge = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, background: 'var(--color-brand)', color: '#fff', fontSize: 11, fontWeight: 800, flexShrink: 0 };
 
 function ProgressBar({ step, total }) {
   return (
@@ -142,7 +143,7 @@ function Step2({ connected, onToggle, onNext, onBack }) {
               transition: 'border-color 0.2s',
             }}
           >
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, background: 'var(--color-brand)', color: '#fff', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{sys.icon}</span>
+            <span style={systemIconBadge}>{sys.icon}</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)', marginBottom: 2 }}>
                 {sys.label}

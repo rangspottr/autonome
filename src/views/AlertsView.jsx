@@ -96,7 +96,7 @@ export default function AlertsView() {
         <div className={styles.headerStats}>
           {criticalCount > 0 && (
             <span className={styles.criticalBadge}>
-              !! {criticalCount} critical
+              CRIT {criticalCount} critical
             </span>
           )}
           <span className={styles.totalBadge}>{totalActive} active</span>

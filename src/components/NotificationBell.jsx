@@ -16,7 +16,7 @@ function relativeTime(ts) {
 const TYPE_ICONS = {
   daily_digest: "DG",
   approval_needed: "!",
-  critical_risk: "!!",
+  critical_risk: "CRIT",
   boardroom_summary: "BR",
   agent_alert: "AG",
 };
