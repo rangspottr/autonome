@@ -187,6 +187,62 @@ All endpoints are prefixed with `/api`.
 | `GET` | `/api/webhooks/key` | Get current webhook API key |
 | `GET` | `/api/settings/integrations` | Integration status |
 
+### Companies
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/companies` | List companies for workspace |
+| `POST` | `/api/companies` | Create company |
+| `GET` | `/api/companies/:id` | Get company with linked contacts, deals, invoices |
+| `PATCH` | `/api/companies/:id` | Update company |
+| `DELETE` | `/api/companies/:id` | Delete company |
+| `POST` | `/api/companies/:id/link-contact` | Link a contact to a company |
+
+### Integrations
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/integrations` | List integrations for workspace |
+| `POST` | `/api/integrations` | Create integration (`type`, `name`, `config`) |
+| `PATCH` | `/api/integrations/:id` | Update integration status/config/name |
+| `DELETE` | `/api/integrations/:id` | Remove integration |
+| `POST` | `/api/integrations/:id/test` | Test integration connection |
+
+Supported `type` values: `gmail`, `outlook`, `twilio`, `stripe`, `webhook`, `form`, `calendar`, `csv_import`.
+
+### Business Events
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/business-events` | List events (paginated, filterable by `source`, `event_type`, `status`, `owner_agent`, `from`/`to` date) |
+| `GET` | `/api/business-events/stats` | Aggregate stats by source, status, agent, type |
+| `GET` | `/api/business-events/:id` | Get single event with full pipeline details |
+| `POST` | `/api/business-events/:id/reprocess` | Re-run the intake pipeline on an event |
+
+### Intake (Ingest Endpoints)
+All ingest endpoints accept authenticated requests (session cookie/JWT) or an `x-api-key` header matching an active integration's `config.api_key`.
+
+| Method | Path | Required Fields | Description |
+|---|---|---|---|
+| `POST` | `/api/ingest/email` | `from`, `subject` | Ingest an inbound email |
+| `POST` | `/api/ingest/form` | `form_type`, `fields` | Ingest a form submission |
+| `POST` | `/api/ingest/call` | `caller_phone` | Ingest a phone call event |
+| `POST` | `/api/ingest/sms` | `from`, `body` | Ingest an SMS message |
+| `POST` | `/api/ingest/payment` | `amount`, `currency`, `status`, `provider` | Ingest a payment event |
+| `POST` | `/api/ingest/support` | `subject`, `body` | Ingest a support request |
+| `POST` | `/api/ingest/calendar` | `title`, `start` | Ingest a calendar/booking event |
+| `POST` | `/api/ingest/document` | `type`, `name` | Ingest a document |
+| `POST` | `/api/ingest/webhook` | `source`, `event_type`, `payload` | Generic webhook ingestion |
+
+Each ingest endpoint runs the full 4-stage pipeline (classify → identify entities → route to agents → resolve) and returns the processed event including `classified_data`, `entity_links`, `agent_routing`, and `resolution`.
+
+### Operator Instructions
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/operator-instructions` | List active instructions (filterable by `agent`, `type`) |
+| `POST` | `/api/operator-instructions` | Create instruction (`instruction`, `agent?`, `type`, `priority`) |
+| `PATCH` | `/api/operator-instructions/:id` | Update instruction |
+| `DELETE` | `/api/operator-instructions/:id` | Soft-delete (sets `active=false`) |
+
+Supported `type` values: `preference`, `policy`, `rule`, `override`.
+
 ## Architecture
 
 ```
@@ -199,7 +255,7 @@ autonome/
 ├── server/            # Node.js + Express API
 │   ├── routes/        # REST endpoints
 │   ├── middleware/     # JWT auth, workspace, subscription guards
-│   ├── engine/        # Agent decision engine + scheduler
+│   ├── engine/        # Agent decision engine, scheduler, intake pipeline
 │   ├── services/      # Email (SMTP) and SMS (Twilio)
 │   ├── db/            # PostgreSQL pool + migrations
 │   └── __tests__/     # Vitest unit tests
@@ -207,6 +263,39 @@ autonome/
 ├── docker-compose.yml # Local stack (app + PostgreSQL)
 └── Procfile           # Heroku / Railway deployment
 ```
+
+## Intake Pipeline Architecture
+
+Every inbound business event (email, form, call, payment, webhook, etc.) flows through a 4-stage pipeline defined in `server/engine/intake.js`:
+
+```
+Ingest → [Stage 1: Classify] → [Stage 2: Identify Entities] → [Stage 3: Route to Agents] → [Stage 4: Resolve] → Update business_events
+```
+
+### Stage 1: Classification
+Assigns `category`, `urgency` (critical/high/medium/low), `sentiment` (positive/neutral/negative), and a human-readable `summary` based on `event_type` and `raw_data` keywords.
+
+### Stage 2: Entity Identification
+Searches contacts (by email/phone), companies (by domain), deals, invoices, and workflows to build an `entity_links` array — each entry has `entity_type`, `entity_id`, `relationship`, and `confidence`.
+
+### Stage 3: Agent Routing
+Maps the event to one or more agents based on content and entity links. Returns `agent_routing` (with `primary`, `informed`, and `coordinator` roles) and `owner_agent`.
+
+| Event Type | Primary Agent | Logic |
+|---|---|---|
+| `payment_received` / `payment_failed` | `finance` | Always; `revenue` informed if open deal |
+| `inbound_email` | `finance` / `revenue` / `support` | Detected from subject/body keywords |
+| `form_submission` / `new_lead` | `revenue` or `support` | Based on form type |
+| `missed_call` | `revenue` / `support` / `operations` | Based on entity links |
+| `support_request` / `complaint` | `support` | Always; others informed |
+| `review` | `support` | Always; `growth` informed |
+| `booking_request` / `schedule_event` | `operations` | Always |
+
+### Stage 4: Resolution
+Decides what to do automatically (e.g., mark invoice paid on payment received, create contact on new lead) and checks `operator_instructions` for any applicable policies. Sets `requires_approval` if a policy applies. Returns a `resolution` object with `action_taken`, `auto_acted`, and `notes`.
+
+### Idempotency
+Reprocessing an event (via `POST /api/business-events/:id/reprocess`) resets status to `pending` and re-runs all stages. Auto-actions use `ON CONFLICT DO NOTHING` or conditional updates to prevent duplicates.
 
 ## Stripe Setup
 

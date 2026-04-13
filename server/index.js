@@ -30,6 +30,11 @@ import webhookRoutes from './routes/webhooks.js';
 import settingsRoutes from './routes/settings.js';
 import agentsRoutes from './routes/agents.js';
 import intelligenceRoutes from './routes/intelligence.js';
+import integrationsRoutes from './routes/integrations.js';
+import businessEventsRoutes from './routes/business-events.js';
+import ingestRoutes from './routes/ingest.js';
+import operatorInstructionsRoutes from './routes/operator-instructions.js';
+import companiesRoutes from './routes/companies.js';
 import { startScheduler } from './engine/cycle.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
@@ -164,6 +169,11 @@ export function createApp() {
   app.use('/api/settings', apiLimiter, settingsRoutes);
   app.use('/api/agents', apiLimiter, agentsRoutes);
   app.use('/api/intelligence', apiLimiter, intelligenceRoutes);
+  app.use('/api/integrations', apiLimiter, integrationsRoutes);
+  app.use('/api/business-events', apiLimiter, businessEventsRoutes);
+  app.use('/api/ingest', apiLimiter, ingestRoutes);
+  app.use('/api/operator-instructions', apiLimiter, operatorInstructionsRoutes);
+  app.use('/api/companies', apiLimiter, companiesRoutes);
 
   // In production, serve the Vite build
   if (process.env.NODE_ENV === 'production') {

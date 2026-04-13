@@ -134,6 +134,8 @@ Migration files are run in alphabetical/numeric order by `server/db/migrate.js`.
 | `002_assets_knowledge.sql` | Assets and knowledge base tables |
 | `003_password_reset.sql` | Password reset tokens table |
 | `004_security.sql` | Security improvements: webhook keys, CSRF tokens |
+| `005_agent_intelligence.sql` | Agent actions, agent memory, chat messages |
+| `006_intake_layer.sql` | Universal intake: companies, integrations, business_events, operator_instructions; adds company_id to contacts |
 
 **To run all migrations:**
 
