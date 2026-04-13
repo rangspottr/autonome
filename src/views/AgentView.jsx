@@ -525,7 +525,7 @@ export default function AgentView({ onRefreshMetrics }) {
         <EmptyState icon="○" title="No agents configured" description="Agent metadata is not available." />
       ) : (
         <div className={styles.agentsGrid}>
-          {agentStats.map(({ agent, meta, decisions: decs, executions, activeWorkflows: awf, workstream }) => {
+          {agentStats.map(({ agent, meta, decisions: decs, executions: _executions, activeWorkflows: awf, workstream }) => {
             const isSelected = selectedAgent === agent;
             return (
               <div

@@ -5,8 +5,6 @@ import { requireAuth, requireWorkspace, requireActiveSubscription } from '../mid
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
 
-const VALID_STATUSES = ['active', 'acknowledged', 'dismissed', 'resolved'];
-const VALID_SEVERITIES = ['low', 'medium', 'high', 'critical'];
 
 /**
  * GET /api/proactive-alerts

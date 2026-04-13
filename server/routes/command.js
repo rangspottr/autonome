@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/index.js';
 import { config } from '../config.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
-import { buildWorkspaceContext, findEntityContext, buildRichLocalContext, buildLocalSummary } from '../lib/ai-context.js';
+import { buildWorkspaceContext, findEntityContext, buildRichLocalContext } from '../lib/ai-context.js';
 import { executeAction } from '../engine/execution.js';
 import rateLimit from 'express-rate-limit';
 

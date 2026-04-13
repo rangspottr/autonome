@@ -67,7 +67,7 @@ export async function seedScenario(workspaceId) {
       dealIds.push(r.rows[0].id);
     }
 
-    const [meridianDealId, apexDealId, summitDealId, vertexDealId, cascadeDealId, novatechDealId] = dealIds;
+    const [meridianDealId, apexDealId, summitDealId, _vertexDealId, cascadeDealId, novatechDealId] = dealIds;
 
     // ── Invoices ──────────────────────────────────────────────────────────────
     const invoiceRows = [
@@ -94,7 +94,7 @@ export async function seedScenario(workspaceId) {
       invoiceIds.push(r.rows[0].id);
     }
 
-    const [inv1, inv2, inv3, inv4, inv5, inv6, inv7, inv8] = invoiceIds;
+    const [inv1, inv2, inv3, inv4, inv5, inv6, _inv7, inv8] = invoiceIds;
 
     // ── Tasks ─────────────────────────────────────────────────────────────────
     const taskRows = [
