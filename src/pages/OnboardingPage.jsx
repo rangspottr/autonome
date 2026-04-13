@@ -171,7 +171,7 @@ function Step2({ connected, onToggle, onNext, onBack }) {
         ))}
       </div>
 
-      <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Connect &amp; Continue →</button>
+      <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Connect & Continue →</button>
       <div style={{ textAlign: 'center' }}>
         <button onClick={onBack} style={secondaryBtn}>← Back</button>
       </div>

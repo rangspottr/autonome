@@ -5,7 +5,7 @@ import styles from "./AIStatusBanner.module.css";
 
 const AGENT_KEYS = Object.keys(AgentMeta);
 
-export default function AIStatusBanner({ onNavigateToSettings }) {
+export default function AIStatusBanner({ onNavigateToConnections }) {
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export default function AIStatusBanner({ onNavigateToSettings }) {
       </div>
       <button
         className={styles.activateBtn}
-        onClick={onNavigateToSettings}
+        onClick={onNavigateToConnections}
         type="button"
       >
         Activate AI →

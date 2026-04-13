@@ -388,7 +388,7 @@ function MainApp() {
 
         {/* Content */}
         <main className={styles.content}>
-          <AIStatusBanner onNavigateToSettings={() => setView("connections")} />
+          <AIStatusBanner onNavigateToConnections={() => setView("connections")} />
           <ErrorBoundary key={view}>
             {VIEWS[view] || (
               <div style={{ color: "var(--color-text-muted)" }}>View not found.</div>

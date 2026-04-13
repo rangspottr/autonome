@@ -322,8 +322,8 @@ export default function Setup({ onComplete }) {
       </p>
       <Input label="Business Name" value={form.name} onChange={set("name")} placeholder="e.g. ABC Roofing LLC" />
       <div style={{ marginBottom: "var(--space-4)" }}>
-        <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-1)" }}>Industry</div>
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginBottom: "var(--space-3)", lineHeight: 1.5 }}>
+        <div className={styles.industryHeader}>Industry</div>
+        <div className={styles.industryHelp}>
           Your industry determines how your five AI specialists analyze your business — what they monitor, what they prioritize, and how they communicate.
         </div>
         <div className={styles.industryGrid}>
