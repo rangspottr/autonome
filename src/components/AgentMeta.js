@@ -8,6 +8,16 @@ const AGENT_META = {
     description: "Monitors cash flow pressure, overdue invoices, payment patterns, and spend anomalies",
     focus: "Money at risk",
     watchesFor: ["Overdue invoices", "Cash flow gaps", "Spend anomalies", "Payment delays"],
+    responsibilities: [
+      "Invoice collection & follow-up",
+      "Cash flow monitoring",
+      "Spend anomaly detection",
+      "Payment pattern analysis",
+      "Collections escalation",
+    ],
+    pressureMetric: "overdueAmount",
+    monitoringStatement: "Monitoring cash flow, tracking payment patterns, and watching for overdue invoices",
+    emptyStateMessage: "Your Finance agent is ready. Add invoices or connect payments to activate cash flow monitoring.",
   },
   revenue: {
     icon: "REV",
@@ -18,6 +28,16 @@ const AGENT_META = {
     description: "Tracks pipeline health, deal velocity, stale opportunities, and close probability",
     focus: "Pipeline pressure",
     watchesFor: ["Stale deals", "Pipeline gaps", "Win rate changes", "Revenue leaks"],
+    responsibilities: [
+      "Pipeline velocity tracking",
+      "Stale deal identification",
+      "Close probability optimization",
+      "Revenue leak detection",
+      "Deal stage progression",
+    ],
+    pressureMetric: "staleDealCount",
+    monitoringStatement: "Tracking pipeline velocity, identifying stale deals, and optimizing close probability",
+    emptyStateMessage: "Your Revenue agent is ready. Add deals to your pipeline to begin tracking velocity and close rates.",
   },
   operations: {
     icon: "OPS",
@@ -28,6 +48,16 @@ const AGENT_META = {
     description: "Identifies workflow bottlenecks, task overload, process inefficiencies, and delivery risks",
     focus: "Execution blockers",
     watchesFor: ["Task bottlenecks", "Workflow delays", "Resource conflicts", "SLA risks"],
+    responsibilities: [
+      "Task overload detection",
+      "Workflow bottleneck identification",
+      "SLA risk monitoring",
+      "Resource conflict resolution",
+      "Delivery risk escalation",
+    ],
+    pressureMetric: "overdueTaskCount",
+    monitoringStatement: "Scanning for overdue tasks, workflow bottlenecks, and delivery risks across active projects",
+    emptyStateMessage: "Your Operations agent is ready. Add tasks or activate workflows to begin monitoring execution health.",
   },
   growth: {
     icon: "GRO",
@@ -38,6 +68,16 @@ const AGENT_META = {
     description: "Identifies dormant leads, expansion opportunities, engagement drops, and nurture gaps",
     focus: "Untapped potential",
     watchesFor: ["Dormant leads", "Cold prospects", "Engagement drops", "Expansion signals"],
+    responsibilities: [
+      "Dormant lead reactivation",
+      "Expansion opportunity detection",
+      "Engagement drop monitoring",
+      "Nurture gap identification",
+      "New lead scoring & routing",
+    ],
+    pressureMetric: "dormantLeadCount",
+    monitoringStatement: "Scanning for dormant leads, engagement drops, and untapped expansion opportunities",
+    emptyStateMessage: "Your Growth agent is standing by. Import leads or connect a lead source to begin opportunity detection.",
   },
   support: {
     icon: "SUP",
@@ -48,6 +88,16 @@ const AGENT_META = {
     description: "Detects customer churn signals, satisfaction drops, escalation patterns, and response gaps",
     focus: "Retention risk",
     watchesFor: ["Churn signals", "Response delays", "Satisfaction drops", "Escalation spikes"],
+    responsibilities: [
+      "Churn signal detection",
+      "Customer health monitoring",
+      "Escalation pattern tracking",
+      "Response gap identification",
+      "Satisfaction drop alerts",
+    ],
+    pressureMetric: "atRiskCount",
+    monitoringStatement: "Monitoring customer health, tracking churn signals, and watching for escalation patterns",
+    emptyStateMessage: "Your Support agent is monitoring customer health. No at-risk signals detected — all customers are in good standing.",
   },
 };
 
@@ -60,6 +110,10 @@ export const DEFAULT_AGENT_META = {
   description: "Monitors your business for patterns and opportunities",
   focus: "Business intelligence",
   watchesFor: [],
+  responsibilities: [],
+  pressureMetric: "",
+  monitoringStatement: "Monitoring your business for patterns and opportunities",
+  emptyStateMessage: "Your agent is ready. Connect data sources to begin monitoring.",
 };
 
 export default AGENT_META;

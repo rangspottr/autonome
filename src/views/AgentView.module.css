@@ -72,8 +72,30 @@
 
 .agentInfo { flex: 1; min-width: 0; }
 .agentName { font-size: var(--text-base); font-weight: 700; color: var(--color-text-primary); }
+.agentSubtitle { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; line-height: 1.4; }
 .agentDesc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; max-width: 320px; line-height: 1.4; }
 .agentFocusTag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); margin-top: 4px; }
+
+.agentCardBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.agentFocusBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
 
 .agentMetrics {
   display: grid;
