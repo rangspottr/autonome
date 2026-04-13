@@ -270,6 +270,141 @@ export async function seedScenario(workspaceId) {
       );
     }
 
+    // ── Companies ─────────────────────────────────────────────────────────────
+    const companyRows = [
+      { name: 'Meridian Consulting',  domain: 'meridianconsulting.com', industry: 'Consulting'          },
+      { name: 'Apex Digital',         domain: 'apexdigital.io',         industry: 'Technology'           },
+      { name: 'Summit Logistics',     domain: 'summitlogistics.com',    industry: 'Logistics'            },
+    ];
+    const companyIds = [];
+    for (const co of companyRows) {
+      const r = await client.query(
+        `INSERT INTO companies (workspace_id, name, domain, industry)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [workspaceId, co.name, co.domain, co.industry]
+      );
+      companyIds.push(r.rows[0].id);
+    }
+    const [meridianCoId, apexCoId, summitCoId] = companyIds;
+
+    // Link contacts to companies
+    await client.query(`UPDATE contacts SET company_id = $1, updated_at = NOW() WHERE id = $2`, [meridianCoId, sarahId]);
+    await client.query(`UPDATE contacts SET company_id = $1, updated_at = NOW() WHERE id = $2`, [apexCoId, marcusId]);
+    await client.query(`UPDATE contacts SET company_id = $1, updated_at = NOW() WHERE id = $2`, [summitCoId, priyaId]);
+
+    // ── Integrations ──────────────────────────────────────────────────────────
+    const integrationRows = [
+      { type: 'webhook', name: 'Stripe Payments Webhook', status: 'active', config: { endpoint: '/api/billing/webhook', provider: 'stripe' } },
+      { type: 'form',    name: 'Contact Us Form',         status: 'active', config: { form_id: 'contact-form-001', source_url: '/contact' } },
+    ];
+    const integrationIds = [];
+    for (const ig of integrationRows) {
+      const r = await client.query(
+        `INSERT INTO integrations (workspace_id, type, name, status, config)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [workspaceId, ig.type, ig.name, ig.status, JSON.stringify(ig.config)]
+      );
+      integrationIds.push(r.rows[0].id);
+    }
+    const [stripeIntegId, formIntegId] = integrationIds;
+
+    // ── Business Events ───────────────────────────────────────────────────────
+    const businessEventRows = [
+      {
+        integration_id: stripeIntegId,
+        source: 'webhook', event_type: 'payment_received', status: 'acted',
+        raw_data: { amount: 8400, currency: 'USD', status: 'succeeded', customer_email: 'sarah@meridianconsulting.com', provider: 'stripe', provider_event_id: 'evt_001' },
+        classified_data: { category: 'financial', urgency: 'low', sentiment: 'positive', summary: 'Payment received: USD 8400 from sarah@meridianconsulting.com' },
+        owner_agent: 'finance',
+        resolution: { action_taken: 'marked_invoice_paid', auto_acted: true, notes: ['Invoice automatically marked as paid'] },
+      },
+      {
+        integration_id: formIntegId,
+        source: 'form', event_type: 'form_submission', status: 'acted',
+        raw_data: { form_type: 'contact', fields: { name: 'Alex Rivera', email: 'alex@newprospect.com', message: 'Interested in your services' } },
+        classified_data: { category: 'communication', urgency: 'medium', sentiment: 'positive', summary: 'Form submission: contact from alex@newprospect.com' },
+        owner_agent: 'revenue',
+        resolution: { action_taken: 'created_contact', auto_acted: true, notes: ['Created new lead contact: Alex Rivera'] },
+      },
+      {
+        integration_id: null,
+        source: 'email', event_type: 'inbound_email', status: 'acted',
+        raw_data: { from: 'marcus@apexdigital.io', to: 'hello@autonome.io', subject: 'Re: Apex Digital Platform Build proposal', body: 'Happy to move forward — can we schedule a call to finalize?' },
+        classified_data: { category: 'communication', urgency: 'medium', sentiment: 'positive', summary: 'Email from marcus@apexdigital.io: Re: Apex Digital Platform Build proposal' },
+        owner_agent: 'revenue',
+        resolution: { action_taken: 'routed', auto_acted: false, notes: ['Event routed to revenue'] },
+      },
+      {
+        integration_id: null,
+        source: 'phone', event_type: 'missed_call', status: 'classified',
+        raw_data: { caller_phone: '+1-713-555-0108', caller_name: 'Omar Hassan', type: 'missed' },
+        classified_data: { category: 'operations', urgency: 'high', sentiment: 'neutral', summary: 'Missed call from Omar Hassan' },
+        owner_agent: 'support',
+        resolution: {},
+      },
+      {
+        integration_id: stripeIntegId,
+        source: 'webhook', event_type: 'payment_failed', status: 'acted',
+        raw_data: { amount: 4500, currency: 'USD', status: 'failed', customer_email: 'carlos@elevatebrands.com', provider: 'stripe', provider_event_id: 'evt_002' },
+        classified_data: { category: 'financial', urgency: 'high', sentiment: 'negative', summary: 'Payment failed: USD 4500 from carlos@elevatebrands.com' },
+        owner_agent: 'finance',
+        resolution: { action_taken: 'routed', requires_approval: false, auto_acted: false, notes: ['Routed to finance — payment retry required'] },
+      },
+      {
+        integration_id: null,
+        source: 'support', event_type: 'support_request', status: 'pending',
+        raw_data: { from_email: 'priya@summitlogistics.com', from_name: 'Priya Nair', subject: 'Invoice confusion — billed twice?', body: 'I received two invoices for Phase 1. Please clarify.', priority: 'high', channel: 'email' },
+        classified_data: {},
+        owner_agent: null,
+        resolution: {},
+      },
+      {
+        integration_id: formIntegId,
+        source: 'form', event_type: 'form_submission', status: 'acted',
+        raw_data: { form_type: 'demo_request', fields: { name: 'Kim Park', email: 'kim@techstartup.io', company: 'TechStartup', message: 'Would love a demo of your platform' } },
+        classified_data: { category: 'communication', urgency: 'medium', sentiment: 'positive', summary: 'Form submission: demo_request from kim@techstartup.io' },
+        owner_agent: 'revenue',
+        resolution: { action_taken: 'created_contact', auto_acted: true, notes: ['Created new lead contact: Kim Park'] },
+      },
+    ];
+
+    for (const be of businessEventRows) {
+      await client.query(
+        `INSERT INTO business_events
+           (workspace_id, integration_id, source, event_type, status, raw_data, classified_data, owner_agent, resolution, processed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          workspaceId,
+          be.integration_id || null,
+          be.source,
+          be.event_type,
+          be.status,
+          JSON.stringify(be.raw_data),
+          JSON.stringify(be.classified_data),
+          be.owner_agent || null,
+          JSON.stringify(be.resolution),
+          be.status === 'pending' ? null : daysAgo(Math.floor(Math.random() * 5)),
+        ]
+      );
+    }
+
+    // ── Operator Instructions ─────────────────────────────────────────────────
+    const instructionRows = [
+      { agent: 'finance',  instruction: 'Escalate any invoice over 14 days overdue to a direct call — do not send another email', type: 'policy',     priority: 90 },
+      { agent: null,       instruction: "Don't auto-send emails to contacts tagged as VIP — always surface for approval first",  type: 'rule',       priority: 85 },
+      { agent: null,       instruction: 'Surface any transaction or commitment over $10,000 for operator approval before acting', type: 'rule',       priority: 95 },
+      { agent: 'revenue',  instruction: 'Always follow up on inbound leads within 2 hours during business hours',                 type: 'preference', priority: 70 },
+      { agent: 'support',  instruction: 'For complaints from existing clients, prioritise human review before automated response', type: 'policy',     priority: 80 },
+    ];
+
+    for (const ins of instructionRows) {
+      await client.query(
+        `INSERT INTO operator_instructions (workspace_id, agent, instruction, type, priority, source)
+         VALUES ($1, $2, $3, $4, $5, 'manual')`,
+        [workspaceId, ins.agent || null, ins.instruction, ins.type, ins.priority]
+      );
+    }
+
     await client.query('COMMIT');
     console.log(`[Seed Scenario] Workspace ${workspaceId} seeded with realistic business data.`);
   } catch (err) {

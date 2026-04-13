@@ -1,6 +1,7 @@
 import { pool } from '../db/index.js';
 import { processEmailQueue } from '../services/email.js';
 import { processSMSQueue } from '../services/sms.js';
+import { processBusinessEvent } from './intake.js';
 
 const CYCLE_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -84,7 +85,6 @@ async function writeAgentMemory(workspaceId) {
     [workspaceId]
   );
   for (const row of paidResult.rows) {
-    const label = row.label || `Invoice #${row.id.slice(0, 8)}`;
     const contactName = row.contact_name || 'client';
     await pool.query(
       `INSERT INTO agent_memory (workspace_id, agent, memory_type, entity_type, entity_id, content, confidence)
@@ -189,6 +189,23 @@ export async function runAgentCycle(workspaceId) {
     await writeAgentMemory(workspaceId);
   } catch (memErr) {
     console.error(`[Agent Cycle] Memory write error for workspace ${workspaceId}:`, memErr);
+  }
+
+  // Process any pending/classified business events
+  try {
+    const pendingEvents = await pool.query(
+      `SELECT id FROM business_events WHERE workspace_id = $1 AND status IN ('pending', 'classified') ORDER BY created_at ASC LIMIT 50`,
+      [workspaceId]
+    );
+    for (const row of pendingEvents.rows) {
+      try {
+        await processBusinessEvent(workspaceId, row.id);
+      } catch (err) {
+        console.error(`[Agent Cycle] Failed to process business event ${row.id}:`, err.message);
+      }
+    }
+  } catch (eventsErr) {
+    console.error(`[Agent Cycle] Business events processing error for workspace ${workspaceId}:`, eventsErr.message);
   }
 
   return { ...summary, runId: runResult.rows[0]?.id };
