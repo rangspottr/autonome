@@ -30,6 +30,9 @@ import ConnectionsView from "./views/ConnectionsView.jsx";
 import AutonomyRulesView from "./views/AutonomyRulesView.jsx";
 import WorkspaceSettingsView from "./views/WorkspaceSettingsView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
+import OutputsView from "./views/OutputsView.jsx";
+import InboxOperatorView from "./views/InboxOperatorView.jsx";
+import CollectionsView from "./views/CollectionsView.jsx";
 
 import CommandWidget from "./components/CommandWidget.jsx";
 import AIStatusBanner from "./components/AIStatusBanner.jsx";
@@ -50,6 +53,7 @@ const NAV_GROUPS = [
     items: [
       { id: "cmd", icon: "CMD", label: "Command Center" },
       { id: "briefing", icon: "BRF", label: "Briefing" },
+      { id: "outputs", icon: "OUT", label: "Outputs" },
     ],
   },
   {
@@ -59,6 +63,13 @@ const NAV_GROUPS = [
       { id: "boardroom", icon: "BRD", label: "Boardroom" },
       { id: "approvals", icon: "APR", label: "Approvals" },
       { id: "alerts", icon: "ALT", label: "Alerts" },
+    ],
+  },
+  {
+    label: "OPERATORS",
+    items: [
+      { id: "inbox", icon: "INB", label: "Inbox / Leads" },
+      { id: "collections", icon: "COL", label: "Collections" },
     ],
   },
   {
@@ -206,10 +217,13 @@ function MainApp() {
       </>
     ),
     briefing: <BriefingView />,
+    outputs: <OutputsView />,
     agents: <AgentView onRefreshMetrics={refreshMetrics} />,
     boardroom: <BoardroomView />,
     approvals: <ApprovalView onRefreshMetrics={refreshMetrics} />,
     alerts: <AlertsView />,
+    inbox: <InboxOperatorView />,
+    collections: <CollectionsView />,
     sales: <SalesView />,
     finance: <FinanceView />,
     ops: <OpsView />,

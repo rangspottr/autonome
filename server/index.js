@@ -41,10 +41,15 @@ import notificationsRoutes from './routes/notifications.js';
 import autonomyRoutes from './routes/autonomy.js';
 import proactiveAlertsRoutes from './routes/proactive-alerts.js';
 import credentialsRoutes from './routes/credentials.js';
+import outputsRoutes from './routes/outputs.js';
+import operatorRoutes from './routes/operator.js';
 import { startScheduler } from './engine/scheduler.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
 import { startDailyDigestScheduler } from './jobs/daily-digest.js';
+import { startMorningBriefingScheduler } from './jobs/morning-briefing.js';
+import { startWeeklyReportScheduler } from './jobs/weekly-report.js';
+import { startCollectionsScheduler } from './jobs/collections-operator.js';
 
 export function createApp() {
   const app = express();
@@ -187,6 +192,8 @@ export function createApp() {
   app.use('/api/autonomy-settings', apiLimiter, autonomyRoutes);
   app.use('/api/proactive-alerts', apiLimiter, proactiveAlertsRoutes);
   app.use('/api/credentials', apiLimiter, credentialsRoutes);
+  app.use('/api/outputs', apiLimiter, outputsRoutes);
+  app.use('/api/operator', apiLimiter, operatorRoutes);
 
   // In production, serve the Vite build
   if (process.env.NODE_ENV === 'production') {
@@ -232,6 +239,21 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       startDailyDigestScheduler();
     } catch (err) {
       console.error('[Daily Digest Scheduler] Failed to start:', err.message);
+    }
+    try {
+      startMorningBriefingScheduler();
+    } catch (err) {
+      console.error('[Morning Briefing Scheduler] Failed to start:', err.message);
+    }
+    try {
+      startWeeklyReportScheduler();
+    } catch (err) {
+      console.error('[Weekly Report Scheduler] Failed to start:', err.message);
+    }
+    try {
+      startCollectionsScheduler();
+    } catch (err) {
+      console.error('[Collections Scheduler] Failed to start:', err.message);
     }
   });
 }
