@@ -5,6 +5,34 @@ import { seedScenario } from '../db/seed-scenario.js';
 
 const router = Router();
 
+/**
+ * Fire-and-forget the first agent cycle for a workspace.
+ * Sets initialScanTriggered so it only fires once.
+ * Errors are non-fatal and logged only.
+ */
+async function triggerInitialScan(workspaceId) {
+  try {
+    // Guard: only trigger once
+    const wsRow = await pool.query('SELECT settings FROM workspaces WHERE id = $1', [workspaceId]);
+    const currentSettings = wsRow.rows[0]?.settings || {};
+    if (currentSettings.initialScanTriggered) return;
+
+    // Mark as triggered before running to prevent race conditions
+    await pool.query(
+      `UPDATE workspaces
+       SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb, updated_at = NOW()
+       WHERE id = $2`,
+      [JSON.stringify({ initialScanTriggered: true }), workspaceId]
+    );
+
+    const { runAgentCycle } = await import('../engine/cycle.js');
+    await runAgentCycle(workspaceId);
+    console.log(`[Workspace] Initial scan completed for workspace ${workspaceId}`);
+  } catch (err) {
+    console.error(`[Workspace] Initial scan failed for workspace ${workspaceId} (non-fatal):`, err.message);
+  }
+}
+
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const { name, industry } = req.body;
@@ -45,6 +73,12 @@ router.get('/:id', requireAuth, requireWorkspace, async (req, res, next) => {
 router.patch('/:id', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const { name, industry, company_size, phone, address, settings } = req.body;
+
+    // Detect if setupCompleted is being set to true for the first time
+    const prevSettings = req.workspace.settings || {};
+    const newSettings = settings || {};
+    const setupJustCompleted = newSettings.setupCompleted === true && !prevSettings.setupCompleted;
+
     const result = await pool.query(
       `UPDATE workspaces SET
         name = COALESCE($1, name),
@@ -57,6 +91,12 @@ router.patch('/:id', requireAuth, requireWorkspace, async (req, res, next) => {
        WHERE id = $7 RETURNING *`,
       [name, industry, company_size, phone, address, settings ? JSON.stringify(settings) : null, req.workspace.id]
     );
+
+    // Fire-and-forget initial scan on first setup completion
+    if (setupJustCompleted) {
+      triggerInitialScan(req.workspace.id);
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -78,6 +118,11 @@ router.post('/:id/complete-onboarding', requireAuth, requireWorkspace, async (re
        WHERE id = $6 RETURNING *`,
       [company_size, phone, address, industry, settings ? JSON.stringify(settings) : null, req.workspace.id]
     );
+
+    // Fire-and-forget initial scan after onboarding completion.
+    // triggerInitialScan guards against duplicate runs via initialScanTriggered flag.
+    triggerInitialScan(req.workspace.id);
+
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
