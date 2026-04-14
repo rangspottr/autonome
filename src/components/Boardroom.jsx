@@ -255,7 +255,7 @@ export default function Boardroom({ sessionId: initialSessionId }) {
                     </div>
                     {ar.ai_attempted && ar.source === 'local' && (
                       <div className={styles.aiFallbackNotice}>
-                        AI call to {ar.provider_attempted || 'provider'} failed — showing data-driven summary.
+                        AI call to {ar.provider_attempted || 'configured AI provider'} failed — showing data-driven summary.
                         {ar.ai_error && <span className={styles.aiFallbackError}>{ar.ai_error}</span>}
                       </div>
                     )}

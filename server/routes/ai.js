@@ -177,7 +177,7 @@ Provide concise, actionable answers grounded in this data.`;
         response: summary,
         source: 'local',
         ai_attempted: true,
-        ai_error: fetchErr.message || 'AI provider did not return a response',
+        ai_error: fetchErr.message || 'Failed to reach AI provider',
         provider_attempted: creds.AI_PROVIDER,
       });
     }
@@ -192,7 +192,7 @@ Provide concise, actionable answers grounded in this data.`;
         response: summary,
         source: 'local',
         ai_attempted: aiAttempted,
-        ai_error: aiAttempted ? (aiResult.error || 'AI provider did not return a response') : null,
+        ai_error: aiAttempted ? (aiResult.error || 'AI provider returned an empty response') : null,
         provider_attempted: aiAttempted ? creds.AI_PROVIDER : null,
       });
     }

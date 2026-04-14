@@ -326,7 +326,7 @@ export default function AgentChat({ agent, sessionId: initialSessionId, onBack }
               )}
               {msg.role === "assistant" && msg.ai_attempted && msg.source === "local" && (
                 <div className={styles.aiFallbackNotice}>
-                  AI call to {msg.provider_attempted || "provider"} failed — showing data-driven summary.
+                  AI call to {msg.provider_attempted || "configured AI provider"} failed — showing data-driven summary.
                   {msg.ai_error && <span className={styles.aiFallbackError}>{msg.ai_error}</span>}
                 </div>
               )}

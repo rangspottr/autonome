@@ -459,7 +459,7 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
       agent,
       session_id: resolvedSessionId,
       ai_attempted: aiAttempted && source === 'local',
-      ai_error: (aiAttempted && source === 'local') ? (aiResult.error || 'AI provider did not return a response') : null,
+      ai_error: (aiAttempted && source === 'local') ? (aiResult.error || 'AI provider returned an empty response') : null,
       provider_attempted: (aiAttempted && source === 'local') ? (creds.AI_PROVIDER || null) : null,
       context_summary: {
         actions: agentCtx.actions.length,
@@ -550,16 +550,16 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
         const source = aiResult.text ? (aiProvider || 'local') : 'local';
         const hasProvider = !!(creds.AI_PROVIDER && creds.AI_API_KEY);
         const responseText = aiResult.text || buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx, hasProvider);
-        const agentAiAttempted = aiResult.attempted !== false && hasProvider && !aiResult.text;
+        const agentAiFailed = aiResult.attempted !== false && hasProvider && !aiResult.text;
         if (aiResult.inputTokens !== null) boardroomTotalInputTokens += aiResult.inputTokens;
 
         return {
           agent,
           response: responseText,
           source,
-          ai_attempted: agentAiAttempted,
-          ai_error: agentAiAttempted ? (aiResult.error || 'AI provider did not return a response') : null,
-          provider_attempted: agentAiAttempted ? (creds.AI_PROVIDER || null) : null,
+          ai_attempted: agentAiFailed,
+          ai_error: agentAiFailed ? (aiResult.error || 'AI provider returned an empty response') : null,
+          provider_attempted: agentAiFailed ? (creds.AI_PROVIDER || null) : null,
           context_summary: {
             actions: ctx.actions.length,
             memory: ctx.memory.length,
