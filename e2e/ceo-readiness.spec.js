@@ -336,7 +336,9 @@ test.describe('Approvals View', () => {
     if (await approveBtn.count() > 0) {
       // Verify button is visible and enabled
       await expect(approveBtn).toBeVisible();
+      const requestPromise = page.waitForRequest('**/api/agent-actions/*/approve');
       await approveBtn.click();
+      await requestPromise;
       expect(approveCalled).toBe(true);
     }
   });
