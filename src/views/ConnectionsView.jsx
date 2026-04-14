@@ -213,9 +213,9 @@ function AIProviderForm({ dbCreds, onSaved }) {
 
   return (
     <div className={styles.formBody}>
-      <p className={styles.formHint}>Find your API key at <strong>console.anthropic.com</strong>. Your key is stored securely and powers all 5 specialist agents.</p>
+      <p className={styles.formHint}>Your AI team is powered by the platform by default. Add your own API key here if you want to use a separate billing account or a different model.</p>
       <Input
-        label="Anthropic API Key"
+        label="Anthropic API Key (optional override)"
         type="password"
         value={apiKey}
         onChange={setApiKey}
