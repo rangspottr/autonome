@@ -119,7 +119,8 @@ router.post('/:id/complete-onboarding', requireAuth, requireWorkspace, async (re
       [company_size, phone, address, industry, settings ? JSON.stringify(settings) : null, req.workspace.id]
     );
 
-    // Fire-and-forget initial scan after onboarding completion
+    // Fire-and-forget initial scan after onboarding completion.
+    // triggerInitialScan guards against duplicate runs via initialScanTriggered flag.
     triggerInitialScan(req.workspace.id);
 
     res.json(result.rows[0]);

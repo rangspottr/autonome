@@ -91,10 +91,12 @@ function classifyEvent(event) {
   }
 
   // ── After-hours detection ──────────────────────────────────────────────────
+  // Uses server UTC time as a safe default. Workspace-specific business hours
+  // and timezones can be stored in workspace settings for more precise detection.
   const now = new Date();
-  const hour = now.getHours();
-  const isAfterHours = hour < 8 || hour >= 18; // before 8am or after 6pm
-  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  const hour = now.getUTCHours();
+  const isAfterHours = hour < 8 || hour >= 18; // before 8am or after 6pm UTC
+  const isWeekend = now.getUTCDay() === 0 || now.getUTCDay() === 6;
   const afterHours = isAfterHours || isWeekend;
   if (afterHours && urgency !== 'critical') {
     // Flag after-hours events; bump non-urgent ones so they don't get lost
