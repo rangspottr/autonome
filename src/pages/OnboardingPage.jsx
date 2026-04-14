@@ -273,6 +273,7 @@ export default function OnboardingPage() {
   const { workspace, subscription, setWorkspace } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [activating, setActivating] = useState(false);
   const [formData, setFormData] = useState({
     businessName: workspace?.name || '',
     industry: workspace?.industry || '',
@@ -323,7 +324,9 @@ export default function OnboardingPage() {
         industry: formData.industry,
       });
       setWorkspace(updated);
-      navigate(isActive ? '/' : '/checkout');
+      const target = isActive ? '/' : '/checkout';
+      setActivating(true);
+      setTimeout(() => navigate(target), 2500);
     } catch (err) {
       setError(err.message || 'Failed to complete setup.');
     } finally {
@@ -340,7 +343,9 @@ export default function OnboardingPage() {
         industry: formData.industry,
       });
       setWorkspace(updated);
-      navigate(isActive ? '/' : '/checkout');
+      const target = isActive ? '/' : '/checkout';
+      setActivating(true);
+      setTimeout(() => navigate(target), 2500);
     } catch (err) {
       setError(err.message || 'Failed to complete setup.');
     } finally {
@@ -348,9 +353,53 @@ export default function OnboardingPage() {
     }
   }
 
+  const pulseKeyframes = `
+    @keyframes activatingPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 0.85; }
+    }
+  `;
+
   return (
     <div style={wrap}>
       <div style={card}>
+        {activating ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', textAlign: 'center' }}>
+            <style>{pulseKeyframes}</style>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 28, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {Object.entries(AgentMeta).map(([key, meta], i) => (
+                <div
+                  key={key}
+                  title={meta.title}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    background: meta.bg,
+                    color: meta.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    border: `2px solid ${meta.color}30`,
+                    animation: `activatingPulse 1.6s ease-in-out infinite`,
+                    animationDelay: `${i * 0.2}s`,
+                  }}
+                >
+                  {meta.icon}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12 }}>
+              Your AI team is now active
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 320 }}>
+              Finance, Revenue, Operations, Growth, and Support are scanning your business…
+            </div>
+          </div>
+        ) : (
+          <>
         {step === 1 && (
           <Step1
             workspace={workspace}
@@ -379,6 +428,8 @@ export default function OnboardingPage() {
             onTest={handleTest}
             testing={testing}
           />
+        )}
+          </>
         )}
       </div>
     </div>
