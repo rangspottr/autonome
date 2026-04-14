@@ -15,6 +15,11 @@ const primaryBtn = (disabled) => ({ width: '100%', padding: '12px', background: 
 const secondaryBtn = { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 13, cursor: 'pointer', padding: '8px 0', fontFamily: 'var(--font-family)' };
 const systemIconBadge = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, background: 'var(--color-brand)', color: '#fff', fontSize: 11, fontWeight: 800, flexShrink: 0 };
 
+const activatingScreenStyle = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', textAlign: 'center' };
+const activatingAgentsStyle = { display: 'flex', gap: 12, marginBottom: 28, flexWrap: 'wrap', justifyContent: 'center' };
+const activatingTitleStyle = { fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12 };
+const activatingDescStyle = { fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 320 };
+
 function ProgressBar({ step, total }) {
   return (
     <div style={{ marginBottom: 32 }}>
@@ -364,9 +369,9 @@ export default function OnboardingPage() {
     <div style={wrap}>
       <div style={card}>
         {activating ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', textAlign: 'center' }}>
+          <div style={activatingScreenStyle}>
             <style>{pulseKeyframes}</style>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 28, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div style={activatingAgentsStyle}>
               {Object.entries(AgentMeta).map(([key, meta], i) => (
                 <div
                   key={key}
@@ -391,10 +396,10 @@ export default function OnboardingPage() {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 12 }}>
+            <div style={activatingTitleStyle}>
               Your AI team is now active
             </div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 320 }}>
+            <div style={activatingDescStyle}>
               Finance, Revenue, Operations, Growth, and Support are scanning your business…
             </div>
           </div>
