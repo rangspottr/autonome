@@ -92,12 +92,12 @@ router.get('/ai-status', requireAuth, requireWorkspace, async (req, res, next) =
     const connected = !!(creds.AI_PROVIDER && creds.AI_API_KEY);
     const model = creds.AI_MODEL || null;
 
-    // Check DB verification status
+    // Check DB verification status; defaults to null on failure (treated as 'active' for env-based credentials)
     let isVerified = null;
     try {
       const dbFlags = await loadDbCredFlags(workspaceId);
       isVerified = dbFlags[provider] ?? null;
-    } catch { /* non-fatal */ }
+    } catch { /* non-fatal — isVerified remains null */ }
 
     let status;
     if (!connected) {

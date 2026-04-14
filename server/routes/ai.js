@@ -74,7 +74,7 @@ router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
     try {
       const provider = creds.AI_PROVIDER;
       const verResult = await pool.query(
-        'SELECT is_verified, last_verified_at FROM workspace_credentials WHERE workspace_id = $1 AND provider = $2',
+        'SELECT is_verified FROM workspace_credentials WHERE workspace_id = $1 AND provider = $2',
         [workspaceId, provider]
       );
       if (verResult.rows.length > 0) {
