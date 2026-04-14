@@ -73,6 +73,7 @@
 .agentInfo { flex: 1; min-width: 0; }
 .agentName { font-size: var(--text-base); font-weight: 700; color: var(--color-text-primary); }
 .agentSubtitle { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; line-height: 1.4; }
+.agentOwnership { font-size: var(--text-xs); color: var(--color-text-secondary); margin-top: 3px; line-height: 1.4; font-style: italic; }
 .agentDesc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; max-width: 320px; line-height: 1.4; }
 .agentFocusTag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); margin-top: 4px; }
 

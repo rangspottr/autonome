@@ -129,7 +129,7 @@ export default function KnowledgeView() {
         <div>
           <h2 className={styles.pageTitle}>Knowledge Base</h2>
           <div className={styles.pageSubtitle}>
-            Articles here are included as context in AI queries. Keep them accurate and up-to-date.
+            Your knowledge base powers how agents understand your business. Keep it accurate — agents reference these articles when making decisions.
           </div>
         </div>
         <Button size="sm" onClick={openNew}>+ New Article</Button>

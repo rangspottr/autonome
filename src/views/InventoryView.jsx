@@ -97,8 +97,8 @@ export default function InventoryView() {
       ) : assets.length === 0 ? (
         <EmptyState
           icon="○"
-          title="No inventory items yet"
-          description="Your Operations agent tracks inventory here. Add items to enable stock monitoring and reorder alerts."
+          title="No inventory tracked yet"
+          description="Add items to enable automated reorder monitoring by the Operations agent."
           agent="operations"
           statusIndicator
         />

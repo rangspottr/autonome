@@ -109,7 +109,7 @@ export default function ProcessView() {
         <div>
           <h2 className={styles.pageTitle}>Process View</h2>
           <div className={styles.pageSubtitle}>
-            Paste any text — notes, emails, messages — and Autonome will extract contacts, intents, and actions.
+            Paste any business communication — notes, emails, voicemails, messages — and your AI team will extract contacts, intents, and actionable items.
           </div>
         </div>
       </div>

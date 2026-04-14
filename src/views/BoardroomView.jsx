@@ -101,7 +101,7 @@ export default function BoardroomView() {
       <div className={styles.pageHeader}>
         <h2 className={styles.pageTitle}>Boardroom</h2>
         <p className={styles.pageDesc}>
-          Bring your entire AI team together. Ask a question and hear from all five specialists at once.
+          Convene your AI leadership team. Pose a question and receive analysis from all five specialists, synthesized into a unified recommendation.
         </p>
       </div>
       <BoardroomPreamble />

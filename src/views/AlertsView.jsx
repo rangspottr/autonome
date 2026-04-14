@@ -90,7 +90,7 @@ export default function AlertsView() {
         <div>
           <h2 className={styles.pageTitle}>Proactive Alerts</h2>
           <p className={styles.pageDesc}>
-            Risks, opportunities, and blockers detected automatically by agents.
+            Risks, opportunities, and blockers surfaced by your AI team — ranked by business impact.
           </p>
         </div>
         <div className={styles.headerStats}>
@@ -177,7 +177,7 @@ export default function AlertsView() {
           </div>
           <div className={styles.emptyTitle}>No active alerts</div>
           <div className={styles.emptyDesc}>
-            Agents are monitoring your business. Risks and opportunities will appear here automatically.
+            Your AI team is actively monitoring. When risks, opportunities, or blockers are detected, they&apos;ll appear here ranked by severity and impact.
           </div>
         </div>
       ) : (

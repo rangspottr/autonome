@@ -6,6 +6,7 @@ import Pill from "../components/Pill.jsx";
 import Skeleton from "../components/Skeleton.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Table from "../components/Table.jsx";
+import AIStatusBar from "../components/AIStatusBar.jsx";
 import styles from "./AgentView.module.css";
 
 const MEMORY_TYPE_LABELS = {
@@ -519,15 +520,15 @@ export default function AgentView({ onRefreshMetrics }) {
         <div>
           <h2 className={styles.title}>Agent Dashboard</h2>
           <div className={styles.headerSubtitle}>
-            Last cycle: {status?.lastRunAt ? new Date(status.lastRunAt).toLocaleTimeString() : "Initializing — first scan in progress…"}
+            <AIStatusBar lastRunAt={status?.lastRunAt} />
           </div>
         </div>
-        <Button onClick={runCycle} disabled={running}>{running ? "Running…" : "▶ Run Cycle"}</Button>
+        <Button onClick={runCycle} disabled={running} variant="secondary">{running ? "Running…" : "Run Business Scan"}</Button>
       </div>
 
       {/* Agent cards */}
       {agentStats.length === 0 ? (
-        <EmptyState icon="○" title="Agent team unavailable" description="Something went wrong loading your AI team. Please refresh or contact support." />
+        <EmptyState icon="○" title="Agent team initializing" description="Agent team is initializing. Your five specialists will appear here once the first business scan completes." />
       ) : (
         <div className={styles.agentsGrid}>
           {agentStats.map(({ agent, meta, decisions: decs, executions: _executions, activeWorkflows: awf, workstream }) => {
@@ -549,6 +550,9 @@ export default function AgentView({ onRefreshMetrics }) {
                   <div className={styles.agentInfo}>
                     <div className={styles.agentName}>{meta.label}</div>
                     <div className={styles.agentSubtitle}>{meta.description}</div>
+                    {meta.ownershipStatement && (
+                      <div className={styles.agentOwnership}>{meta.ownershipStatement}</div>
+                    )}
                     <div className={styles.agentCardBadgeRow}>
                       {meta.focus && (
                         <span className={styles.agentFocusBadge} style={{ color: meta.color, borderColor: meta.color }}>
@@ -600,7 +604,7 @@ export default function AgentView({ onRefreshMetrics }) {
           loading={false}
           emptyIcon="○"
           emptyTitle="No active workflows"
-          emptyDescription="Your agents are monitoring for issues that require multi-step resolution. Workflows will appear here automatically."
+          emptyDescription="No active workflows. Workflows are created automatically when agents detect patterns requiring multi-step resolution."
         />
       </div>
     </div>
