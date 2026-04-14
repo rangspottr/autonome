@@ -106,6 +106,12 @@ router.patch('/:id', requireAuth, requireWorkspace, async (req, res, next) => {
 router.post('/:id/complete-onboarding', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const { company_size, phone, address, industry, settings } = req.body;
+
+    // Merge setupCompleted: true into existing settings so both onboarding paths
+    // converge on the same state and the triggerInitialScan guard works consistently.
+    const existingSettings = req.workspace.settings || {};
+    const mergedSettings = { ...existingSettings, ...(settings || {}), setupCompleted: true };
+
     const result = await pool.query(
       `UPDATE workspaces SET
         onboarding_completed = TRUE,
@@ -113,10 +119,10 @@ router.post('/:id/complete-onboarding', requireAuth, requireWorkspace, async (re
         phone = COALESCE($2, phone),
         address = COALESCE($3, address),
         industry = COALESCE($4, industry),
-        settings = COALESCE($5, settings),
+        settings = $5::jsonb,
         updated_at = NOW()
        WHERE id = $6 RETURNING *`,
-      [company_size, phone, address, industry, settings ? JSON.stringify(settings) : null, req.workspace.id]
+      [company_size, phone, address, industry, JSON.stringify(mergedSettings), req.workspace.id]
     );
 
     // Fire-and-forget initial scan after onboarding completion.

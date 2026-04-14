@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
+import AgentMeta from "../components/AgentMeta.js";
 import styles from "./Setup.module.css";
 
 const INDUSTRY_DEFAULTS = {
@@ -221,6 +222,7 @@ export default function Setup({ onComplete }) {
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
     name: workspace?.name || "",
@@ -316,10 +318,13 @@ export default function Setup({ onComplete }) {
         } catch (e) { /* non-fatal */ }
       }
 
-      // Trigger first agent cycle so the team is immediately active
-      try { await api.post("/agent/run-cycle"); } catch (e) { /* non-fatal */ }
-
-      onComplete();
+      // The server triggers the initial agent cycle via triggerInitialScan when
+      // setupCompleted transitions to true. Show the activating transition here
+      // so the owner feels the team coming alive, then call onComplete.
+      setActivating(true);
+      setTimeout(() => {
+        onComplete();
+      }, 2500);
     } catch (err) {
       setError(err.message || "Setup failed. Please try again.");
     } finally {
@@ -467,6 +472,28 @@ export default function Setup({ onComplete }) {
 
   return (
     <div className={styles.page}>
+      {activating ? (
+        <div className={styles.card}>
+          <div className={styles.activatingScreen}>
+            <div className={styles.activatingAgents}>
+              {Object.entries(AgentMeta).map(([key, meta]) => (
+                <div
+                  key={key}
+                  className={styles.activatingAgent}
+                  style={{ background: meta.bg, color: meta.color, borderColor: `${meta.color}30` }}
+                  title={meta.title}
+                >
+                  {meta.icon}
+                </div>
+              ))}
+            </div>
+            <div className={styles.activatingTitle}>Your AI team is now active</div>
+            <div className={styles.activatingDesc}>
+              Finance, Revenue, Operations, Growth, and Support are scanning your business…
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className={styles.card}>
         <div className={styles.logo}>
           <div className={styles.logoTitle}>Autonome</div>
@@ -511,6 +538,7 @@ export default function Setup({ onComplete }) {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
