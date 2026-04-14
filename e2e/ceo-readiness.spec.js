@@ -187,6 +187,7 @@ test.describe('Outputs — Morning Briefing, Weekly Report, Collections', () => 
     await page.waitForLoadState('domcontentloaded');
     // Morning briefing data is seeded so the page should have real content
     const bodyText = await page.locator('body').innerText();
+    expect(bodyText).not.toMatch(/column .* does not exist/i);
     // At minimum the app should not throw JS errors
     const errors = await page.evaluate(() => window.__e2eErrors || []);
     expect(errors).toHaveLength(0);
@@ -335,6 +336,10 @@ test.describe('Approvals View', () => {
     if (await approveBtn.count() > 0) {
       // Verify button is visible and enabled
       await expect(approveBtn).toBeVisible();
+      const requestPromise = page.waitForRequest('**/api/agent-actions/*/approve');
+      await approveBtn.click();
+      await requestPromise;
+      expect(approveCalled).toBe(true);
     }
   });
 });
