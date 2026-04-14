@@ -5,3 +5,5 @@ dist
 *.local
 .env
 backups/*.sql
+test-results/
+playwright-report/
