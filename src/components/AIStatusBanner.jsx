@@ -81,10 +81,9 @@ export default function AIStatusBanner({ onNavigateToConnections }) {
           <span className={styles.activeDot} />
           <div className={styles.activeInfo}>
             <span className={styles.activeText}>
-              AI Active
-              {status.model && <span className={styles.activeModel}> · {status.model}</span>}
+              AI Team Active
             </span>
-            <span className={styles.activeSub}>Powering all {AGENT_KEYS.length} specialist agents</span>
+            <span className={styles.activeSub}>Your AI specialists are analyzing your business</span>
           </div>
         </div>
         <div className={styles.activeAgents}>
@@ -112,20 +111,11 @@ export default function AIStatusBanner({ onNavigateToConnections }) {
         <span className={styles.offlineIcon}>◉</span>
       </div>
       <div className={styles.offlineBody}>
-        <div className={styles.offlineHeadline}>AI intelligence is initializing</div>
+        <div className={styles.offlineHeadline}>AI Team Initializing</div>
         <div className={styles.offlineText}>
-          AI analysis is available when your platform administrator configures AI services. Your agents are already monitoring your business data.
+          Your agents are monitoring your business data. Full AI analysis will be available shortly.
         </div>
       </div>
-      {onNavigateToConnections && (
-        <button
-          className={styles.activateBtn}
-          onClick={onNavigateToConnections}
-          type="button"
-        >
-          Settings →
-        </button>
-      )}
     </div>
   );
 }
