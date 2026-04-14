@@ -195,9 +195,11 @@ export default function SalesView() {
               data={contacts}
               loading={loading}
               emptyIcon="○"
-              emptyTitle="No contacts yet"
-              emptyDescription="Add your first contact."
+              emptyTitle="Revenue agent is standing by"
+              emptyDescription="Add your first contact to begin tracking leads and customers."
               emptyAction={<Button size="sm" onClick={() => setShowContactForm(true)}>+ Add Contact</Button>}
+              emptyAgent="revenue"
+              emptyStatusIndicator
             />
           </>
         )}
@@ -213,9 +215,11 @@ export default function SalesView() {
               data={deals}
               loading={loading}
               emptyIcon="○"
-              emptyTitle="No deals yet"
-              emptyDescription="Add your first deal."
+              emptyTitle="Revenue agent is standing by"
+              emptyDescription="Add your first deal to begin tracking pipeline velocity and close rates."
               emptyAction={<Button size="sm" onClick={() => setShowDealForm(true)}>+ Add Deal</Button>}
+              emptyAgent="revenue"
+              emptyStatusIndicator
             />
           </>
         )}

@@ -3,7 +3,7 @@ import styles from "./Table.module.css";
 import Skeleton from "./Skeleton.jsx";
 import EmptyState from "./EmptyState.jsx";
 
-export default function Table({ columns, data, loading, emptyIcon, emptyTitle, emptyDescription, emptyAction }) {
+export default function Table({ columns, data, loading, emptyIcon, emptyTitle, emptyDescription, emptyAction, emptyAgent, emptyStatusIndicator }) {
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
 
@@ -63,7 +63,7 @@ export default function Table({ columns, data, loading, emptyIcon, emptyTitle, e
           ) : sorted.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className={styles.td}>
-                <EmptyState icon={emptyIcon} title={emptyTitle || "No data"} description={emptyDescription} action={emptyAction} />
+                <EmptyState icon={emptyIcon} title={emptyTitle || "No data"} description={emptyDescription} action={emptyAction} agent={emptyAgent} statusIndicator={emptyStatusIndicator} />
               </td>
             </tr>
           ) : (
