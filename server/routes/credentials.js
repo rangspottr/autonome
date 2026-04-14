@@ -106,6 +106,10 @@ router.put('/:provider', ...guard, async (req, res, next) => {
     // Auto-verify AI credentials immediately after save so the UI reflects the
     // real runtime status without requiring a separate "Test Connection" click.
     let verified = false;
+    let verificationMessage = null;
+    let verificationError = null;
+    let verificationStatus = null;
+
     if (provider === 'anthropic' || provider === 'openai') {
       try {
         const testFn = provider === 'anthropic' ? testAnthropic : testOpenAI;
@@ -117,14 +121,51 @@ router.put('/:provider', ...guard, async (req, res, next) => {
             [req.workspace.id, provider]
           );
           verified = true;
+          verificationMessage = testResult.message || `${provider === 'openai' ? 'OpenAI' : 'Anthropic'} connected and verified.`;
+          verificationStatus = 'active';
+        } else {
+          // Explicitly persist failed verification state with timestamp for consistency
+          await pool.query(
+            `UPDATE workspace_credentials SET is_verified = false, last_verified_at = NOW(), updated_at = NOW()
+             WHERE workspace_id = $1 AND provider = $2`,
+            [req.workspace.id, provider]
+          );
+          verificationError = testResult.error || 'Verification failed. Check your credentials.';
+          verificationStatus = 'needs_attention';
         }
       } catch (verifyErr) {
         // Non-fatal: credentials are always saved regardless of verification outcome
         console.error(`[credentials] Auto-verify failed for provider=${provider}:`, verifyErr.message);
+        // Persist the failed state so the UI reflects it accurately
+        try {
+          await pool.query(
+            `UPDATE workspace_credentials SET is_verified = false, last_verified_at = NOW(), updated_at = NOW()
+             WHERE workspace_id = $1 AND provider = $2`,
+            [req.workspace.id, provider]
+          );
+        } catch (dbErr) {
+          console.error(`[credentials] Failed to persist verify-error state:`, dbErr.message);
+        }
+        verificationError = `Verification failed: ${verifyErr.message}`;
+        verificationStatus = 'needs_attention';
       }
     }
 
-    res.json({ success: true, provider, message: 'Credentials saved.', verified });
+    const responsePayload = { success: true, provider, verified };
+    if (verificationStatus) {
+      responsePayload.status = verificationStatus;
+    }
+    if (verificationMessage) {
+      responsePayload.message = verificationMessage;
+    }
+    if (verificationError) {
+      responsePayload.error = verificationError;
+    }
+    if (!verificationStatus) {
+      responsePayload.message = 'Credentials saved.';
+    }
+
+    res.json(responsePayload);
   } catch (err) {
     next(err);
   }

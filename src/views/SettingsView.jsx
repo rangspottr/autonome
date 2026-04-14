@@ -67,11 +67,22 @@ function AIProviderForm({ dbCreds, onSaved }) {
 
   async function handleSave() {
     if (!apiKey.trim()) { setSaveError("API key is required."); return; }
-    setSaving(true); setSaveError(null);
+    setSaving(true); setSaveError(null); setTestResult(null);
     try {
-      await api.put(`/credentials/${provider}`, { credentials: { api_key: apiKey, model } });
+      const resp = await api.put(`/credentials/${provider}`, { credentials: { api_key: apiKey, model } });
+      // Show inline verification result from auto-verify on save
+      if (resp.verified !== undefined) {
+        setTestResult({
+          success: resp.verified,
+          message: resp.verified ? (resp.message || 'Credentials verified and saved.') : undefined,
+          error: !resp.verified ? (resp.error || 'Verification failed. Check your credentials.') : undefined,
+        });
+      }
+      // Only clear the key input on successful verification; on failure, keep it so the user can retry
+      if (resp.verified !== false) {
+        setApiKey("");
+      }
       onSaved?.();
-      setApiKey("");
     } catch (err) {
       setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }

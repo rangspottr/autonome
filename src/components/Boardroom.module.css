@@ -201,9 +201,21 @@
 
 .agentResponseSource {
   font-size: 10px;
-  color: var(--color-text-muted);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+.agentSrcAI {
+  color: var(--color-brand);
+  background: var(--color-brand-light);
+}
+
+.agentSrcLocal {
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.1);
 }
 
 .agentResponseCtx {
@@ -239,6 +251,28 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.synthesisSource {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+.synthesisSrcAI {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.synthesisSrcLocal {
+  background: rgba(245, 158, 11, 0.3);
+  color: #fff;
 }
 
 .recommendation,

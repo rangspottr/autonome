@@ -276,10 +276,24 @@
 }
 
 .messageSource {
-  font-size: 10px;
-  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  display: inline-block;
+  width: fit-content;
+}
+
+.messageSourceAI {
+  color: var(--color-brand);
+  background: var(--color-brand-light);
+}
+
+.messageSourceLocal {
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.1);
 }
 
 /* Action items */
