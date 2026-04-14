@@ -56,21 +56,48 @@ async function getOrCreateQuickSession(workspaceId, userId) {
 // GET /api/ai/status — returns whether AI is active and which provider/model is configured
 router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
-    const creds = await resolveCredentials(req.workspace.id);
-    if (creds.AI_PROVIDER && creds.AI_API_KEY) {
+    const workspaceId = req.workspace.id;
+    const creds = await resolveCredentials(workspaceId);
+
+    if (!creds.AI_PROVIDER || !creds.AI_API_KEY) {
       return res.json({
-        active: true,
-        provider: creds.AI_PROVIDER,
-        model: creds.AI_MODEL,
-        source: creds.AI_SOURCE,
+        active: false,
+        status: 'not_configured',
+        provider: null,
+        model: null,
+        source: null,
       });
     }
-    res.json({
-      active: false,
-      provider: null,
-      model: null,
-      source: null,
-      message: 'AI brain is not active. Activate it in Settings → AI Provider.',
+
+    // Check DB verification status
+    let isVerified = null;
+    try {
+      const provider = creds.AI_PROVIDER;
+      const verResult = await pool.query(
+        'SELECT is_verified, last_verified_at FROM workspace_credentials WHERE workspace_id = $1 AND provider = $2',
+        [workspaceId, provider]
+      );
+      if (verResult.rows.length > 0) {
+        isVerified = verResult.rows[0].is_verified;
+      }
+    } catch { /* non-fatal */ }
+
+    let status;
+    if (isVerified === true) {
+      status = 'active';
+    } else if (isVerified === false) {
+      status = 'needs_attention';
+    } else {
+      // Credentials exist (possibly from env) but never tested via DB — treat as active
+      status = 'active';
+    }
+
+    return res.json({
+      active: status === 'active',
+      status,
+      provider: creds.AI_PROVIDER,
+      model: creds.AI_MODEL,
+      source: creds.AI_SOURCE,
     });
   } catch (err) {
     next(err);
