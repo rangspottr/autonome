@@ -407,11 +407,199 @@ export async function seedScenario(workspaceId) {
 
     await client.query('COMMIT');
     console.log(`[Seed Scenario] Workspace ${workspaceId} seeded with realistic business data.`);
+
+    // Seed demo outputs (briefings and reports) so the first-run experience
+    // shows finished work being produced immediately.
+    await seedDemoOutputs(workspaceId);
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[Seed Scenario] Failed:', err.message);
     throw err;
   } finally {
     client.release();
+  }
+}
+
+/**
+ * Seed demo output artifacts so new workspaces immediately show
+ * morning briefings, weekly reports, and collections summaries.
+ */
+async function seedDemoOutputs(workspaceId) {
+  try {
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const weekStartStr = weekStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    const weekEndStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    const briefingContent = `# Morning Briefing — ${todayStr}
+Prepared for **Your Business**
+
+## What Happened Overnight
+Your AI team completed **7 actions** overnight across 4 agents.
+
+**Finance Agent** — 3 completed
+  • Escalated Cascade Brand Audit invoice — $2,400 (6d overdue)
+  • Queued payment reminder to Elevate Brands — $4,500 (12d overdue)
+  • Reviewed Ironclad Industries account status — $6,200 escalated
+
+**Revenue Agent** — 2 completed
+  • Followed up on Meridian Q3 Retainer — negotiation stage
+  • Classified inbound form lead: Kim Park (TechStartup)
+
+**Operations Agent** — 1 completed
+  • Advanced Summit Logistics Integration workflow
+
+**Support Agent** — 1 completed
+  • Flagged Priya Nair billing dispute for owner review
+
+## New Leads Overnight
+• **Kim Park** (TechStartup) — lead
+• **Alex Rivera** — lead
+
+## Needs Your Attention Today
+🔴 **2 urgent alerts** require immediate attention
+⚠️  **3 agent decisions** awaiting your approval
+💰 **3 overdue invoices** totaling $13,100
+📋 **4 tasks** due today or overdue
+
+## Overdue Invoices
+• **Cascade Partners** — $2,400 overdue 6d (Cascade Brand Audit)
+• **Elevate Brands** — $4,500 overdue 12d (Elevate Brand Strategy)
+• **Ironclad Industries** — $6,200 overdue 15d (Ironclad Consulting Fees)
+
+## Tasks Due Today
+• **Send Momentum Corp renewal invoice** 🔴 — due today
+• **Review overdue invoices** 🟡 — due today
+• **Prepare pipeline review for board meeting** 🟡 — due today
+
+## Stale Deals (No Activity in 7+ Days)
+• **Summit Logistics Integration** (qualified) — $15,000
+• **Vertex Systems Upgrade** (new) — $9,800
+• **Cascade Brand Campaign** (qualified) — $6,500
+
+## What Each Agent Is Handling
+**Finance:** Escalated overdue invoice: Cascade Partners — $2,400 (6d overdue)
+**Revenue:** Followed up on Meridian Q3 Retainer — negotiation stage
+**Operations:** Advanced Summit Logistics Integration workflow
+**Growth:** Monitoring lead pipeline — no overnight actions
+**Support:** Flagged Priya Nair billing dispute for owner review`;
+
+    const weeklyContent = `# Weekly Owner Report
+**Your Business** | Week of ${weekStartStr} – ${weekEndStr}
+
+## Revenue Summary
+💰 **Collected this week:** $11,600 (+8% vs. prior week)
+⏳ **Outstanding (pending/sent):** $6,800
+🔴 **Overdue:** $13,100 — needs collection action
+✅ **Invoices paid:** 2
+⚠️  **Invoices overdue:** 3
+
+## Pipeline Movement
+**Total active pipeline:** $101,800
+
+• **Negotiation** — 1 deal ($42,000)
+• **Qualified** — 2 deals ($21,500)
+• **Proposal** — 1 deal ($28,500)
+• **New** — 1 deal ($9,800)
+
+**Recently active deals:**
+  • Meridian Q3 Retainer (negotiation) — $42,000
+  • Apex Digital Platform Build (proposal) — $28,500
+
+## Overdue Invoices
+• **Cascade Partners** — $2,400 (6d overdue) — overdue
+• **Elevate Brands** — $4,500 (12d overdue) — overdue
+• **Ironclad Industries** — $6,200 (15d overdue) — escalated
+
+*Collections operator is monitoring these accounts.*
+
+## Tasks
+✅ Completed this week: **12**
+📋 Pending (due next 7 days): **8**
+
+## AI Agent Activity This Week
+**Total actions:** 47 | **Completed:** 38
+
+**Finance:** 14 actions — 11 completed, 3 pending
+**Revenue:** 12 actions — 10 completed, 2 pending
+**Operations:** 11 actions — 9 completed, 2 pending
+**Growth:** 6 actions — 5 completed, 1 pending
+**Support:** 4 actions — 3 completed, 1 pending
+
+## Growth Opportunities
+📈 **5 new contacts added** this week — ensure they receive timely follow-up
+🎯 **1 deal in negotiation** worth $42,000 — close this week
+
+## Next Week's Priorities
+• Resolve $13,100 in overdue invoices
+• Close Meridian Q3 Retainer ($42,000 — negotiation stage)
+• Complete 8 pending tasks
+• Review agent recommendations in Approvals
+• Follow up with 2 new leads from overnight intake`;
+
+    const collectionsContent = `# Collections Summary — ${todayStr}
+
+## Cash Risk Overview
+💰 **Total overdue:** $13,100 across 3 invoices
+🔴 **Escalated (14+ days):** $6,200
+🟡 **At risk (3–13 days):** $6,900
+
+## Overdue Accounts
+🔴 **Ironclad Industries** — $6,200 (15d overdue) — Ironclad Consulting Fees
+🟡 **Elevate Brands** — $4,500 (12d overdue) — Elevate Brand Strategy
+🟡 **Cascade Partners** — $2,400 (6d overdue) — Cascade Brand Audit
+
+## Actions Taken
+**Reminders queued:** 2
+**Escalations:** 1 account escalated
+
+## Recommended Owner Actions
+• Call **Ironclad Industries** directly — $6,200 is 15+ days overdue`;
+
+    const client2 = await pool.connect();
+    try {
+      await client2.query('BEGIN');
+      await client2.query(
+        `INSERT INTO outputs (workspace_id, output_type, title, content, data, period_start, period_end, created_at)
+         VALUES
+           ($1, 'morning_briefing', $2, $3, $4, $5, $6, $7),
+           ($1, 'weekly_report',    $8, $9, $10, $11, $12, $13),
+           ($1, 'collections_summary', $14, $15, $16, $17, $18, $19)`,
+        [
+          workspaceId,
+          // morning briefing
+          `Morning Briefing — ${todayStr}`,
+          briefingContent,
+          JSON.stringify({ overdue_invoices: 3, overdue_amount: 13100, pending_tasks: 4, pending_approvals: 3, stale_deals: 3, new_leads: 2, agent_actions: 7, blocked_workflows: 0 }),
+          new Date(now.getTime() - 16 * 60 * 60 * 1000).toISOString(),
+          now.toISOString(),
+          now.toISOString(),
+          // weekly report
+          `Weekly Owner Report — ${weekEndStr}`,
+          weeklyContent,
+          JSON.stringify({ revenue_collected: 11600, revenue_pending: 6800, revenue_overdue: 13100, invoices_overdue: 3, tasks_completed: 12, tasks_pending: 8, agent_actions: 47, blocked_workflows: 0, new_contacts: 5 }),
+          weekStart.toISOString(),
+          now.toISOString(),
+          new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+          // collections summary
+          `Collections Summary — ${todayStr}`,
+          collectionsContent,
+          JSON.stringify({ total_overdue: 13100, overdue_count: 3, escalated_count: 1, reminders_sent: 2, disputes_flagged: 0 }),
+          new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+          now.toISOString(),
+          now.toISOString(),
+        ]
+      );
+      await client2.query('COMMIT');
+      console.log(`[Seed Scenario] Demo outputs seeded for workspace ${workspaceId}`);
+    } catch (err) {
+      await client2.query('ROLLBACK');
+      console.error('[Seed Scenario] Failed to seed demo outputs:', err.message);
+    } finally {
+      client2.release();
+    }
+  } catch (err) {
+    console.error('[Seed Scenario] Demo outputs error:', err.message);
   }
 }
