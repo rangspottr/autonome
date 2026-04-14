@@ -5,7 +5,7 @@ import styles from "./AIStatusBanner.module.css";
 
 const AGENT_KEYS = Object.keys(AgentMeta);
 
-export default function AIStatusBanner({ onNavigateToConnections }) {
+export default function AIStatusBanner() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
