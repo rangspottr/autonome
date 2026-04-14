@@ -336,6 +336,291 @@ describe('Scenario 5 — Two agents acting on the same entity are detected as a 
   });
 });
 
+// ── Scenario 7: After-Hours Lead Qualification ───────────────────────────────
+describe('Scenario 7 — After-hours lead with no deal is queued for revenue qualification', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('generates a revenue qualify decision for a lead contact with no associated deal', async () => {
+    mockQuery.mockResolvedValueOnce(wsRow({}));       // workspaces
+    mockQuery.mockResolvedValueOnce(EMPTY);           // invoices
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deals
+    // Revenue: lead with no deal
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'lead-1', name: 'After Hours Corp' }],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // tasks
+    mockQuery.mockResolvedValueOnce(EMPTY);           // assets
+    mockQuery.mockResolvedValueOnce(EMPTY);           // at-risk
+    mockQuery.mockResolvedValueOnce(EMPTY);           // repeat blockers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deal regressions
+    mockQuery.mockResolvedValueOnce(EMPTY);           // dormant customers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // stale leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // expansion opportunities
+    mockQuery.mockResolvedValueOnce(EMPTY);           // disputed invoices
+
+    const decisions = await generateDecisions('ws-1');
+
+    const qualify = decisions.find(
+      (d) => d.action === 'qualify' && d.target === 'lead-1'
+    );
+    expect(qualify).toBeDefined();
+    expect(qualify.agent).toBe('revenue');
+    expect(qualify.auto).toBe(true);
+    expect(qualify.needsApproval).toBe(false);
+    expect(qualify.desc).toMatch(/After Hours Corp/);
+  });
+});
+
+// ── Scenario 8: Stale Deal Reengagement ──────────────────────────────────────
+describe('Scenario 8 — Stale deal (6 days) triggers revenue reengage with correct impact', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('generates a revenue reengage decision with priority 85 and expected value impact', async () => {
+    mockQuery.mockResolvedValueOnce(wsRow({}));       // workspaces
+    mockQuery.mockResolvedValueOnce(EMPTY);           // invoices
+    // Revenue: deal stale 6 days, value $10000 at 50% probability
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'deal-1',
+          title: 'Big Contract',
+          value: '10000',
+          stage: 'qualified',
+          probability: 50,
+          contact_id: 'c1',
+          updated_at: daysAgo(6),
+          contact_name: 'Acme Corp',
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // contacts leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // tasks
+    mockQuery.mockResolvedValueOnce(EMPTY);           // assets
+    mockQuery.mockResolvedValueOnce(EMPTY);           // at-risk
+    mockQuery.mockResolvedValueOnce(EMPTY);           // repeat blockers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deal regressions
+    mockQuery.mockResolvedValueOnce(EMPTY);           // dormant customers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // stale leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // expansion opportunities
+    mockQuery.mockResolvedValueOnce(EMPTY);           // disputed invoices
+
+    const decisions = await generateDecisions('ws-1');
+
+    const reengage = decisions.find(
+      (d) => d.agent === 'revenue' && d.action === 'reengage' && d.target === 'deal-1'
+    );
+    expect(reengage).toBeDefined();
+    expect(reengage.priority).toBe(85);
+    expect(reengage.impact).toBe(5000); // 10000 * 50/100
+    expect(reengage.auto).toBe(true);
+    expect(reengage.desc).toMatch(/Acme Corp/);
+  });
+});
+
+// ── Scenario 9: Invoice 2-day overdue → remind ───────────────────────────────
+describe('Scenario 9 — Invoice 2 days overdue triggers a finance remind (not urgent/escalate)', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('generates a finance remind decision with priority >= 90 for a 2-day overdue invoice', async () => {
+    mockQuery.mockResolvedValueOnce(wsRow({}));       // workspaces
+    // Finance: invoice 2 days overdue
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'inv-2d',
+          description: 'HVAC service — Smith',
+          amount: '1000.00',
+          due_date: daysAgo(2),
+          contact_id: 'c1',
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deals
+    mockQuery.mockResolvedValueOnce(EMPTY);           // contacts leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // tasks
+    mockQuery.mockResolvedValueOnce(EMPTY);           // assets
+    mockQuery.mockResolvedValueOnce(EMPTY);           // at-risk
+    mockQuery.mockResolvedValueOnce(EMPTY);           // repeat blockers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deal regressions
+    mockQuery.mockResolvedValueOnce(EMPTY);           // dormant customers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // stale leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // expansion opportunities
+    mockQuery.mockResolvedValueOnce(EMPTY);           // disputed invoices
+
+    const decisions = await generateDecisions('ws-1');
+
+    const remind = decisions.find(
+      (d) => d.agent === 'finance' && d.target === 'inv-2d'
+    );
+    expect(remind).toBeDefined();
+    expect(remind.action).toBe('remind');
+    expect(remind.priority).toBeGreaterThanOrEqual(90);
+  });
+});
+
+// ── Scenario 10: Invoice 10-day overdue → escalate ───────────────────────────
+describe('Scenario 10 — Invoice 10 days overdue triggers escalate with priority 98 and needsApproval', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('generates a finance escalate decision with priority 98 and needsApproval true', async () => {
+    mockQuery.mockResolvedValueOnce(wsRow({}));       // workspaces
+    // Finance: invoice 10 days overdue
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'inv-10d',
+          description: 'Electrical panel — Jones',
+          amount: '1000.00',
+          due_date: daysAgo(10),
+          contact_id: 'c1',
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deals
+    mockQuery.mockResolvedValueOnce(EMPTY);           // contacts leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // tasks
+    mockQuery.mockResolvedValueOnce(EMPTY);           // assets
+    mockQuery.mockResolvedValueOnce(EMPTY);           // at-risk
+    mockQuery.mockResolvedValueOnce(EMPTY);           // repeat blockers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deal regressions
+    mockQuery.mockResolvedValueOnce(EMPTY);           // dormant customers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // stale leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // expansion opportunities
+    mockQuery.mockResolvedValueOnce(EMPTY);           // disputed invoices
+
+    const decisions = await generateDecisions('ws-1');
+
+    const escalate = decisions.find(
+      (d) => d.agent === 'finance' && d.target === 'inv-10d'
+    );
+    expect(escalate).toBeDefined();
+    expect(escalate.action).toBe('escalate');
+    expect(escalate.priority).toBe(98);
+    expect(escalate.needsApproval).toBe(true);
+    expect(escalate.auto).toBe(false);
+  });
+});
+
+// ── Scenario 11: At-Risk Account (Payment Dispute / Support Conflict) ─────────
+describe('Scenario 11 — At-risk account triggers support retention with full impact and approval', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('generates a support retention decision with deal impact and needsApproval true', async () => {
+    mockQuery.mockResolvedValueOnce(wsRow({}));       // workspaces
+    mockQuery.mockResolvedValueOnce(EMPTY);           // invoices
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deals
+    mockQuery.mockResolvedValueOnce(EMPTY);           // contacts leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // tasks
+    mockQuery.mockResolvedValueOnce(EMPTY);           // assets
+    // Support: at-risk contact with overdue invoices and open deal
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'c1',
+          name: 'Troubled Client',
+          overdue_amount: '5000',
+          deal_id: 'd1',
+          deal_value: '20000',
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // repeat blockers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deal regressions
+    mockQuery.mockResolvedValueOnce(EMPTY);           // dormant customers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // stale leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // expansion opportunities
+    mockQuery.mockResolvedValueOnce(EMPTY);           // disputed invoices
+
+    const decisions = await generateDecisions('ws-1');
+
+    const retention = decisions.find(
+      (d) => d.agent === 'support' && d.action === 'retention' && d.target === 'c1'
+    );
+    expect(retention).toBeDefined();
+    expect(retention.impact).toBe(20000);
+    expect(retention.needsApproval).toBe(true);
+    expect(retention.desc).toMatch(/5000/);
+    expect(retention.desc).toMatch(/20000/);
+  });
+});
+
+// ── Scenario 12: Multi-Agent Decision on Same Contact ────────────────────────
+describe('Scenario 12 — Finance, Revenue, and Support all act when a contact is overdue, stale, and at-risk', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('generates distinct decisions from finance, revenue, and support agents for the same context', async () => {
+    mockQuery.mockResolvedValueOnce(wsRow({}));       // workspaces
+    // Finance: invoice 4 days overdue (triggers urgent)
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'inv-multi',
+          description: 'Plumbing repair — Williams',
+          amount: '3000.00',
+          due_date: daysAgo(4),
+          contact_id: 'c1',
+        },
+      ],
+    });
+    // Revenue: deal stale 6 days (triggers reengage)
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'deal-multi',
+          title: 'Service Contract',
+          value: '8000',
+          stage: 'qualified',
+          probability: 40,
+          contact_id: 'c1',
+          updated_at: daysAgo(6),
+          contact_name: 'Williams Co',
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // contacts leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // tasks
+    mockQuery.mockResolvedValueOnce(EMPTY);           // assets
+    // Support: at-risk (overdue + active deal) → retention
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'c1',
+          name: 'Williams Co',
+          overdue_amount: '3000',
+          deal_id: 'deal-multi',
+          deal_value: '8000',
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce(EMPTY);           // repeat blockers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // deal regressions
+    mockQuery.mockResolvedValueOnce(EMPTY);           // dormant customers
+    mockQuery.mockResolvedValueOnce(EMPTY);           // stale leads
+    mockQuery.mockResolvedValueOnce(EMPTY);           // expansion opportunities
+    mockQuery.mockResolvedValueOnce(EMPTY);           // disputed invoices
+
+    const decisions = await generateDecisions('ws-1');
+
+    const financeDecision = decisions.find((d) => d.agent === 'finance' && d.target === 'inv-multi');
+    const revenueDecision = decisions.find((d) => d.agent === 'revenue' && d.target === 'deal-multi');
+    const supportDecision = decisions.find((d) => d.agent === 'support' && d.action === 'retention' && d.target === 'c1');
+
+    // All three must exist
+    expect(financeDecision).toBeDefined();
+    expect(revenueDecision).toBeDefined();
+    expect(supportDecision).toBeDefined();
+
+    // Each addresses a different concern
+    expect(financeDecision.action).toBe('urgent');
+    expect(revenueDecision.action).toBe('reengage');
+    expect(supportDecision.action).toBe('retention');
+
+    // All three must have distinct agent values
+    const agents = [financeDecision.agent, revenueDecision.agent, supportDecision.agent];
+    expect(new Set(agents).size).toBe(3);
+  });
+});
+
 // ── Scenario 6: Owner-Away Continuity ────────────────────────────────────────
 describe('Scenario 6 — Owner-away mode auto-executes pre-approved action types', () => {
   it('pre-approved action types skip needsApproval when ownerAwayMode is true', () => {
