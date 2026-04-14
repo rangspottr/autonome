@@ -366,6 +366,67 @@ export async function seedScenario(workspaceId) {
         owner_agent: 'revenue',
         resolution: { action_taken: 'created_contact', auto_acted: true, notes: ['Created new lead contact: Kim Park'] },
       },
+      // ── After-hours missed calls ──────────────────────────────────────────
+      {
+        integration_id: null,
+        source: 'phone', event_type: 'missed_call', status: 'pending',
+        raw_data: { caller_phone: '+1-312-555-0171', caller_name: 'Derek Fong', type: 'missed', notes: 'After-hours call, no voicemail left' },
+        classified_data: { category: 'operations', urgency: 'high', sentiment: 'neutral', afterHours: true, summary: 'Missed call from Derek Fong' },
+        owner_agent: 'revenue',
+        resolution: {},
+      },
+      {
+        integration_id: null,
+        source: 'phone', event_type: 'missed_call', status: 'classified',
+        raw_data: { caller_phone: '+1-415-555-0192', caller_name: 'Rachel Simmons', type: 'missed', notes: 'Second missed call this week' },
+        classified_data: { category: 'operations', urgency: 'high', sentiment: 'neutral', afterHours: false, summary: 'Missed call from Rachel Simmons' },
+        owner_agent: 'revenue',
+        resolution: { action_taken: 'created_followup_task', auto_acted: true, notes: ['Follow-up task created for missed call from Rachel Simmons'] },
+      },
+      // ── Inbound SMS leads ─────────────────────────────────────────────────
+      {
+        integration_id: null,
+        source: 'sms', event_type: 'inbound_sms', status: 'acted',
+        raw_data: { from: '+1-646-555-0133', body: 'Hi, I saw your ad and wanted to learn more about your services. Is someone available to chat?', direction: 'inbound' },
+        classified_data: { category: 'communication', urgency: 'medium', sentiment: 'positive', summary: 'SMS from +1-646-555-0133: Hi, I saw your ad...' },
+        owner_agent: 'revenue',
+        resolution: { action_taken: 'routed', auto_acted: false, notes: ['Routed to revenue for follow-up'] },
+      },
+      // ── Calendar / booking events ─────────────────────────────────────────
+      {
+        integration_id: null,
+        source: 'calendar', event_type: 'booking_request', status: 'acted',
+        raw_data: { title: 'Discovery call — Nina Kowalski (BrightLine Media)', start: new Date(Date.now() + 2 * 86400000).toISOString(), attendees: ['nina@brightlinemedia.co', 'hello@autonome.io'], type: 'meeting' },
+        classified_data: { category: 'operations', urgency: 'medium', sentiment: 'positive', summary: 'Booking request: Discovery call — Nina Kowalski (BrightLine Media)' },
+        owner_agent: 'revenue',
+        resolution: { action_taken: 'routed', auto_acted: false, notes: ['Meeting routed to revenue for preparation'] },
+      },
+      // ── Additional support / billing tickets ──────────────────────────────
+      {
+        integration_id: null,
+        source: 'support', event_type: 'support_request', status: 'acted',
+        raw_data: { from_email: 'nina@brightlinemedia.co', from_name: 'Nina Kowalski', subject: 'Service disruption — campaign data not updating', body: 'Our dashboard has been showing stale data for 3 days. This is impacting our team.', priority: 'high', channel: 'email' },
+        classified_data: { category: 'support', urgency: 'high', sentiment: 'negative', summary: 'Support request: Service disruption — campaign data not updating from nina@brightlinemedia.co' },
+        owner_agent: 'support',
+        resolution: { action_taken: 'routed', auto_acted: false, notes: ['High-priority support ticket escalated to support agent'] },
+      },
+      {
+        integration_id: null,
+        source: 'support', event_type: 'support_request', status: 'pending',
+        raw_data: { from_email: 'marcus@apexdigital.io', from_name: 'Marcus Webb', subject: 'Invoice question — charge does not match estimate', body: 'The invoice for Phase 2 is $2,000 higher than the estimate we agreed on. Can you clarify?', priority: 'medium', channel: 'email' },
+        classified_data: { category: 'support', urgency: 'medium', sentiment: 'negative', summary: 'Support request: Invoice question from marcus@apexdigital.io' },
+        owner_agent: 'finance',
+        resolution: {},
+      },
+      // ── Positive signals ──────────────────────────────────────────────────
+      {
+        integration_id: null,
+        source: 'email', event_type: 'inbound_email', status: 'acted',
+        raw_data: { from: 'sarah@meridianconsulting.com', to: 'hello@autonome.io', subject: 'Thank you — great first month', body: 'Just wanted to say the platform has been excellent. We are ready to expand to the full team.' },
+        classified_data: { category: 'communication', urgency: 'low', sentiment: 'positive', summary: 'Email from sarah@meridianconsulting.com: Thank you — great first month' },
+        owner_agent: 'growth',
+        resolution: { action_taken: 'routed', auto_acted: false, notes: ['Positive signal routed to growth for expansion opportunity'] },
+      },
     ];
 
     for (const be of businessEventRows) {
