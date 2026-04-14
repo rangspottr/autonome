@@ -455,3 +455,20 @@
     right: 16px;
   }
 }
+
+.aiFallbackNotice {
+  font-size: 11px;
+  color: var(--color-warning);
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.2);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  margin-top: 6px;
+}
+
+.aiFallbackError {
+  display: block;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}

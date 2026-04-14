@@ -212,6 +212,12 @@ export default function CommandWidget({ pendingApprovals = 0, workspace }) {
                     </span>
                   </div>
                   <div className={styles.quickText}>{quickResponse.response}</div>
+                  {quickResponse.ai_attempted && quickResponse.source === 'local' && (
+                    <div className={styles.aiFallbackNotice}>
+                      AI call to {quickResponse.provider_attempted || 'provider'} failed — showing data-driven summary.
+                      {quickResponse.ai_error && <span className={styles.aiFallbackError}>{quickResponse.ai_error}</span>}
+                    </div>
+                  )}
                   <button
                     className={styles.quickClear}
                     onClick={() => setQuickResponse(null)}

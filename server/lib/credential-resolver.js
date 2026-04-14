@@ -114,6 +114,8 @@ export async function resolveCredentials(workspaceId) {
       AI_PROVIDER = 'openai';
       AI_API_KEY = openai.credentials.api_key;
       AI_MODEL_RESOLVED = openai.credentials.model || OPENAI_DEFAULT_MODEL;
+      AI_SOURCE = 'db:openai';
+    } else {
       AI_PROVIDER = 'anthropic';
       AI_API_KEY = anthropic.credentials.api_key;
       AI_MODEL_RESOLVED = anthropic.credentials.model || config.AI_MODEL;
