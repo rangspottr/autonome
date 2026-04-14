@@ -6,6 +6,7 @@ import { buildWorkspaceContext, findEntityContext, buildRichLocalContext } from 
 import { executeAction } from '../engine/execution.js';
 import rateLimit from 'express-rate-limit';
 import { resolveCredentials } from '../lib/credential-resolver.js';
+import { callAI } from '../lib/ai-client.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
@@ -152,47 +153,22 @@ Respond as this specific agent. Be direct, data-driven, and actionable. When you
 }
 
 /**
- * Call Anthropic or fall back to a local structured response.
+ * Invoke the shared AI client with resolved workspace credentials.
+ * Returns { text, inputTokens, provider } from the active provider.
  */
-async function callAI(systemPrompt, messages, maxTokens = 2048, creds = null) {
-  const apiKey = creds?.ANTHROPIC_API_KEY ?? config.ANTHROPIC_API_KEY;
-  const aiModel = creds?.AI_MODEL ?? config.AI_MODEL;
-  if (!apiKey) return { text: null, inputTokens: null };
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: aiModel,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages,
-      }),
-    });
-
-    if (!res.ok) {
-      console.error('[Command] Anthropic API error:', res.status);
-      return { text: null, inputTokens: null };
-    }
-
-    const data = await res.json();
-    return { text: data.content?.[0]?.text || null, inputTokens: data.usage?.input_tokens ?? null };
-  } catch (err) {
-    console.error('[Command] Anthropic fetch error:', err.message);
-    return { text: null, inputTokens: null };
-  }
+async function callAIWithCreds(systemPrompt, messages, maxTokens = 2048, creds = null) {
+  const provider = creds?.AI_PROVIDER ?? config.AI_PROVIDER ?? null;
+  const apiKey = creds?.AI_API_KEY ?? null;
+  const model = creds?.AI_MODEL ?? config.AI_MODEL ?? null;
+  return callAI({ provider, apiKey, model, system: systemPrompt, messages, maxTokens });
 }
 
 /**
  * Build a rich, role-specific local fallback response for an agent.
  * Provides specialist reasoning, prioritized items, and recommended next actions.
+ * @param {boolean} [hasProvider=false] - Whether an AI provider is configured (suppresses connection warning)
  */
-function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) {
+function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null, hasProvider = false) {
   const businessName = workspaceCtx.businessName;
   const lines = [];
 
@@ -324,7 +300,9 @@ function buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx = null) 
     }
   }
 
-  lines.push('\n[WARNING] Connect your AI provider in Settings to unlock full specialist intelligence.');
+  if (!hasProvider) {
+    lines.push('\n[WARNING] Connect an AI provider in Settings to unlock full specialist intelligence.');
+  }
   return lines.join('\n');
 }
 
@@ -423,14 +401,16 @@ router.post('/agent-chat', ...guard, commandLimiter, async (req, res, next) => {
 
     let responseText = null;
     let agentChatInputTokens = null;
-    const aiResult = await callAI(systemPrompt, messages, 2048, creds);
+    const aiResult = await callAIWithCreds(systemPrompt, messages, 2048, creds);
     responseText = aiResult.text;
     agentChatInputTokens = aiResult.inputTokens;
-    const source = responseText ? 'anthropic' : 'local';
+    const aiProvider = aiResult.provider || creds.AI_PROVIDER || null;
+    const source = responseText ? (aiProvider || 'local') : 'local';
+    const hasProvider = !!(creds.AI_PROVIDER && creds.AI_API_KEY);
     if (!responseText) {
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
-      responseText = buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx);
+      responseText = buildLocalAgentResponse(agent, agentCtx, workspaceCtx, richCtx, hasProvider);
     }
 
     const hasPendingActions = responseText.includes('[APPROVAL NEEDED]') || responseText.includes('[ACTION]');
@@ -561,9 +541,11 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
           { role: 'user', content: trimmedMessage },
         ];
 
-        const aiResult = await callAI(systemPrompt, messages, 2048, creds);
-        const source = aiResult.text ? 'anthropic' : 'local';
-        const responseText = aiResult.text || buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx);
+        const aiResult = await callAIWithCreds(systemPrompt, messages, 2048, creds);
+        const aiProvider = aiResult.provider || creds.AI_PROVIDER || null;
+        const source = aiResult.text ? (aiProvider || 'local') : 'local';
+        const hasProvider = !!(creds.AI_PROVIDER && creds.AI_API_KEY);
+        const responseText = aiResult.text || buildLocalAgentResponse(agent, ctx, workspaceCtx, richCtx, hasProvider);
         if (aiResult.inputTokens !== null) boardroomTotalInputTokens += aiResult.inputTokens;
 
         return {
@@ -584,7 +566,7 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
 
     // Synthesize all agent responses
     let synthesis;
-    if (creds.ANTHROPIC_API_KEY) {
+    if (creds.AI_PROVIDER && creds.AI_API_KEY) {
       const entityContext = entityL1 ? `\nShared entity context (all agents have this):\n${entityL1}\n` : '';
       const synthesisPrompt = `You are a synthesis engine for ${workspaceCtx.businessName}.
 ${entityContext}
@@ -608,7 +590,7 @@ Rules:
 - Return ONLY valid JSON. No markdown code fences, no explanation text before or after.`;
 
       let synthesisText = null;
-      const synthesisResult = await callAI(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048, creds);
+      const synthesisResult = await callAIWithCreds(synthesisPrompt, [{ role: 'user', content: 'Synthesize the agent responses now.' }], 2048, creds);
       synthesisText = synthesisResult.text;
       if (synthesisResult.inputTokens !== null) boardroomTotalInputTokens += synthesisResult.inputTokens;
 
@@ -630,7 +612,7 @@ Rules:
 
         // If still null, retry with a simpler structured-text prompt
         if (!synthesis) {
-          const retryResult = await callAI(
+          const retryResult = await callAIWithCreds(
             'You must output only a valid JSON object, no other text.',
             [{ role: 'user', content: `Return this as valid JSON only:\n${synthesisText}` }],
             1024,

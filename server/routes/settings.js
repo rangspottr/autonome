@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { config } from '../config.js';
 import { requireAuth, requireWorkspace } from '../middleware/auth.js';
 import { pool } from '../db/index.js';
+import { resolveCredentials } from '../lib/credential-resolver.js';
 
 const router = Router();
 
@@ -85,43 +86,20 @@ router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
 router.get('/ai-status', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = req.workspace.id;
-    const dbCreds = await loadDbCredFlags(workspaceId);
+    const creds = await resolveCredentials(workspaceId);
 
-    let provider = 'none';
-    let connected = false;
-    let model = config.AI_MODEL || null;
+    const provider = creds.AI_PROVIDER || 'none';
+    const connected = !!(creds.AI_PROVIDER && creds.AI_API_KEY);
+    const model = creds.AI_MODEL || null;
 
-    if (dbCreds.anthropic !== undefined) {
-      provider = 'anthropic';
-      connected = dbCreds.anthropic === true;
-      // Load model from DB if available
-      try {
-        const row = await pool.query(
-          `SELECT credentials FROM workspace_credentials WHERE workspace_id = $1 AND provider = 'anthropic'`,
-          [workspaceId]
-        );
-        if (row.rows.length > 0) {
-          const { deobfuscate: deob } = await import('../lib/credential-resolver.js');
-          const creds = row.rows[0].credentials || {};
-          if (creds.model) model = deob(creds.model);
-        }
-      } catch { /* non-fatal */ }
-    } else if (dbCreds.openai !== undefined) {
-      provider = 'openai';
-      connected = dbCreds.openai === true;
-    } else if (config.ANTHROPIC_API_KEY) {
-      provider = 'anthropic';
-      connected = true;
-    }
-
-    // Look up the most recent successful AI response (source = 'anthropic') in chat_messages
+    // Look up the most recent successful AI response for any provider
     let lastSuccessful = null;
     try {
       const lastResult = await pool.query(
         `SELECT created_at FROM chat_messages
          WHERE workspace_id = $1
            AND role = 'assistant'
-           AND metadata->>'source' = 'anthropic'
+           AND metadata->>'source' IN ('anthropic', 'openai')
          ORDER BY created_at DESC LIMIT 1`,
         [workspaceId]
       );
