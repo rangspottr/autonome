@@ -344,6 +344,7 @@ export default function ConnectionsView() {
   const [dbCreds, setDbCreds] = useState(null);
   const [csvStatus, setCsvStatus] = useState(null);
   const [csvImporting, setCsvImporting] = useState(false);
+  const [showEnterpriseAI, setShowEnterpriseAI] = useState(false);
 
   const loadData = useCallback(() => {
     Promise.all([
@@ -415,7 +416,6 @@ export default function ConnectionsView() {
     e.target.value = "";
   }
 
-  const aiConnected = !!(dbCreds?.anthropic?.credentials || integrations?.ai?.configured);
   const emailStatus = connectionStatus(integrations, "email", dbCreds);
   const smsStatus = connectionStatus(integrations, "sms", dbCreds);
   const stripeStatus = connectionStatus(integrations, "stripe", dbCreds);
@@ -438,17 +438,29 @@ export default function ConnectionsView() {
       ) : (
         <div className={styles.cardGrid}>
 
-          {/* AI Intelligence — highest priority, powers the core differentiator */}
-          <ConnectionCard
-            title="AI Intelligence"
-            description="Powers advanced analysis, synthesis, and proactive recommendations across all 5 agents"
-            statusLabel={aiConnected ? "Connected ✓" : "Not connected"}
-            statusVariant={aiConnected ? "green" : "muted"}
-            connected={aiConnected}
-            defaultOpen={!aiConnected}
-          >
-            <AIProviderForm dbCreds={dbCreds} onSaved={handleSaved} />
-          </ConnectionCard>
+          {/* Enterprise / Advanced — AI provider override, hidden by default */}
+          <Card className={styles.connCard}>
+            <div className={styles.connCardHeader}>
+              <div className={styles.connCardLeft}>
+                <div className={styles.connCardTitle}>Enterprise / Advanced</div>
+                <div className={styles.connCardDesc}>Autonome includes AI by default. This section is for enterprise clients who need dedicated AI billing.</div>
+              </div>
+              <div className={styles.connCardRight}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShowEnterpriseAI((v) => !v)}
+                >
+                  {showEnterpriseAI ? "Hide" : "Configure"}
+                </Button>
+              </div>
+            </div>
+            {showEnterpriseAI && (
+              <div className={styles.connCardBody}>
+                <AIProviderForm dbCreds={dbCreds} onSaved={handleSaved} />
+              </div>
+            )}
+          </Card>
 
           {/* Email */}
           <ConnectionCard
