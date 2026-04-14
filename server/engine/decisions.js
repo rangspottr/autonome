@@ -475,5 +475,40 @@ export async function generateDecisions(workspaceId) {
     });
   }
 
+  // ── Support: disputed invoices ────────────────────────────────────────────────
+  const disputeResult = await pool.query(
+    `SELECT id, description, amount, contact_id
+     FROM invoices
+     WHERE workspace_id = $1 AND status = 'disputed'`,
+    [workspaceId]
+  );
+
+  for (const inv of disputeResult.rows) {
+    if (has('support', 'flag_dispute', inv.id)) continue;
+    decisions.push(buildDisputeDecision(inv));
+  }
+
   return decisions.sort((a, b) => b.priority - a.priority);
+}
+
+/**
+ * Check if a single invoice is disputed and generate a support flag decision.
+ * Exported for targeted testing of the dispute scenario.
+ */
+export function buildDisputeDecision(inv) {
+  const impact = parseFloat(inv.amount) || 0;
+  const label = inv.description || `Invoice #${String(inv.id).slice(0, 8)}`;
+  return {
+    id: `support-dispute-${inv.id}`,
+    agent: 'support',
+    action: 'flag_dispute',
+    target: inv.id,
+    targetName: label,
+    priority: 96,
+    impact,
+    desc: `Payment dispute: ${label} ($${impact.toFixed(2)}) has been disputed — flag for owner review`,
+    auto: false,
+    needsApproval: true,
+    reasoning: `Invoice ${label} has been marked as disputed. Disputed payments require immediate owner attention to prevent chargeback escalation and protect the business relationship.`,
+  };
 }

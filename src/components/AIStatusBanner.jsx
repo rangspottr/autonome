@@ -112,18 +112,20 @@ export default function AIStatusBanner({ onNavigateToConnections }) {
         <span className={styles.offlineIcon}>◉</span>
       </div>
       <div className={styles.offlineBody}>
-        <div className={styles.offlineHeadline}>Your AI team is operating on business data</div>
+        <div className={styles.offlineHeadline}>AI intelligence is initializing</div>
         <div className={styles.offlineText}>
-          Connect an AI provider to unlock advanced analysis, synthesis, and proactive recommendations. Your agents are already monitoring your business.
+          AI analysis is available when your platform administrator configures AI services. Your agents are already monitoring your business data.
         </div>
       </div>
-      <button
-        className={styles.activateBtn}
-        onClick={onNavigateToConnections}
-        type="button"
-      >
-        Upgrade Intelligence →
-      </button>
+      {onNavigateToConnections && (
+        <button
+          className={styles.activateBtn}
+          onClick={onNavigateToConnections}
+          type="button"
+        >
+          Settings →
+        </button>
+      )}
     </div>
   );
 }

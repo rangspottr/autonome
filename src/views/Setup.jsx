@@ -213,7 +213,6 @@ const STEPS = [
   "Communication Rules",
   "Agent Guardrails",
   "Bring Your Data",
-  "Power Your AI Team",
 ];
 
 export default function Setup({ onComplete }) {
@@ -233,8 +232,6 @@ export default function Setup({ onComplete }) {
     refundThreshold: settings.riskLimits?.refundThreshold || 100,
     approvalAbove: settings.riskLimits?.approvalAbove || 5000,
     typicalDealSize: Math.round((settings.riskLimits?.approvalAbove || 5000) / 2),
-    importText: "",
-    apiKey: "",
   });
 
   const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
@@ -310,13 +307,6 @@ export default function Setup({ onComplete }) {
       }
 
       setWorkspace(updatedWorkspace);
-
-      // Save AI provider key if entered
-      if (form.apiKey.trim()) {
-        try {
-          await api.put("/credentials/anthropic", { credentials: { api_key: form.apiKey.trim() } });
-        } catch (e) { /* non-fatal */ }
-      }
 
       // The server triggers the initial agent cycle via triggerInitialScan when
       // setupCompleted transitions to true. Show the activating transition here
@@ -439,33 +429,14 @@ export default function Setup({ onComplete }) {
 
     // Step 5: Bring Your Data
     <div key="s5">
-      <p className={styles.stepSubtitle}>Optionally paste existing customer or deal data to import.</p>
-      <textarea
-        className={styles.textarea}
-        value={form.importText}
-        onChange={(e) => setForm((f) => ({ ...f, importText: e.target.value }))}
-        placeholder="Paste customer names, emails, deal information..."
-      />
+      <p className={styles.stepSubtitle}>Your agents start analyzing your business immediately after setup.</p>
+      <div className={styles.dataPromise}>
+        <p className={styles.dataPromiseText}>
+          Your agents will start analyzing your business data as soon as you complete setup. You can import contacts, deals, and invoices from the dashboard at any time.
+        </p>
+      </div>
       <p className={styles.textareaHint}>
-        Autonome will parse this text and extract contacts, deals, and tasks.
-      </p>
-    </div>,
-
-    // Step 6: Power Your AI Team
-    <div key="s6">
-      <p className={styles.stepSubtitle}>
-        Enter your Anthropic API key to power all 5 specialist agents with advanced intelligence.
-        You can also do this later in Connections.
-      </p>
-      <Input
-        label="Anthropic API Key"
-        type="password"
-        value={form.apiKey}
-        onChange={set("apiKey")}
-        placeholder="sk-ant-api…"
-      />
-      <p className={styles.textareaHint}>
-        Your key is stored securely and never shared. It unlocks advanced analysis, synthesis, and proactive recommendations across your entire AI team.
+        Skip ahead — data import is always available from your dashboard whenever you're ready.
       </p>
     </div>,
   ];

@@ -63,7 +63,7 @@ function resolveHandoff(agent, action) {
  * Detect cross-agent conflicts before executing an action.
  * Returns { conflict: boolean, conflictingAgent, conflictingAction, details }
  */
-async function detectConflict(workspaceId, agent, action, entityId) {
+export async function detectConflict(workspaceId, agent, action, entityId) {
   if (!entityId) return { conflict: false };
   try {
     // Look for pending/recent actions by OTHER agents on the same entity within the last 2 hours

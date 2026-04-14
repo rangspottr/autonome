@@ -120,7 +120,7 @@ const BUSINESS_SYSTEMS = [
   { key: 'payments', icon: 'PM', label: 'Payments', desc: 'Track invoices and payments', hint: 'Stripe' },
 ];
 
-function Step2({ connected, onToggle, onNext, onBack }) {
+function Step2({ onNext, onBack }) {
   return (
     <div>
       <ProgressBar step={2} total={3} />
@@ -129,7 +129,7 @@ function Step2({ connected, onToggle, onNext, onBack }) {
           Connect your business
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          Your agents need to see your business to start working. Connect the tools you already use.
+          Your agents are ready to work with the data you import.
         </div>
       </div>
 
@@ -143,9 +143,8 @@ function Step2({ connected, onToggle, onNext, onBack }) {
               gap: 14,
               padding: '14px 16px',
               background: 'var(--color-bg)',
-              border: `1px solid ${connected[sys.key] ? 'rgba(16,185,129,0.4)' : 'var(--color-border)'}`,
+              border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              transition: 'border-color 0.2s',
             }}
           >
             <span style={systemIconBadge}>{sys.icon}</span>
@@ -156,28 +155,17 @@ function Step2({ connected, onToggle, onNext, onBack }) {
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{sys.desc}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{sys.hint}</span>
-              {connected[sys.key] ? (
-                <button
-                  onClick={() => onToggle(sys.key, false)}
-                  style={{ fontSize: 11, color: 'var(--color-success)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  ✓ Connected
-                </button>
-              ) : (
-                <button
-                  onClick={() => onToggle(sys.key, true)}
-                  style={{ fontSize: 11, color: 'var(--color-brand)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  Connect →
-                </button>
-              )}
+              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Coming soon</span>
             </div>
           </div>
         ))}
       </div>
 
-      <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Connect & Continue →</button>
+      <div style={{ padding: '12px 16px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: 28, fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+        We're building integrations for email, phone, and payments. For now, your agents work with the data you import from the dashboard.
+      </div>
+
+      <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Continue →</button>
       <div style={{ textAlign: 'center' }}>
         <button onClick={onBack} style={secondaryBtn}>← Back</button>
       </div>
@@ -185,54 +173,59 @@ function Step2({ connected, onToggle, onNext, onBack }) {
   );
 }
 
-function Step3({ onSubmit, onSkip, loading, error, apiKey, onApiKeyChange, testResult, onTest, testing }) {
+function Step3({ onSubmit, loading, error }) {
   return (
     <div>
       <ProgressBar step={3} total={3} />
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-          Activate your AI Brain
+      <div style={{ marginBottom: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 8 }}>
+          Your AI team is ready
         </div>
-        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          Connect an AI provider so your specialists can think, analyze, and act on your behalf — not just report data.
+        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 340, margin: '0 auto' }}>
+          Five specialist agents — Finance, Revenue, Operations, Growth, and Support — are standing by to run your business.
         </div>
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <label style={labelStyle}>Anthropic API Key</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={e => onApiKeyChange(e.target.value)}
-          placeholder="sk-ant-api…"
-          style={inputStyle}
-          autoComplete="off"
-        />
-        <div style={{ marginTop: 6 }}>
-          <a
-            href="https://console.anthropic.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, color: 'var(--color-brand)', textDecoration: 'none' }}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+        {Object.entries(AgentMeta).map(([key, meta]) => (
+          <div
+            key={key}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 14px',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+            }}
           >
-            Don't have a key? Get one at anthropic.com →
-          </a>
-        </div>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                background: meta.bg,
+                color: meta.color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 800,
+                flexShrink: 0,
+              }}
+            >
+              {meta.icon}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>{meta.title}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{meta.focus}</div>
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--color-success)', fontWeight: 700 }}>● Ready</span>
+          </div>
+        ))}
       </div>
-
-      {testResult && (
-        <div style={{
-          padding: '10px 14px',
-          borderRadius: 'var(--radius-md)',
-          marginBottom: 16,
-          fontSize: 13,
-          background: testResult.success ? 'rgba(16,185,129,0.08)' : 'rgba(220,38,38,0.08)',
-          border: `1px solid ${testResult.success ? 'rgba(16,185,129,0.3)' : 'rgba(220,38,38,0.3)'}`,
-          color: testResult.success ? 'var(--color-success)' : 'var(--color-danger)',
-        }}>
-          {testResult.success ? `✓ Verified — ${testResult.message || 'API key is valid'}` : `✗ ${testResult.error}`}
-        </div>
-      )}
 
       {error && (
         <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 13, color: 'var(--color-danger)', marginBottom: 16 }}>
@@ -240,36 +233,9 @@ function Step3({ onSubmit, onSkip, loading, error, apiKey, onApiKeyChange, testR
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-        <button
-          onClick={onTest}
-          disabled={testing || !apiKey.trim()}
-          style={{
-            flex: 1,
-            padding: '11px',
-            background: 'var(--color-bg)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: (testing || !apiKey.trim()) ? 'not-allowed' : 'pointer',
-            opacity: (testing || !apiKey.trim()) ? 0.6 : 1,
-            fontFamily: 'var(--font-family)',
-          }}
-        >
-          {testing ? 'Testing…' : 'Test Key'}
-        </button>
-        <button onClick={onSubmit} disabled={loading} style={{ flex: 2, ...primaryBtn(loading) }}>
-          {loading ? 'Activating…' : 'Enter Your Operating Room →'}
-        </button>
-      </div>
-
-      <div style={{ textAlign: 'center', marginTop: 8 }}>
-        <button onClick={onSkip} disabled={loading} style={secondaryBtn}>
-          Skip for now — I'll set this up later
-        </button>
-      </div>
+      <button onClick={onSubmit} disabled={loading} style={primaryBtn(loading)}>
+        {loading ? 'Activating…' : 'Enter Your Operating Room →'}
+      </button>
     </div>
   );
 }
@@ -284,10 +250,6 @@ export default function OnboardingPage() {
     industry: workspace?.industry || '',
     companySize: '',
   });
-  const [connected, setConnected] = useState({ email: false, phone: false, payments: false });
-  const [apiKey, setApiKey] = useState('');
-  const [testResult, setTestResult] = useState(null);
-  const [testing, setTesting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -297,52 +259,11 @@ export default function OnboardingPage() {
     setFormData(f => ({ ...f, [field]: value }));
   }
 
-  function handleToggle(key, value) {
-    setConnected(c => ({ ...c, [key]: value }));
-  }
-
-  async function handleTest() {
-    if (!apiKey.trim()) return;
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await api.post('/credentials/anthropic/test', { credentials: { api_key: apiKey.trim(), model: 'claude-sonnet-4-20250514' } });
-      setTestResult(result);
-    } catch (err) {
-      setTestResult({ success: false, error: err.message || 'Test failed.' });
-    } finally {
-      setTesting(false);
-    }
-  }
-
   async function handleFinish() {
     setError('');
     setLoading(true);
     try {
-      // Save AI key if provided
-      if (apiKey.trim()) {
-        await api.put('/credentials/anthropic', { credentials: { api_key: apiKey.trim(), model: 'claude-sonnet-4-20250514' } });
-      }
       // Complete onboarding
-      const updated = await api.post(`/workspaces/${workspace.id}/complete-onboarding`, {
-        company_size: formData.companySize,
-        industry: formData.industry,
-      });
-      setWorkspace(updated);
-      const target = isActive ? '/' : '/checkout';
-      setActivating(true);
-      setTimeout(() => navigate(target), 2500);
-    } catch (err) {
-      setError(err.message || 'Failed to complete setup.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleSkip() {
-    setError('');
-    setLoading(true);
-    try {
       const updated = await api.post(`/workspaces/${workspace.id}/complete-onboarding`, {
         company_size: formData.companySize,
         industry: formData.industry,
@@ -415,8 +336,6 @@ export default function OnboardingPage() {
         )}
         {step === 2 && (
           <Step2
-            connected={connected}
-            onToggle={handleToggle}
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
           />
@@ -424,14 +343,8 @@ export default function OnboardingPage() {
         {step === 3 && (
           <Step3
             onSubmit={handleFinish}
-            onSkip={handleSkip}
             loading={loading}
             error={error}
-            apiKey={apiKey}
-            onApiKeyChange={setApiKey}
-            testResult={testResult}
-            onTest={handleTest}
-            testing={testing}
           />
         )}
           </>
