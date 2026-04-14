@@ -68,28 +68,30 @@
 
    Set `NODE_ENV=production` and configure all required variables (see table below).
 
-3. **Run database migrations**
+3. **Start the server**
 
-   ```bash
-   node server/db/migrate.js
-   ```
-
-4. **Start the server**
+   `server/start.js` automatically runs all pending migrations before starting the
+   HTTP server. This ensures the database schema is always in sync with the
+   deployed code.
 
    Direct:
    ```bash
-   node server/index.js
+   node server/start.js
    ```
 
    Using PM2 (recommended for production):
    ```bash
    npm install -g pm2
-   pm2 start server/index.js --name autonome
+   pm2 start server/start.js --name autonome
    pm2 save
    pm2 startup
    ```
 
    The server listens on `PORT` (default `3001`) and serves the built frontend.
+
+   > **Note:** If the startup script cannot connect to the database or a migration
+   > fails, the process exits with a non-zero code so the process manager treats
+   > it as a failed deployment and does not route traffic to a broken instance.
 
 ---
 
@@ -136,8 +138,19 @@ Migration files are run in alphabetical/numeric order by `server/db/migrate.js`.
 | `004_security.sql` | Security improvements: webhook keys, CSRF tokens |
 | `005_agent_intelligence.sql` | Agent actions, agent memory, chat messages |
 | `006_intake_layer.sql` | Universal intake: companies, integrations, business_events, operator_instructions; adds company_id to contacts |
+| `007_command_interface.sql` | Command interface: chat sessions, command history |
+| `008_proactive_autonomy.sql` | Proactive autonomy: scheduled jobs, alerts, agent workstreams |
+| `009_agent_runs_created_at.sql` | Adds `created_at` to agent_runs |
+| `010_intelligence_trust_fixes.sql` | Intelligence trust improvements: indexes, constraints |
+| `011_entity_grounding.sql` | Entity grounding: structured business context for agents |
+| `012_workspace_credentials.sql` | Per-workspace provider credentials with encrypted storage and verification state |
+| `013_outputs.sql` | **Outputs table** — stores finished deliverables (morning briefings, weekly reports, collections summaries) produced by scheduled jobs |
 
-**To run all migrations:**
+**Migrations run automatically on startup** via `server/start.js`. All SQL files use
+`CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`, so they are safe to
+re-run and idempotent.
+
+**To run migrations manually** (e.g. on a fresh database or for debugging):
 
 ```bash
 node server/db/migrate.js

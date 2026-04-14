@@ -14,4 +14,4 @@ COPY server/ ./server/
 WORKDIR /app/server
 RUN npm ci --production
 EXPOSE 3001
-CMD ["node", "index.js"]
+CMD ["node", "start.js"]
