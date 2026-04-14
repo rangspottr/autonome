@@ -8,6 +8,7 @@ import AgentMeta from "../components/AgentMeta.js";
 import Input from "../components/Input.jsx";
 import Stat from "../components/Stat.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import WelcomeBriefing from "../components/WelcomeBriefing.jsx";
 import styles from "./CmdCenter.module.css";
 import { T } from "../lib/theme.js";
@@ -329,15 +330,20 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
 
       {/* Welcome empty state when workspace has no data yet */}
       {summary && (summary.contacts?.total || 0) === 0 && (summary.invoices?.total || 0) === 0 && (summary.deals?.total || 0) === 0 && (
-        <div className={styles.emptyActions} style={{ marginBottom: "var(--space-4)" }}>
-          <div className={styles.emptyActionsIcon}>A</div>
-          <div className={styles.emptyActionsTitle}>Your agents need business data to start working</div>
-          <div className={styles.emptyActionsDesc}>Import your contacts, create an invoice, or add a deal — then your AI team will start monitoring and acting.</div>
-          <div className={styles.emptyActionsCtas}>
-            <button className={styles.emptyActionCta} onClick={() => onNavigate?.("sales")} type="button">+ Add a Deal</button>
-            <button className={styles.emptyActionCta} onClick={() => onNavigate?.("finance")} type="button">+ Create Invoice</button>
-            <button className={styles.emptyActionCta} onClick={() => onNavigate?.("sales")} type="button">+ Import Contacts</button>
-          </div>
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <EmptyState
+            icon="A"
+            title="Your AI team is scanning your business"
+            description="Your five specialists are running their first analysis. Add contacts, invoices, or deals to give them more to work with."
+            statusIndicator
+            quickActions={
+              <>
+                <button className={styles.emptyActionCta} onClick={() => onNavigate?.("sales")} type="button">+ Add a Deal</button>
+                <button className={styles.emptyActionCta} onClick={() => onNavigate?.("finance")} type="button">+ Create Invoice</button>
+                <button className={styles.emptyActionCta} onClick={() => onNavigate?.("sales")} type="button">+ Import Contacts</button>
+              </>
+            }
+          />
         </div>
       )}
 

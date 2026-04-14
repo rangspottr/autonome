@@ -4,6 +4,7 @@ import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 import Stat from "../components/Stat.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import AGENT_META from "../components/AgentMeta.js";
 import styles from "./GrowthView.module.css";
 
@@ -169,13 +170,13 @@ export default function GrowthView() {
           {contacts.length > 0 && <Pill label={`${contacts.length} leads`} variant="purple" size="sm" />}
         </div>
         {contacts.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>○</div>
-            <div className={styles.emptyTitle}>No leads yet</div>
-            <div className={styles.emptyDesc}>
-              {EMPTY_MSG}
-            </div>
-          </div>
+          <EmptyState
+            icon={AGENT_META.growth.icon}
+            title="Growth agent is standing by"
+            description={AGENT_META.growth.emptyStateMessage}
+            agent="growth"
+            statusIndicator
+          />
         ) : (
           <div className={styles.list}>
             {contacts.map((c) => (

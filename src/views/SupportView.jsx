@@ -4,6 +4,7 @@ import Button from "../components/Button.jsx";
 import Pill from "../components/Pill.jsx";
 import Stat from "../components/Stat.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import AGENT_META from "../components/AgentMeta.js";
 import styles from "./SupportView.module.css";
 
@@ -166,13 +167,13 @@ export default function SupportView() {
           {contacts.length > 0 && <Pill label={`${contacts.length} customers`} variant="blue" size="sm" />}
         </div>
         {contacts.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>○</div>
-            <div className={styles.emptyTitle}>No customers yet</div>
-            <div className={styles.emptyDesc}>
-              {EMPTY_MSG}
-            </div>
-          </div>
+          <EmptyState
+            icon={AGENT_META.support.icon}
+            title="Support agent is standing by"
+            description={AGENT_META.support.emptyStateMessage}
+            agent="support"
+            statusIndicator
+          />
         ) : (
           <div className={styles.list}>
             {contacts.map((c) => (

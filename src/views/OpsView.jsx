@@ -147,9 +147,11 @@ export default function OpsView() {
           data={filtered}
           loading={loading}
           emptyIcon="○"
-          emptyTitle="No tasks tracked yet"
-          emptyDescription="Tasks appear here as they're created — by you or by agents detecting work that needs attention."
+          emptyTitle="Operations agent is standing by"
+          emptyDescription="Your Operations agent is ready. Add tasks or activate workflows to begin monitoring execution health."
           emptyAction={<Button size="sm" onClick={() => setShowForm(true)}>+ Add Task</Button>}
+          emptyAgent="operations"
+          emptyStatusIndicator
         />
       </Tabs>
 

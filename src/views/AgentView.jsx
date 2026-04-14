@@ -528,7 +528,7 @@ export default function AgentView({ onRefreshMetrics }) {
 
       {/* Agent cards */}
       {agentStats.length === 0 ? (
-        <EmptyState icon="○" title="Agent team initializing" description="Agent team is initializing. Your five specialists will appear here once the first business scan completes." />
+        <EmptyState icon="○" title="Agent team initializing" description="Your five specialists are completing their first scan. They'll appear here momentarily with monitoring status and pending decisions." statusIndicator />
       ) : (
         <div className={styles.agentsGrid}>
           {agentStats.map(({ agent, meta, decisions: decs, executions: _executions, activeWorkflows: awf, workstream }) => {
