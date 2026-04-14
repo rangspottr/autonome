@@ -6,6 +6,7 @@ import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
 import Pill from "../components/Pill.jsx";
+import { friendlyError } from "../lib/errors.js";
 import styles from "./WorkspaceSettingsView.module.css";
 
 // ─── AI Provider Form ─────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       onSaved?.();
       setApiKey("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -61,7 +62,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       const result = await api.post(`/credentials/${provider}/test`, { credentials: { api_key: apiKey, model } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
