@@ -201,9 +201,25 @@ export default function Boardroom({ sessionId: initialSessionId }) {
       <div className={styles.exchanges}>
         {exchanges.length === 0 && (
           <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Boardroom</div>
+            <div className={styles.emptyTitle}>Your AI Team is Ready</div>
             <div className={styles.emptyDesc}>
-              Select agents and ask a question. Each agent will respond from their perspective, followed by a synthesized recommendation.
+              Ask a question and all five specialists will respond from their domain expertise. You&apos;ll receive a synthesized recommendation with suggested actions.
+            </div>
+            <div className={styles.starterQuestions}>
+              {[
+                "How is my business doing this week?",
+                "What are my biggest risks right now?",
+                "Which deals should I focus on?",
+              ].map((q) => (
+                <button
+                  key={q}
+                  className={styles.starterQuestion}
+                  onClick={() => setMessage(q)}
+                  type="button"
+                >
+                  {q}
+                </button>
+              ))}
             </div>
           </div>
         )}

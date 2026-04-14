@@ -141,7 +141,7 @@ export default function ProcessView() {
           <div className={styles.resultsGrid}>
             <div className={styles.resultsCard}>
               <h3 className={styles.resultsCardTitle}>Contacts ({result.contacts.length})</h3>
-              {result.contacts.length === 0 && <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No contacts detected.</p>}
+              {result.contacts.length === 0 && <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No contacts found in this text.</p>}
               {result.contacts.map((c) => (
                 <div key={c.id} className={styles.checkboxRow}>
                   <input
@@ -159,7 +159,7 @@ export default function ProcessView() {
 
             <div className={styles.resultsCard}>
               <h3 className={styles.resultsCardTitle}>Intents ({result.intents.length})</h3>
-              {result.intents.length === 0 && <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No intents detected.</p>}
+              {result.intents.length === 0 && <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No actionable intents found in this text.</p>}
               {result.intents.map((intent, i) => (
                 <div key={i} className={styles.checkboxRow}>
                   <input

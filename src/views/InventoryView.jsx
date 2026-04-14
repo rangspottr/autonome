@@ -7,6 +7,7 @@ import Dialog from "../components/Dialog.jsx";
 import Input from "../components/Input.jsx";
 import Bar from "../components/Bar.jsx";
 import Stat from "../components/Stat.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import styles from "./InventoryView.module.css";
 
 export default function InventoryView() {
@@ -94,7 +95,13 @@ export default function InventoryView() {
       {loading ? (
         <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>Loading inventory…</p>
       ) : assets.length === 0 ? (
-        <p style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No inventory items yet.</p>
+        <EmptyState
+          icon="○"
+          title="No inventory items yet"
+          description="Your Operations agent tracks inventory here. Add items to enable stock monitoring and reorder alerts."
+          agent="operations"
+          statusIndicator
+        />
       ) : (
         assets.map((a) => {
           const aRp = rp(a);

@@ -169,7 +169,7 @@ export default function FinanceView() {
           loading={loading}
           emptyIcon="—"
           emptyTitle={`No ${tab} yet`}
-          emptyDescription="Add a record to get started."
+          emptyDescription="Your Finance agent monitors all financial activity here. Add a record or connect your payment provider to start tracking."
           emptyAction={<Button size="sm" onClick={() => setShowForm(true)}>+ Add Record</Button>}
         />
       </Tabs>

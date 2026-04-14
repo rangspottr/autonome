@@ -171,7 +171,10 @@ export default function AlertsView() {
         <div className={styles.error}>Could not load alerts: {error}</div>
       ) : alerts.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>○</div>
+          <div className={styles.emptyIconWrapper}>
+            <div className={styles.emptyIcon}>○</div>
+            <span className={styles.emptyPulseDot} aria-label="Agents are actively monitoring" />
+          </div>
           <div className={styles.emptyTitle}>No active alerts</div>
           <div className={styles.emptyDesc}>
             Agents are monitoring your business. Risks and opportunities will appear here automatically.

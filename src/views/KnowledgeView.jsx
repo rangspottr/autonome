@@ -162,7 +162,7 @@ export default function KnowledgeView() {
           loading={loading}
           emptyIcon="—"
           emptyTitle="No articles found"
-          emptyDescription={search || filterCat !== "All" ? "No articles match your search." : "Add your first knowledge base article."}
+          emptyDescription={search || filterCat !== "All" ? "No articles match your search." : "Knowledge base articles are used as context by all five agents. Add articles about your policies, pricing, and procedures to make your AI team smarter."}
           emptyAction={!search && filterCat === "All" ? <Button size="sm" onClick={openNew}>+ New Article</Button> : undefined}
         />
       </Card>
