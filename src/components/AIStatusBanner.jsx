@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "../lib/api.js";
 import AgentMeta from "./AgentMeta.js";
 import styles from "./AIStatusBanner.module.css";
@@ -7,14 +7,74 @@ const AGENT_KEYS = Object.keys(AgentMeta);
 
 export default function AIStatusBanner({ onNavigateToConnections }) {
   const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    api.get("/ai/status").then(setStatus).catch(() => setStatus(null));
+  const fetchStatus = useCallback(() => {
+    setError(false);
+    api
+      .get("/ai/status")
+      .then((data) => {
+        setStatus(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
   }, []);
 
-  if (!status) return null;
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
 
-  if (status.active) {
+  // Auto-retry on error after 30 seconds
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(fetchStatus, 30000);
+    return () => clearTimeout(timer);
+  }, [error, fetchStatus]);
+
+  if (loading) {
+    return (
+      <div className={styles.offlineBanner} style={{ opacity: 0.7 }}>
+        <div className={styles.offlineIconWrap}>
+          <span className={styles.offlineIcon}>◉</span>
+        </div>
+        <div className={styles.offlineBody}>
+          <div className={styles.offlineHeadline}>Checking AI status…</div>
+          <div className={styles.offlineText}>
+            Your agents are monitoring your business while status is confirmed.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.offlineBanner}>
+        <div className={styles.offlineIconWrap}>
+          <span className={styles.offlineIcon}>◉</span>
+        </div>
+        <div className={styles.offlineBody}>
+          <div className={styles.offlineHeadline}>AI status unavailable — your agents are still operating on business data</div>
+          <div className={styles.offlineText}>
+            Status check failed. Your agents continue monitoring your business in the background.
+          </div>
+        </div>
+        <button
+          className={styles.activateBtn}
+          onClick={fetchStatus}
+          type="button"
+        >
+          Retry →
+        </button>
+      </div>
+    );
+  }
+
+  if (status && status.active) {
     return (
       <div className={styles.activeBanner}>
         <div className={styles.activeLeft}>

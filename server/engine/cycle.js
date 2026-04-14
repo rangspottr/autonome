@@ -212,22 +212,37 @@ export async function runAgentCycle(workspaceId) {
   // Respect global quiet hours for communications
   const quietNow = isQuietHours(globalAutonomy);
 
+  // Owner-away mode: when enabled, loosen approval requirements to keep business running
+  // Check workspace settings for owner_away_mode flag
+  const ownerAwayMode = settings.ownerAwayMode === true || globalAutonomy?.owner_away_mode === true;
+
   const decisions = await generateDecisions(workspaceId);
 
   const autoExecutable = decisions.filter((d) => {
-    if (d.needsApproval) return false;
-    if (!d.auto) return false;
-    // Check per-agent autonomy settings
+    if (!d.auto && !ownerAwayMode) return false;
+    // In owner-away mode, auto-execute actions that would normally need approval,
+    // but only if impact is below the owner-away threshold (2x normal threshold)
     const agentSetting = autonomy[d.agent] || globalAutonomy;
     if (agentSetting && agentSetting.enabled === false) return false;
-    const threshold = agentSetting?.auto_execute_threshold ?? limits.maxAutoSpend ?? 500;
+    const baseThreshold = agentSetting?.auto_execute_threshold ?? limits.maxAutoSpend ?? 500;
+    const threshold = ownerAwayMode ? baseThreshold * 2 : baseThreshold;
     if (d.impact && parseFloat(d.impact) > threshold) {
       d.needsApproval = true;
       return false;
     }
+    // In owner-away mode, allow pre-approved action types to auto-execute
+    if (ownerAwayMode && d.needsApproval) {
+      const ownerAwayAutoActions = ['remind', 'pre', 'followup', 'reactivate', 'outreach', 'follow_up_open_issue', 'nurture_lead'];
+      if (ownerAwayAutoActions.includes(d.action)) {
+        d.needsApproval = false;
+        return true;
+      }
+      return false;
+    }
+    if (d.needsApproval) return false;
     return true;
   });
-  const needsApproval = decisions.filter((d) => d.needsApproval === true || d.auto === false);
+  const needsApproval = decisions.filter((d) => d.needsApproval === true || (!d.auto && !ownerAwayMode));
 
   // Apply per-cycle auto-execute cap
   const maxAutoPerCycle = globalAutonomy?.max_auto_actions_per_cycle ?? limits.maxAutoPerCycle ?? 20;

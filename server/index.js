@@ -41,7 +41,7 @@ import notificationsRoutes from './routes/notifications.js';
 import autonomyRoutes from './routes/autonomy.js';
 import proactiveAlertsRoutes from './routes/proactive-alerts.js';
 import credentialsRoutes from './routes/credentials.js';
-import { startScheduler } from './engine/cycle.js';
+import { startScheduler } from './engine/scheduler.js';
 import { autoSeed } from './db/auto-seed.js';
 import { startCleanupScheduler } from './jobs/cleanup.js';
 import { startDailyDigestScheduler } from './jobs/daily-digest.js';

@@ -132,7 +132,7 @@ function MainApp() {
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [devStatus, setDevStatus] = useState(null);
   const [showSinceLogin, setShowSinceLogin] = useState(true);
-  const [aiStatus, setAiStatus] = useState(null);
+  const [aiStatus, setAiStatus] = useState(undefined); // undefined = loading, null = error, object = loaded
 
   useEffect(() => {
     async function init() {
@@ -148,7 +148,7 @@ function MainApp() {
         setPendingApprovals(agentStatus.pendingDecisions || 0);
         setActiveAlerts(alertsData.total || 0);
         if (statusData) setDevStatus(statusData);
-        if (aiStatusData) setAiStatus(aiStatusData);
+        setAiStatus(aiStatusData || null);
         const wsSettings = workspace?.settings || {};
         if (!wsSettings.setupCompleted) setSetupNeeded(true);
       } catch {
@@ -361,20 +361,32 @@ function MainApp() {
               {workspace?.name}
               {workspace?.industry ? ` · ${workspace.industry}` : ""}
             </span>
-            {aiStatus !== null && (
+            {aiStatus === undefined ? (
               <span
                 className={styles.aiStatusBadge}
-                title={aiStatus.connected
-                  ? `AI Active · ${aiStatus.model || "Connected"} — Powering all 5 agents`
-                  : "AI Offline — Connect your AI provider in Connections"}
                 style={{
-                  background: aiStatus.connected ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
-                  color: aiStatus.connected ? "var(--color-success)" : "var(--color-warning)",
-                  border: `1px solid ${aiStatus.connected ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`,
+                  background: "rgba(156,163,175,0.12)",
+                  color: "var(--color-text-muted)",
+                  border: "1px solid rgba(156,163,175,0.3)",
                 }}
               >
                 <span style={{ fontSize: 9, marginRight: 4 }}>●</span>
-                {aiStatus.connected
+                Checking…
+              </span>
+            ) : (
+              <span
+                className={styles.aiStatusBadge}
+                title={aiStatus?.connected
+                  ? `AI Active · ${aiStatus.model || "Connected"} — Powering all 5 agents`
+                  : "AI Offline — Connect your AI provider in Connections"}
+                style={{
+                  background: aiStatus?.connected ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
+                  color: aiStatus?.connected ? "var(--color-success)" : "var(--color-warning)",
+                  border: `1px solid ${aiStatus?.connected ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`,
+                }}
+              >
+                <span style={{ fontSize: 9, marginRight: 4 }}>●</span>
+                {aiStatus?.connected
                   ? (aiStatus.model ? `AI · ${aiStatus.model}` : "AI Active")
                   : "AI Offline"}
               </span>

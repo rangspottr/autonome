@@ -90,7 +90,18 @@ function classifyEvent(event) {
     summary = `${event_type} event from ${event.source}`;
   }
 
-  return { category, urgency, sentiment, summary };
+  // ── After-hours detection ──────────────────────────────────────────────────
+  const now = new Date();
+  const hour = now.getHours();
+  const isAfterHours = hour < 8 || hour >= 18; // before 8am or after 6pm
+  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  const afterHours = isAfterHours || isWeekend;
+  if (afterHours && urgency !== 'critical') {
+    // Flag after-hours events; bump non-urgent ones so they don't get lost
+    if (urgency === 'low') urgency = 'medium';
+  }
+
+  return { category, urgency, sentiment, summary, afterHours };
 }
 
 // ── Stage 2: Entity Identification ───────────────────────────────────────────
@@ -297,7 +308,7 @@ function routeToAgents(event, entityLinks) {
 
 // ── Stage 4: Resolution Decision ──────────────────────────────────────────────
 
-async function resolveEvent(workspaceId, event, entityLinks, agentRouting) {
+async function resolveEvent(workspaceId, event, entityLinks, agentRouting, classifiedData = {}) {
   const { event_type, raw_data } = event;
   const data = raw_data || {};
   const resolution = {
@@ -391,6 +402,38 @@ async function resolveEvent(workspaceId, event, entityLinks, agentRouting) {
     }
   }
 
+  // Missed call — create a follow-up task for the next business day
+  if (event_type === 'missed_call') {
+    const callerName = data.caller_name || data.caller_phone || 'Unknown caller';
+    const callerPhone = data.caller_phone || null;
+    try {
+      // Find or resolve contact for linking
+      const contactLink = entityLinks ? entityLinks.find((l) => l.entity_type === 'contact') : null;
+      const contactId = contactLink?.entity_id || null;
+
+      // Determine urgency for the task title
+      const classificationSummary = `Missed call from ${callerName}${callerPhone ? ` (${callerPhone})` : ''}`;
+      await pool.query(
+        `INSERT INTO tasks (workspace_id, title, description, priority, status, contact_id)
+         VALUES ($1, $2, $3, $4, 'todo', $5)`,
+        [
+          workspaceId,
+          `Follow up: missed call from ${callerName}`,
+          `${classificationSummary}. Auto-created by intake pipeline — follow up as soon as possible.`,
+          classifiedData.urgency === 'critical' || classifiedData.urgency === 'high' ? 'high' : 'medium',
+          contactId,
+        ]
+      );
+      resolution.notes.push(`Follow-up task created for missed call from ${callerName}`);
+      if (!resolution.action_taken) {
+        resolution.action_taken = 'created_followup_task';
+        resolution.auto_acted = true;
+      }
+    } catch (_err) {
+      resolution.notes.push('Failed to create missed-call follow-up task');
+    }
+  }
+
   if (!resolution.action_taken && !resolution.requires_approval) {
     resolution.action_taken = 'routed';
     resolution.notes.push(`Event routed to ${agentRouting.find((r) => r.role === 'primary')?.agent || 'operations'}`);
@@ -451,7 +494,7 @@ export async function processBusinessEvent(workspaceId, eventId) {
 
   // 5. Resolve
   try {
-    resolution = await resolveEvent(workspaceId, event, entityLinks, agentRoutingArr);
+    resolution = await resolveEvent(workspaceId, event, entityLinks, agentRoutingArr, classifiedData);
     if (resolution.requires_approval) {
       finalStatus = 'classified';
     }
