@@ -438,30 +438,6 @@ export default function ConnectionsView() {
       ) : (
         <div className={styles.cardGrid}>
 
-          {/* Enterprise / Advanced — AI provider override, hidden by default */}
-          <Card className={styles.connCard}>
-            <div className={styles.connCardHeader}>
-              <div className={styles.connCardLeft}>
-                <div className={styles.connCardTitle}>Enterprise / Advanced</div>
-                <div className={styles.connCardDesc}>Autonome includes AI by default. This section is for enterprise clients who need dedicated AI billing.</div>
-              </div>
-              <div className={styles.connCardRight}>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setShowEnterpriseAI((v) => !v)}
-                >
-                  {showEnterpriseAI ? "Hide" : "Configure"}
-                </Button>
-              </div>
-            </div>
-            {showEnterpriseAI && (
-              <div className={styles.connCardBody}>
-                <AIProviderForm dbCreds={dbCreds} onSaved={handleSaved} />
-              </div>
-            )}
-          </Card>
-
           {/* Email */}
           <ConnectionCard
             title="Email"
@@ -576,6 +552,30 @@ export default function ConnectionsView() {
 
         </div>
       )}
+
+      {/* Advanced / Enterprise — AI provider override, collapsed by default */}
+      <Card className={styles.connCard} style={{ marginTop: "var(--space-6)" }}>
+        <div className={styles.connCardHeader}>
+          <div className={styles.connCardLeft}>
+            <div className={styles.connCardTitle}>Advanced / Enterprise</div>
+            <div className={styles.connCardDesc}>Your AI team is powered by Autonome's built-in intelligence. Enterprise clients can optionally configure a dedicated AI provider for custom model selection or billing isolation.</div>
+          </div>
+          <div className={styles.connCardRight}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowEnterpriseAI((v) => !v)}
+            >
+              {showEnterpriseAI ? "Hide" : "Configure"}
+            </Button>
+          </div>
+        </div>
+        {showEnterpriseAI && (
+          <div className={styles.connCardBody}>
+            <AIProviderForm dbCreds={dbCreds} onSaved={handleSaved} />
+          </div>
+        )}
+      </Card>
 
       {workspace?.name && (
         <div className={styles.workspaceNote}>
