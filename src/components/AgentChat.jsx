@@ -85,6 +85,14 @@ function InlineActions({ items, onAction, loading }) {
   );
 }
 
+function formatSource(source) {
+  if (source === 'openai') return 'OpenAI';
+  if (source === 'anthropic') return 'Anthropic';
+  if (source === 'local') return 'Local / Fallback';
+  if (source) return source;
+  return null;
+}
+
 export default function AgentChat({ agent, sessionId: initialSessionId, onBack }) {
   const meta = AgentMeta[agent] || DEFAULT_AGENT_META;
   const [briefing, setBriefing] = useState(null);
@@ -322,7 +330,12 @@ export default function AgentChat({ agent, sessionId: initialSessionId, onBack }
                 </div>
               )}
               {msg.role === "assistant" && msg.source && (
-                <div className={styles.messageSource}>{msg.source}</div>
+                <div className={[
+                  styles.messageSource,
+                  msg.source === 'local' ? styles.messageSourceLocal : styles.messageSourceAI,
+                ].join(" ")}>
+                  {formatSource(msg.source)}
+                </div>
               )}
               {msg.role === "assistant" && msg.ai_attempted && msg.source === "local" && (
                 <div className={styles.aiFallbackNotice}>

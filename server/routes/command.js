@@ -574,6 +574,7 @@ router.post('/boardroom', ...guard, commandLimiter, async (req, res, next) => {
 
     // Synthesize all agent responses
     let synthesis;
+    let synthesisSource = 'local';
     if (creds.AI_PROVIDER && creds.AI_API_KEY) {
       const entityContext = entityL1 ? `\nShared entity context (all agents have this):\n${entityL1}\n` : '';
       const synthesisPrompt = `You are a synthesis engine for ${workspaceCtx.businessName}.
@@ -606,12 +607,14 @@ Rules:
         // Try direct JSON parse first
         try {
           synthesis = JSON.parse(synthesisText);
+          if (synthesis) synthesisSource = synthesisResult.provider || creds.AI_PROVIDER || 'local';
         } catch {
           // Try extracting JSON from text (handles cases where model adds prose)
           const jsonMatch = synthesisText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             try {
               synthesis = JSON.parse(jsonMatch[0]);
+              if (synthesis) synthesisSource = synthesisResult.provider || creds.AI_PROVIDER || 'local';
             } catch {
               synthesis = null;
             }
@@ -628,7 +631,10 @@ Rules:
           );
           if (retryResult.text) {
             if (retryResult.inputTokens !== null) boardroomTotalInputTokens += retryResult.inputTokens;
-            try { synthesis = JSON.parse(retryResult.text); } catch { synthesis = null; }
+            try {
+              synthesis = JSON.parse(retryResult.text);
+              if (synthesis) synthesisSource = retryResult.provider || creds.AI_PROVIDER || 'local';
+            } catch { synthesis = null; }
           }
         }
       }
@@ -738,6 +744,7 @@ Rules:
     res.json({
       agents_responses: agentResponses,
       synthesis,
+      synthesis_source: synthesisSource,
       session_id: resolvedSessionId,
     });
   } catch (err) {

@@ -5,6 +5,14 @@ import styles from "./Boardroom.module.css";
 
 const ALL_AGENTS = Object.keys(AgentMeta);
 
+function formatSource(source) {
+  if (source === 'openai') return 'OpenAI';
+  if (source === 'anthropic') return 'Anthropic';
+  if (source === 'local') return 'Local / Fallback';
+  if (source) return source;
+  return null;
+}
+
 function formatResponse(text) {
   return text
     .replace(/\[APPROVAL NEEDED\]/g, "")
@@ -13,7 +21,7 @@ function formatResponse(text) {
     .trim();
 }
 
-function SynthesisSection({ synthesis, sessionId, onAction }) {
+function SynthesisSection({ synthesis, synthesisSource, sessionId, onAction }) {
   const [actionLoading, setActionLoading] = useState(false);
 
   async function handleAction(item, actionType) {
@@ -35,7 +43,17 @@ function SynthesisSection({ synthesis, sessionId, onAction }) {
 
   return (
     <div className={styles.synthesis}>
-      <div className={styles.synthesisHeader}>Synthesis</div>
+      <div className={styles.synthesisHeader}>
+        Synthesis
+        {synthesisSource && (
+          <span className={[
+            styles.synthesisSource,
+            synthesisSource === 'local' ? styles.synthesisSrcLocal : styles.synthesisSrcAI,
+          ].join(" ")}>
+            {formatSource(synthesisSource)}
+          </span>
+        )}
+      </div>
 
       {synthesis.recommendation && (
         <div className={styles.recommendation}>
@@ -155,6 +173,7 @@ export default function Boardroom({ sessionId: initialSessionId }) {
           userMessage: userMsg,
           agentsResponses: data.agents_responses,
           synthesis: data.synthesis,
+          synthesisSource: data.synthesis_source || null,
         },
       ]);
     } catch (err) {
@@ -243,7 +262,12 @@ export default function Boardroom({ sessionId: initialSessionId }) {
                         {meta.icon}
                       </span>
                       <span className={styles.agentResponseName} style={{ color: meta.color }}>{meta.label}</span>
-                      <span className={styles.agentResponseSource}>{ar.source}</span>
+                      <span className={[
+                        styles.agentResponseSource,
+                        ar.source === 'local' ? styles.agentSrcLocal : styles.agentSrcAI,
+                      ].join(" ")}>
+                        {formatSource(ar.source)}
+                      </span>
                       {ar.context_summary && (
                         <span className={styles.agentResponseCtx}>
                           {ar.context_summary.actions}a / {ar.context_summary.memory}m
@@ -268,6 +292,7 @@ export default function Boardroom({ sessionId: initialSessionId }) {
             {exchange.synthesis && (
               <SynthesisSection
                 synthesis={exchange.synthesis}
+                synthesisSource={exchange.synthesisSource}
                 sessionId={sessionId}
               />
             )}
