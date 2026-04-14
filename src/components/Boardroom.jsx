@@ -203,7 +203,7 @@ export default function Boardroom({ sessionId: initialSessionId }) {
           <div className={styles.emptyState}>
             <div className={styles.emptyTitle}>Your AI Team is Ready</div>
             <div className={styles.emptyDesc}>
-              Ask a question and all five specialists will respond from their domain expertise. You&apos;ll receive a synthesized recommendation with suggested actions.
+              Your boardroom is ready. Select agents above and ask any business question — pricing strategy, operational priorities, risk assessment. Each specialist will analyze from their domain, followed by a synthesized recommendation.
             </div>
             <div className={styles.starterQuestions}>
               {[

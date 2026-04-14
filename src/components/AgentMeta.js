@@ -18,6 +18,7 @@ const AGENT_META = {
     pressureMetric: "overdueAmount",
     monitoringStatement: "Monitoring cash flow, tracking payment patterns, and watching for overdue invoices",
     emptyStateMessage: "Your Finance agent is ready. Add invoices or connect payments to activate cash flow monitoring.",
+    ownershipStatement: "Owns invoicing, collections, payment tracking, and cash flow protection",
   },
   revenue: {
     icon: "REV",
@@ -38,6 +39,7 @@ const AGENT_META = {
     pressureMetric: "staleDealCount",
     monitoringStatement: "Tracking pipeline velocity, identifying stale deals, and optimizing close probability",
     emptyStateMessage: "Your Revenue agent is ready. Add deals to your pipeline to begin tracking velocity and close rates.",
+    ownershipStatement: "Owns pipeline, deal progression, lead qualification, and revenue recovery",
   },
   operations: {
     icon: "OPS",
@@ -58,6 +60,7 @@ const AGENT_META = {
     pressureMetric: "overdueTaskCount",
     monitoringStatement: "Scanning for overdue tasks, workflow bottlenecks, and delivery risks across active projects",
     emptyStateMessage: "Your Operations agent is ready. Add tasks or activate workflows to begin monitoring execution health.",
+    ownershipStatement: "Owns task execution, scheduling, inventory, and operational continuity",
   },
   growth: {
     icon: "GRO",
@@ -78,6 +81,7 @@ const AGENT_META = {
     pressureMetric: "dormantLeadCount",
     monitoringStatement: "Scanning for dormant leads, engagement drops, and untapped expansion opportunities",
     emptyStateMessage: "Your Growth agent is standing by. Import leads or connect a lead source to begin opportunity detection.",
+    ownershipStatement: "Owns customer retention, expansion opportunities, and dormant account reactivation",
   },
   support: {
     icon: "SUP",
@@ -98,6 +102,7 @@ const AGENT_META = {
     pressureMetric: "atRiskCount",
     monitoringStatement: "Monitoring customer health, tracking churn signals, and watching for escalation patterns",
     emptyStateMessage: "Your Support agent is monitoring customer health. No at-risk signals detected — all customers are in good standing.",
+    ownershipStatement: "Owns customer satisfaction, risk detection, issue resolution, and escalation",
   },
 };
 

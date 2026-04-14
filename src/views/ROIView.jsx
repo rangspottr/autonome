@@ -56,8 +56,8 @@ export default function ROIView() {
         </div>
         <div style={{ textAlign: "center", padding: "var(--space-16) var(--space-8)", color: "var(--color-text-muted)" }}>
           <div style={{ fontSize: 40, marginBottom: "var(--space-4)" }}>ROI</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>Your AI team hasn&apos;t completed any actions yet</div>
-          <div style={{ fontSize: 14 }}>ROI metrics will appear here as your agents process decisions, send communications, and manage workflows.</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>Your AI team is initializing</div>
+          <div style={{ fontSize: 14 }}>ROI metrics will populate automatically as agents begin operating. No manual action needed.</div>
         </div>
       </div>
     );

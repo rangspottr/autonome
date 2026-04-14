@@ -11,6 +11,7 @@ import styles from "./App.module.css";
 
 import Setup from "./views/Setup.jsx";
 import CmdCenter from "./views/CmdCenter.jsx";
+import BriefingView from "./views/BriefingView.jsx";
 import AgentView from "./views/AgentView.jsx";
 import BoardroomView from "./views/BoardroomView.jsx";
 import ApprovalView from "./views/ApprovalView.jsx";
@@ -48,6 +49,7 @@ const NAV_GROUPS = [
     label: "HOME",
     items: [
       { id: "cmd", icon: "CMD", label: "Command Center" },
+      { id: "briefing", icon: "BRF", label: "Briefing" },
     ],
   },
   {
@@ -203,6 +205,7 @@ function MainApp() {
         <CmdCenter onRefreshMetrics={refreshMetrics} onNavigate={setView} />
       </>
     ),
+    briefing: <BriefingView />,
     agents: <AgentView onRefreshMetrics={refreshMetrics} />,
     boardroom: <BoardroomView />,
     approvals: <ApprovalView onRefreshMetrics={refreshMetrics} />,
