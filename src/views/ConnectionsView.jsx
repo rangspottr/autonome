@@ -9,6 +9,14 @@ import styles from "./ConnectionsView.module.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function friendlyError(err, fallback) {
+  const msg = err?.message || '';
+  if (/invalid|unauthorized|required|forbidden|not found|timeout|network|rate limit|credential|connection/i.test(msg)) {
+    return msg;
+  }
+  return fallback;
+}
+
 function StatusMsg({ testing, result }) {
   if (testing) return <div className={styles.testStatus} style={{ color: "var(--color-text-muted)" }}>Testing…</div>;
   if (!result) return null;
@@ -55,7 +63,7 @@ function EmailForm({ dbCreds, onSaved }) {
       onSaved?.();
       setPass("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -65,7 +73,7 @@ function EmailForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/smtp/test", { credentials: { host, port, user, pass: pass || existing.pass } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -129,7 +137,7 @@ function SMSForm({ dbCreds, onSaved }) {
       onSaved?.();
       setAuthToken("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -139,7 +147,7 @@ function SMSForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/twilio/test", { credentials: { account_sid: accountId, auth_token: authToken || existing.auth_token } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -196,7 +204,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       onSaved?.();
       setApiKey("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -207,7 +215,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/anthropic/test", { credentials: { api_key: apiKey || existing.api_key } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -259,7 +267,7 @@ function StripeForm({ dbCreds, onSaved }) {
       onSaved?.();
       setSecretKey(""); setWebhookSecret("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -269,7 +277,7 @@ function StripeForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/stripe/test", { credentials: { secret_key: secretKey || existing.secret_key } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 

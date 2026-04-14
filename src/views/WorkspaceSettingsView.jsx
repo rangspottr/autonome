@@ -10,6 +10,14 @@ import styles from "./WorkspaceSettingsView.module.css";
 
 // ─── AI Provider Form ─────────────────────────────────────────────────────────
 
+function friendlyError(err, fallback) {
+  const msg = err?.message || '';
+  if (/invalid|unauthorized|required|forbidden|not found|timeout|network|rate limit|credential|connection/i.test(msg)) {
+    return msg;
+  }
+  return fallback;
+}
+
 function StatusMsg({ testing, result }) {
   if (testing) return <div className={styles.testStatus} style={{ color: "var(--color-text-muted)" }}>Testing…</div>;
   if (!result) return null;
@@ -50,7 +58,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       onSaved?.();
       setApiKey("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -61,7 +69,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       const result = await api.post(`/credentials/${provider}/test`, { credentials: { api_key: apiKey, model } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 

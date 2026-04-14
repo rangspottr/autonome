@@ -11,6 +11,14 @@ import styles from "./SettingsView.module.css";
 
 // ─── Integration Setup Forms ─────────────────────────────────────────────────
 
+function friendlyError(err, fallback) {
+  const msg = err?.message || '';
+  if (/invalid|unauthorized|required|forbidden|not found|timeout|network|rate limit|credential|connection/i.test(msg)) {
+    return msg;
+  }
+  return fallback;
+}
+
 function IntegrationCard({ title, statusLabel, statusVariant, children, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   return (
@@ -74,7 +82,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       onSaved?.();
       setApiKey("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -85,7 +93,7 @@ function AIProviderForm({ dbCreds, onSaved }) {
       const result = await api.post(`/credentials/${provider}/test`, { credentials: { api_key: apiKey, model } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -155,7 +163,7 @@ function EmailForm({ dbCreds, onSaved }) {
       onSaved?.();
       setPass("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -165,7 +173,7 @@ function EmailForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/smtp/test", { credentials: { host, port, user, pass: pass || existing.pass } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -217,7 +225,7 @@ function SMSForm({ dbCreds, onSaved }) {
       onSaved?.();
       setAuthToken("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -227,7 +235,7 @@ function SMSForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/twilio/test", { credentials: { account_sid: accountSid, auth_token: authToken || existing.auth_token } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -272,7 +280,7 @@ function StripeForm({ dbCreds, onSaved }) {
       onSaved?.();
       setSecretKey(""); setWebhookSecret("");
     } catch (err) {
-      setSaveError(err.message || "Failed to save.");
+      setSaveError(friendlyError(err, "Could not save credentials. Please try again."));
     } finally { setSaving(false); }
   }
 
@@ -282,7 +290,7 @@ function StripeForm({ dbCreds, onSaved }) {
       const result = await api.post("/credentials/stripe/test", { credentials: { secret_key: secretKey || existing.secret_key } });
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error: err.message || "Test failed." });
+      setTestResult({ success: false, error: friendlyError(err, "Connection test failed. Please check your credentials and try again.") });
     } finally { setTesting(false); }
   }
 
@@ -511,7 +519,6 @@ export default function SettingsView() {
     }
   }
 
-  const aiConfigured = !!(integrations?.ai?.configured);
   const emailConfigured = !!(integrations?.email?.configured);
 
   const checks = metrics
@@ -527,12 +534,6 @@ export default function SettingsView() {
           done: (metrics.contactCount ?? 0) > 0,
           action: () => csvSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
           actionLabel: "Import",
-        },
-        {
-          label: "AI configured",
-          done: aiConfigured,
-          action: () => integrationsSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
-          actionLabel: "Configure",
         },
         {
           label: "Email configured",
@@ -629,30 +630,6 @@ export default function SettingsView() {
           <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Loading…</div>
         ) : (
           <>
-            {/* AI Brain — prominently first */}
-            <div className={styles.aiBrainCard}>
-              <div className={styles.aiBrainHeader}>
-                <div className={styles.aiBrainTitleRow}>
-                  <span className={styles.aiBrainIcon}>AI</span>
-                  <div>
-                    <div className={styles.aiBrainTitle}>AI Brain</div>
-                    <div className={styles.aiBrainSubtitle}>Connect your AI provider to power all agent intelligence</div>
-                  </div>
-                </div>
-                <div className={styles.aiBrainStatus}>
-                  {aiConfigured ? (
-                    <span className={styles.aiStatusActive}>● Active</span>
-                  ) : (
-                    <span className={styles.aiStatusInactive}>● Not Connected</span>
-                  )}
-                </div>
-              </div>
-              {integrations?.ai?.source === "env" && (
-                <div className={styles.envNote}>✓ Configured via environment variable</div>
-              )}
-              <AIProviderForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
-            </div>
-
             {/* Infrastructure Connections — collapsed by default */}
             <details className={styles.infraDetails}>
               <summary className={styles.infraSummary}>
@@ -700,6 +677,36 @@ export default function SettingsView() {
                   )}
                   <StripeForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
                 </IntegrationCard>
+              </div>
+            </details>
+
+            {/* Advanced / Enterprise — AI Provider (collapsed by default) */}
+            <details className={styles.infraDetails} style={{ marginTop: "var(--space-4)" }}>
+              <summary className={styles.infraSummary}>
+                <span>Advanced / Enterprise</span>
+                <span className={styles.infraSummaryHint}>Custom AI Provider</span>
+              </summary>
+              <div className={styles.infraBody}>
+                <Card style={{ marginBottom: 0 }}>
+                  <div className={styles.integrationCardHeader}>
+                    <div className={styles.integrationCardTitle}>AI Provider</div>
+                    <div className={styles.integrationCardActions}>
+                      <Pill
+                        label={integrationStatus("ai").label}
+                        variant={integrationStatus("ai").variant}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.integrationFormBody}>
+                    <p style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginBottom: "var(--space-3)" }}>
+                      Your AI team is powered by the platform by default. Add your own API key here only if you want a separate billing account or custom model.
+                    </p>
+                    {integrations?.ai?.source === "env" && (
+                      <div className={styles.envNote}>✓ Configured via environment variable</div>
+                    )}
+                    <AIProviderForm dbCreds={dbCreds} onSaved={handleCredentialSaved} />
+                  </div>
+                </Card>
               </div>
             </details>
           </>
