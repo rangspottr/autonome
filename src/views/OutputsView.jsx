@@ -61,16 +61,18 @@ export default function OutputsView() {
     try {
       const params = activeType ? `?type=${activeType}&limit=20` : "?limit=20";
       const data = await api.get(`/outputs${params}`);
-      setOutputs(data.outputs || []);
-      if (data.outputs?.length > 0 && !selected) {
-        setSelected(data.outputs[0]);
+      const list = data.outputs || [];
+      setOutputs(list);
+      // Auto-select first item; use functional update to avoid stale closure on selected
+      if (list.length > 0) {
+        setSelected((prev) => prev ?? list[0]);
       }
     } catch (err) {
       setError(err.message || "Failed to load outputs");
     } finally {
       setLoading(false);
     }
-  }, [activeType]); // activeType is the only dep that changes fetchOutputs behavior
+  }, [activeType]);
 
   useEffect(() => {
     fetchOutputs();

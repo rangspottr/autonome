@@ -126,7 +126,7 @@ export default function InboxOperatorView() {
                 <div key={row.stage} className={styles.leadCard}>
                   <div>
                     <div className={styles.leadName}>{row.stage.charAt(0).toUpperCase() + row.stage.slice(1)}</div>
-                    <div className={styles.leadMeta}>{row.count} deal{row.count !== "1" ? "s" : ""}</div>
+                    <div className={styles.leadMeta}>{row.count} deal{parseInt(row.count) !== 1 ? "s" : ""}</div>
                   </div>
                   <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "var(--text-sm)" }}>
                     ${Math.round(parseFloat(row.total_value || 0)).toLocaleString()}

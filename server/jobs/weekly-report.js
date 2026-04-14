@@ -135,7 +135,7 @@ export async function generateWeeklyReport(workspaceId) {
     const totalPipeline = pipelineData.rows.reduce((s, r) => s + parseFloat(r.total_value || 0), 0);
     sections.push(`**Total active pipeline:** $${Math.round(totalPipeline).toLocaleString()}\n`);
     for (const row of pipelineData.rows) {
-      sections.push(`• **${row.stage.charAt(0).toUpperCase() + row.stage.slice(1)}** — ${row.count} deal${row.count !== 1 ? 's' : ''} ($${Math.round(row.total_value).toLocaleString()})`);
+      sections.push(`• **${row.stage.charAt(0).toUpperCase() + row.stage.slice(1)}** — ${row.count} deal${parseInt(row.count) !== 1 ? 's' : ''} ($${Math.round(parseFloat(row.total_value || 0)).toLocaleString()})`);
     }
   }
   if (recentDeals.rows.length > 0) {
