@@ -173,7 +173,13 @@ Provide concise, actionable answers grounded in this data.`;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
       await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId, 'local');
-      return res.json({ response: summary, source: 'local' });
+      return res.json({
+        response: summary,
+        source: 'local',
+        ai_attempted: true,
+        ai_error: fetchErr.message || 'Failed to reach AI provider',
+        provider_attempted: creds.AI_PROVIDER,
+      });
     }
 
     if (!aiResult.text) {
@@ -181,7 +187,14 @@ Provide concise, actionable answers grounded in this data.`;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
       await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId, 'local');
-      return res.json({ response: summary, source: 'local' });
+      const aiAttempted = aiResult.attempted !== false && !!(creds.AI_PROVIDER && creds.AI_API_KEY);
+      return res.json({
+        response: summary,
+        source: 'local',
+        ai_attempted: aiAttempted,
+        ai_error: aiAttempted ? (aiResult.error || 'AI provider returned an empty response') : null,
+        provider_attempted: aiAttempted ? creds.AI_PROVIDER : null,
+      });
     }
 
     const text = aiResult.text;

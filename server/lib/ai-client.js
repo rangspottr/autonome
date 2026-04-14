@@ -16,10 +16,10 @@ export const OPENAI_DEFAULT_MODEL = 'gpt-4o';
  * @param {string} params.system       - System prompt
  * @param {Array}  params.messages     - Message array [{ role, content }]
  * @param {number} [params.maxTokens=2048] - Max tokens for the response
- * @returns {Promise<{ text: string|null, inputTokens: number|null, provider: string|null }>}
+ * @returns {Promise<{ text: string|null, inputTokens: number|null, provider: string|null, attempted: boolean, error?: string, status?: number }>}
  */
 export async function callAI({ provider, apiKey, model, system, messages, maxTokens = 2048 }) {
-  if (!provider || !apiKey) return { text: null, inputTokens: null, provider: null };
+  if (!provider || !apiKey) return { text: null, inputTokens: null, provider: null, attempted: false };
 
   try {
     if (provider === 'anthropic') {
@@ -29,10 +29,10 @@ export async function callAI({ provider, apiKey, model, system, messages, maxTok
       return await callOpenAI({ apiKey, model: model || OPENAI_DEFAULT_MODEL, system, messages, maxTokens });
     }
     console.error('[AI] Unknown provider:', provider);
-    return { text: null, inputTokens: null, provider: null };
+    return { text: null, inputTokens: null, provider: null, attempted: false };
   } catch (err) {
     console.error(`[AI] ${provider} call error:`, err.message);
-    return { text: null, inputTokens: null, provider: null };
+    return { text: null, inputTokens: null, provider, error: err.message, attempted: true };
   }
 }
 
@@ -48,8 +48,10 @@ async function callAnthropic({ apiKey, model, system, messages, maxTokens }) {
   });
 
   if (!res.ok) {
-    console.error('[AI] Anthropic API error:', res.status);
-    return { text: null, inputTokens: null, provider: 'anthropic' };
+    const errBody = await res.json().catch(() => ({}));
+    const errMsg = errBody?.error?.message || `HTTP ${res.status}`;
+    console.error('[AI] Anthropic API error:', res.status, errMsg);
+    return { text: null, inputTokens: null, provider: 'anthropic', error: errMsg, status: res.status, attempted: true };
   }
 
   const data = await res.json();
@@ -76,8 +78,10 @@ async function callOpenAI({ apiKey, model, system, messages, maxTokens }) {
   });
 
   if (!res.ok) {
-    console.error('[AI] OpenAI API error:', res.status);
-    return { text: null, inputTokens: null, provider: 'openai' };
+    const errBody = await res.json().catch(() => ({}));
+    const errMsg = errBody?.error?.message || `HTTP ${res.status}`;
+    console.error('[AI] OpenAI API error:', res.status, errMsg);
+    return { text: null, inputTokens: null, provider: 'openai', error: errMsg, status: res.status, attempted: true };
   }
 
   const data = await res.json();

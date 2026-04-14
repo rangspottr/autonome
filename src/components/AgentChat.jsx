@@ -147,6 +147,9 @@ export default function AgentChat({ agent, sessionId: initialSessionId, onBack }
           role: "assistant",
           content: data.response,
           source: data.source,
+          ai_attempted: data.ai_attempted || false,
+          ai_error: data.ai_error || null,
+          provider_attempted: data.provider_attempted || null,
           context_summary: data.context_summary,
           actionItems: parseActionItems(data.response),
         },
@@ -320,6 +323,12 @@ export default function AgentChat({ agent, sessionId: initialSessionId, onBack }
               )}
               {msg.role === "assistant" && msg.source && (
                 <div className={styles.messageSource}>{msg.source}</div>
+              )}
+              {msg.role === "assistant" && msg.ai_attempted && msg.source === "local" && (
+                <div className={styles.aiFallbackNotice}>
+                  AI call to {msg.provider_attempted || "configured AI provider"} failed — showing data-driven summary.
+                  {msg.ai_error && <span className={styles.aiFallbackError}>{msg.ai_error}</span>}
+                </div>
               )}
             </div>
           </div>
