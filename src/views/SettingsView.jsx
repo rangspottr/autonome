@@ -7,17 +7,10 @@ import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Select from "../components/Select.jsx";
 import Pill from "../components/Pill.jsx";
+import { friendlyError } from "../lib/errors.js";
 import styles from "./SettingsView.module.css";
 
 // ─── Integration Setup Forms ─────────────────────────────────────────────────
-
-function friendlyError(err, fallback) {
-  const msg = err?.message || '';
-  if (/invalid|unauthorized|required|forbidden|not found|timeout|network|rate limit|credential|connection/i.test(msg)) {
-    return msg;
-  }
-  return fallback;
-}
 
 function IntegrationCard({ title, statusLabel, statusVariant, children, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen ?? false);

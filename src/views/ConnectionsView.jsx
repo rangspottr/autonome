@@ -5,17 +5,10 @@ import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import Input from "../components/Input.jsx";
 import Pill from "../components/Pill.jsx";
+import { friendlyError } from "../lib/errors.js";
 import styles from "./ConnectionsView.module.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function friendlyError(err, fallback) {
-  const msg = err?.message || '';
-  if (/invalid|unauthorized|required|forbidden|not found|timeout|network|rate limit|credential|connection/i.test(msg)) {
-    return msg;
-  }
-  return fallback;
-}
 
 function StatusMsg({ testing, result }) {
   if (testing) return <div className={styles.testStatus} style={{ color: "var(--color-text-muted)" }}>Testing…</div>;
