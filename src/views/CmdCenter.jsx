@@ -557,11 +557,11 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
                 <span
                   className={styles.aiSourceBadge}
                   style={{
-                    background: aiResponse.source === 'anthropic' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                    color: aiResponse.source === 'anthropic' ? 'var(--color-success)' : 'var(--color-warning)',
+                    background: aiResponse.source !== 'local' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                    color: aiResponse.source !== 'local' ? 'var(--color-success)' : 'var(--color-warning)',
                   }}
                 >
-                  {aiResponse.source === 'anthropic' ? '✦ AI' : '● Data-driven'}
+                  {aiResponse.source !== 'local' ? '✦ AI' : '● Data-driven'}
                 </span>
               </div>
             )}

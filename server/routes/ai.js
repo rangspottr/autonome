@@ -4,6 +4,7 @@ import { requireAuth, requireWorkspace, requireActiveSubscription } from '../mid
 import rateLimit from 'express-rate-limit';
 import { buildWorkspaceContext, buildLocalSummary, findEntityContext, buildRichLocalContext } from '../lib/ai-context.js';
 import { resolveCredentials } from '../lib/credential-resolver.js';
+import { callAI } from '../lib/ai-client.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
@@ -56,13 +57,12 @@ async function getOrCreateQuickSession(workspaceId, userId) {
 router.get('/status', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const creds = await resolveCredentials(req.workspace.id);
-    if (creds.ANTHROPIC_API_KEY) {
-      const source = creds._aiSource?.startsWith('db') ? 'db' : 'env';
+    if (creds.AI_PROVIDER && creds.AI_API_KEY) {
       return res.json({
         active: true,
-        provider: 'anthropic',
-        model: creds.AI_MODEL || 'claude-sonnet-4-20250514',
-        source,
+        provider: creds.AI_PROVIDER,
+        model: creds.AI_MODEL,
+        source: creds.AI_SOURCE,
       });
     }
     res.json({
@@ -93,7 +93,7 @@ router.post('/query', ...guard, aiLimiter, async (req, res, next) => {
     // Resolve credentials: DB takes priority over env vars
     const creds = await resolveCredentials(workspaceId);
 
-    if (!creds.ANTHROPIC_API_KEY) {
+    if (!creds.AI_PROVIDER || !creds.AI_API_KEY) {
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
@@ -157,24 +157,18 @@ Provide concise, actionable answers grounded in this data.`;
       { role: 'user', content: trimmedMessage },
     ];
 
-    let anthropicRes;
+    let aiResult;
     try {
-      anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': creds.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: creds.AI_MODEL,
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages,
-        }),
+      aiResult = await callAI({
+        provider: creds.AI_PROVIDER,
+        apiKey: creds.AI_API_KEY,
+        model: creds.AI_MODEL,
+        system: systemPrompt,
+        messages,
+        maxTokens: 2048,
       });
     } catch (fetchErr) {
-      console.error('[AI] Anthropic fetch error:', fetchErr.message);
+      console.error('[AI] AI client fetch error:', fetchErr.message);
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
@@ -182,9 +176,7 @@ Provide concise, actionable answers grounded in this data.`;
       return res.json({ response: summary, source: 'local' });
     }
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error('[AI] Anthropic API error:', anthropicRes.status, errText);
+    if (!aiResult.text) {
       let richCtx = null;
       try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
       const summary = buildLocalSummary(ctx, richCtx);
@@ -192,22 +184,14 @@ Provide concise, actionable answers grounded in this data.`;
       return res.json({ response: summary, source: 'local' });
     }
 
-    const data = await anthropicRes.json();
-    const text = data.content?.[0]?.text;
-    if (!text) {
-      let richCtx = null;
-      try { richCtx = await buildRichLocalContext(workspaceId); } catch { /* non-fatal */ }
-      const summary = buildLocalSummary(ctx, richCtx);
-      await saveChatMessages(workspaceId, userId, trimmedMessage, summary, sessionId, 'local');
-      return res.json({ response: summary, source: 'local' });
-    }
-
-    const totalPromptTokens = data.usage?.input_tokens ?? null;
-    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, 'anthropic', entityResult, totalPromptTokens);
+    const text = aiResult.text;
+    const aiProvider = aiResult.provider || creds.AI_PROVIDER;
+    const totalPromptTokens = aiResult.inputTokens ?? null;
+    await saveChatMessages(workspaceId, userId, trimmedMessage, text, sessionId, aiProvider, entityResult, totalPromptTokens);
     if (!hasEntityMatches && totalPromptTokens !== null) {
       console.log(`[CONTEXT] workspace=${workspaceId} query="${trimmedMessage.slice(0, 60)}" entities=0 tier=aggregate total=${totalPromptTokens}`);
     }
-    res.json({ response: text, source: 'anthropic' });
+    res.json({ response: text, source: aiProvider });
   } catch (err) {
     next(err);
   }

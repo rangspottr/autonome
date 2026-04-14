@@ -6,6 +6,7 @@
 import { pool } from '../db/index.js';
 import { config } from '../config.js';
 import { encrypt, decrypt } from './crypto.js';
+import { OPENAI_DEFAULT_MODEL } from './ai-client.js';
 
 /**
  * Obfuscate (encrypt) a string value for storage.
@@ -86,16 +87,57 @@ export async function resolveCredentials(workspaceId) {
     fetchDbCredentials(workspaceId, 'stripe'),
   ]);
 
-  // AI credentials: anthropic DB takes priority, then env var, then openai DB (future use).
-  // OpenAI DB credentials are stored separately and available via OPENAI_API_KEY for future routing.
+  // AI credentials — backward-compat fields
   let ANTHROPIC_API_KEY = config.ANTHROPIC_API_KEY;
   let AI_MODEL = config.AI_MODEL;
   if (anthropic?.credentials?.api_key) {
     ANTHROPIC_API_KEY = anthropic.credentials.api_key;
     if (anthropic.credentials.model) AI_MODEL = anthropic.credentials.model;
   }
-  // OpenAI DB credentials — available for callers that support OpenAI routing
   const OPENAI_API_KEY = openai?.credentials?.api_key || null;
+
+  // Provider-neutral AI fields.
+  // Resolution order:
+  //   1. Workspace DB credentials — if both providers exist, prefer the most recently verified one
+  //      (or Anthropic as a tiebreaker).
+  //   2. Environment variable ANTHROPIC_API_KEY (platform default).
+  //   3. null — no provider available.
+  let AI_PROVIDER = null;
+  let AI_API_KEY = null;
+  let AI_MODEL_RESOLVED = config.AI_MODEL;
+  let AI_SOURCE = null;
+
+  if (anthropic?.credentials?.api_key && openai?.credentials?.api_key) {
+    const anthropicVerifiedAt = anthropic.last_verified_at ? new Date(anthropic.last_verified_at) : new Date(0);
+    const openaiVerifiedAt = openai.last_verified_at ? new Date(openai.last_verified_at) : new Date(0);
+    if (openaiVerifiedAt > anthropicVerifiedAt) {
+      AI_PROVIDER = 'openai';
+      AI_API_KEY = openai.credentials.api_key;
+      AI_MODEL_RESOLVED = openai.credentials.model || OPENAI_DEFAULT_MODEL;
+      AI_PROVIDER = 'anthropic';
+      AI_API_KEY = anthropic.credentials.api_key;
+      AI_MODEL_RESOLVED = anthropic.credentials.model || config.AI_MODEL;
+      AI_SOURCE = 'db:anthropic';
+    }
+  } else if (anthropic?.credentials?.api_key) {
+    AI_PROVIDER = 'anthropic';
+    AI_API_KEY = anthropic.credentials.api_key;
+    AI_MODEL_RESOLVED = anthropic.credentials.model || config.AI_MODEL;
+    AI_SOURCE = 'db:anthropic';
+  } else if (openai?.credentials?.api_key) {
+    AI_PROVIDER = 'openai';
+    AI_API_KEY = openai.credentials.api_key;
+    AI_MODEL_RESOLVED = openai.credentials.model || OPENAI_DEFAULT_MODEL;
+    AI_SOURCE = 'db:openai';
+  } else if (config.ANTHROPIC_API_KEY) {
+    AI_PROVIDER = 'anthropic';
+    AI_API_KEY = config.ANTHROPIC_API_KEY;
+    AI_MODEL_RESOLVED = config.AI_MODEL;
+    AI_SOURCE = 'env';
+  }
+
+  // Keep AI_MODEL in sync with the resolved provider model for backward compat
+  if (AI_MODEL_RESOLVED) AI_MODEL = AI_MODEL_RESOLVED;
 
   // SMTP credentials
   const SMTP_HOST = smtp?.credentials?.host || config.SMTP_HOST;
@@ -114,9 +156,14 @@ export async function resolveCredentials(workspaceId) {
   const STRIPE_WEBHOOK_SECRET = stripe?.credentials?.webhook_secret || config.STRIPE_WEBHOOK_SECRET;
 
   return {
+    // Provider-neutral AI fields (preferred for all new call sites)
+    AI_PROVIDER,
+    AI_API_KEY,
+    AI_MODEL,
+    AI_SOURCE,
+    // Backward-compat per-provider keys
     ANTHROPIC_API_KEY,
     OPENAI_API_KEY,
-    AI_MODEL,
     SMTP_HOST,
     SMTP_PORT,
     SMTP_USER,
@@ -128,7 +175,7 @@ export async function resolveCredentials(workspaceId) {
     STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET,
     // Source tracking
-    _aiSource: anthropic?.credentials?.api_key ? 'db:anthropic' : openai?.credentials?.api_key ? 'db:openai' : 'env',
+    _aiSource: AI_SOURCE,
     _smtpSource: smtp?.credentials?.host ? 'db' : 'env',
     _twilioSource: twilio?.credentials?.account_sid ? 'db' : 'env',
     _stripeSource: stripe?.credentials?.secret_key ? 'db' : 'env',
