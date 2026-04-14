@@ -145,9 +145,10 @@ Migration files are run in alphabetical/numeric order by `server/db/migrate.js`.
 | `011_entity_grounding.sql` | Entity grounding: structured business context for agents |
 | `012_workspace_credentials.sql` | Per-workspace provider credentials with encrypted storage and verification state |
 | `013_outputs.sql` | **Outputs table** — stores finished deliverables (morning briefings, weekly reports, collections summaries) produced by scheduled jobs |
+| `014_outputs_defensive.sql` | **Defensive outputs columns** — uses `ALTER TABLE outputs ADD COLUMN IF NOT EXISTS` to guarantee all required columns exist regardless of prior schema state; backfills titles for existing rows |
 
 **Migrations run automatically on startup** via `server/start.js`. All SQL files use
-`CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`, so they are safe to
+`CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, so they are safe to
 re-run and idempotent.
 
 **To run migrations manually** (e.g. on a fresh database or for debugging):
@@ -155,6 +156,30 @@ re-run and idempotent.
 ```bash
 node server/db/migrate.js
 ```
+
+### Schema verification
+
+After applying migrations, `server/start.js` runs a **startup schema check** that
+queries `information_schema` to confirm every critical table and column is present.
+If any are missing the process **exits non-zero** before the HTTP server starts,
+producing a clear operator-facing error such as:
+
+```
+[start] Schema verification failed — aborting startup:
+ Schema verification failed — the following required schema is missing:
+  • column "outputs"."title" does not exist
+
+Run pending migrations with: node server/db/migrate.js
+```
+
+This prevents a broken schema from ever serving traffic.  The checked tables and
+columns are defined in `REQUIRED_SCHEMA` at the top of `server/start.js`.
+
+**If schema verification fails in production:**
+
+1. SSH / exec into the running container / dyno.
+2. Run `node server/db/migrate.js` (or trigger a fresh deploy — `start.js` will apply and verify automatically).
+3. Confirm the startup log shows `[schema] All critical tables and columns verified.`
 
 ---
 

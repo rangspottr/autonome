@@ -1,17 +1,19 @@
 /**
  * Production startup script.
  *
- * Runs all pending database migrations and then starts the HTTP server.
- * Using a single startup entry-point ensures the live database schema is
- * always in sync with the codebase on every deployment, preventing
- * "column does not exist" errors caused by un-applied migrations.
+ * Runs all pending database migrations, verifies critical schema, and then
+ * starts the HTTP server.  Using a single startup entry-point ensures the
+ * live database schema is always in sync with the codebase on every
+ * deployment, preventing "column does not exist" errors caused by
+ * un-applied migrations.
  *
  * Usage (production):
  *   node server/start.js
  *
- * The script exits non-zero if migrations fail so the process manager
- * (Heroku, Railway, Docker, PM2) treats a migration failure as a failed
- * deployment and does not route traffic to a broken instance.
+ * The script exits non-zero if migrations fail or if schema verification
+ * detects missing tables/columns so the process manager (Heroku, Railway,
+ * Docker, PM2) treats a broken deployment as a failed start and does not
+ * route traffic to a broken instance.
  */
 
 import { readdir, readFile } from 'fs/promises';
@@ -22,6 +24,15 @@ import pg from 'pg';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const { Pool } = pg;
+
+// Critical tables and their required columns.  Any missing entry causes
+// startup to abort with a clear, operator-facing error instead of a raw
+// SQL error surfacing in the UI at runtime.
+const REQUIRED_SCHEMA = {
+  outputs: ['id', 'workspace_id', 'output_type', 'title', 'content', 'data', 'period_start', 'period_end', 'created_at'],
+  workspaces: ['id'],
+  users: ['id'],
+};
 
 async function runMigrations() {
   if (!process.env.DATABASE_URL) {
@@ -61,12 +72,74 @@ async function runMigrations() {
   }
 }
 
+/**
+ * Verify that every table and column listed in REQUIRED_SCHEMA exists in the
+ * live database.  Throws a descriptive error listing every missing item so
+ * the operator knows exactly what to fix before the server can start.
+ */
+async function verifySchema() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  try {
+    const missing = [];
+
+    for (const [table, columns] of Object.entries(REQUIRED_SCHEMA)) {
+      // Check table exists
+      const tableRes = await pool.query(
+        `SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = $1`,
+        [table]
+      );
+      if (tableRes.rowCount === 0) {
+        missing.push(`table "${table}" does not exist`);
+        continue; // skip column checks — whole table is missing
+      }
+
+      // Check each required column exists
+      for (const column of columns) {
+        const colRes = await pool.query(
+          `SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+          [table, column]
+        );
+        if (colRes.rowCount === 0) {
+          missing.push(`column "${table}"."${column}" does not exist`);
+        }
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Schema verification failed — the following required schema is missing:\n` +
+        missing.map((m) => `  • ${m}`).join('\n') +
+        `\n\nRun pending migrations with: node server/db/migrate.js`
+      );
+    }
+
+    console.log('[schema] All critical tables and columns verified.');
+  } finally {
+    await pool.end();
+  }
+}
+
 async function main() {
   console.log('[start] Running database migrations…');
   try {
     await runMigrations();
   } catch (err) {
     console.error('[start] Migration failed — aborting startup:', err.message);
+    process.exit(1);
+  }
+
+  console.log('[start] Verifying database schema…');
+  try {
+    await verifySchema();
+  } catch (err) {
+    console.error('[start] Schema verification failed — aborting startup:\n', err.message);
     process.exit(1);
   }
 
