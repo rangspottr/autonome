@@ -393,7 +393,7 @@ export async function executeAction(workspaceId, decision, options = {}) {
     } else if (action === 'upsell' || action === 'flag_expansion_opportunity') {
       if (contact) {
         // Create a task flagging the expansion opportunity for the owner
-        const taskResult = await pool.query(
+        await pool.query(
           `INSERT INTO tasks (workspace_id, title, description, priority, status, contact_id)
            VALUES ($1, $2, $3, 'medium', 'todo', $4) RETURNING id`,
           [
@@ -458,7 +458,7 @@ export async function executeAction(workspaceId, decision, options = {}) {
       );
       const contact = contactResult.rows[0];
       const contactName = contact?.name || decision.targetName || resolvedContactId;
-      const taskResult = await pool.query(
+      await pool.query(
         `INSERT INTO tasks (workspace_id, title, description, priority, status, contact_id)
          VALUES ($1, $2, $3, 'high', 'todo', $4) RETURNING id`,
         [
