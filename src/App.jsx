@@ -373,12 +373,25 @@ function MainApp() {
                 <span style={{ fontSize: 9, marginRight: 4 }}>●</span>
                 Checking…
               </span>
+            ) : aiStatus?.status === 'needs_attention' ? (
+              <span
+                className={styles.aiStatusBadge}
+                title="AI provider configured but last connection test failed — check Settings"
+                style={{
+                  background: "rgba(245,158,11,0.12)",
+                  color: "var(--color-warning)",
+                  border: "1px solid rgba(245,158,11,0.3)",
+                }}
+              >
+                <span style={{ fontSize: 9, marginRight: 4 }}>⚠</span>
+                AI Needs Attention
+              </span>
             ) : (
               <span
                 className={styles.aiStatusBadge}
                 title={aiStatus?.connected
                   ? "AI Team Active — Your AI specialists are operating"
-                  : "AI Team Initializing"}
+                  : "Operating in data-driven mode — connect an AI provider in Settings"}
                 style={{
                   background: aiStatus?.connected ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
                   color: aiStatus?.connected ? "var(--color-success)" : "var(--color-warning)",

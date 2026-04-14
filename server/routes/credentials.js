@@ -200,37 +200,65 @@ router.delete('/:provider', ...guard, async (req, res, next) => {
 async function testAnthropic(creds) {
   const apiKey = creds.api_key;
   if (!apiKey) return { success: false, error: 'API key is required' };
+  const model = creds.model || 'claude-sonnet-4-20250514';
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/models', {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'Say ok' }],
+      }),
     });
     if (resp.ok) {
-      return { success: true, message: 'Anthropic API key is valid.' };
+      return { success: true, message: `Anthropic connected — ${model} is working.` };
     }
     const body = await resp.json().catch(() => ({}));
-    return { success: false, error: body.error?.message || `HTTP ${resp.status}` };
+    const errMsg = body.error?.message || `HTTP ${resp.status}`;
+    if (resp.status === 401) return { success: false, error: 'Invalid API key. Please check your Anthropic API key.' };
+    if (resp.status === 403) return { success: false, error: `Access denied for model ${model}. Check your Anthropic plan.` };
+    if (resp.status === 404) return { success: false, error: `Model ${model} not found. Select a different model.` };
+    if (resp.status === 429) return { success: false, error: 'Rate limit or quota exceeded. Check your Anthropic billing.' };
+    return { success: false, error: errMsg };
   } catch (err) {
-    return { success: false, error: err.message };
+    return { success: false, error: `Connection failed: ${err.message}` };
   }
 }
 
 async function testOpenAI(creds) {
   const apiKey = creds.api_key;
   if (!apiKey) return { success: false, error: 'API key is required' };
+  const model = creds.model || 'gpt-4o';
   try {
-    const resp = await fetch('https://api.openai.com/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'Say ok' }],
+      }),
     });
     if (resp.ok) {
-      return { success: true, message: 'OpenAI API key is valid.' };
+      return { success: true, message: `OpenAI connected — ${model} is working.` };
     }
     const body = await resp.json().catch(() => ({}));
-    return { success: false, error: body.error?.message || `HTTP ${resp.status}` };
+    const errMsg = body.error?.message || `HTTP ${resp.status}`;
+    if (resp.status === 401) return { success: false, error: 'Invalid API key. Please check your OpenAI API key.' };
+    if (resp.status === 404) return { success: false, error: `Model ${model} does not exist or you do not have access. Select a different model.` };
+    if (resp.status === 429) return { success: false, error: 'Quota exceeded. Check your OpenAI billing at platform.openai.com/account/billing.' };
+    if (resp.status === 403) return { success: false, error: `Access denied for model ${model}. Your OpenAI plan may not include this model.` };
+    return { success: false, error: errMsg };
   } catch (err) {
-    return { success: false, error: err.message };
+    return { success: false, error: `Connection failed: ${err.message}` };
   }
 }
 

@@ -74,6 +74,22 @@ export default function AIStatusBanner() {
     );
   }
 
+  if (status && status.status === 'needs_attention') {
+    return (
+      <div className={styles.offlineBanner} style={{ background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.3)" }}>
+        <div className={styles.offlineIconWrap}>
+          <span className={styles.offlineIcon} style={{ color: "var(--color-warning)" }}>⚠</span>
+        </div>
+        <div className={styles.offlineBody}>
+          <div className={styles.offlineHeadline} style={{ color: "var(--color-warning)" }}>AI Needs Attention</div>
+          <div className={styles.offlineText}>
+            Your AI provider is configured but the last connection test failed. Check your API key, model access, and billing in Settings.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (status && status.active) {
     return (
       <div className={styles.activeBanner}>
@@ -111,9 +127,9 @@ export default function AIStatusBanner() {
         <span className={styles.offlineIcon}>◉</span>
       </div>
       <div className={styles.offlineBody}>
-        <div className={styles.offlineHeadline}>AI Team Initializing</div>
+        <div className={styles.offlineHeadline}>Operating in Data-Driven Mode</div>
         <div className={styles.offlineText}>
-          Your agents are monitoring your business data. Full AI analysis will be available shortly.
+          Your agents are monitoring your business data. Connect an AI provider in Settings to unlock full specialist intelligence.
         </div>
       </div>
     </div>
