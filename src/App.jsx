@@ -389,17 +389,17 @@ function MainApp() {
             ) : (
               <span
                 className={styles.aiStatusBadge}
-                title={aiStatus?.connected
+                title={aiStatus?.status === 'active'
                   ? "AI Team Active — Your AI specialists are operating"
                   : "Operating in data-driven mode — connect an AI provider in Settings"}
                 style={{
-                  background: aiStatus?.connected ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
-                  color: aiStatus?.connected ? "var(--color-success)" : "var(--color-warning)",
-                  border: `1px solid ${aiStatus?.connected ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`,
+                  background: aiStatus?.status === 'active' ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
+                  color: aiStatus?.status === 'active' ? "var(--color-success)" : "var(--color-warning)",
+                  border: `1px solid ${aiStatus?.status === 'active' ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`,
                 }}
               >
                 <span style={{ fontSize: 9, marginRight: 4 }}>●</span>
-                {aiStatus?.connected
+                {aiStatus?.status === 'active'
                   ? "AI Active"
                   : "Business Data"}
               </span>

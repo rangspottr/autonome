@@ -297,24 +297,24 @@ export default function CmdCenter({ onRefreshMetrics, onNavigate }) {
         </div>
       )}
 
+      {/* AI Needs Attention Banner */}
+      {aiStatus?.status === 'needs_attention' && (
+        <div className={styles.aiFallbackBanner} style={{ background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.3)" }}>
+          <span className={styles.aiFallbackIcon} style={{ color: "var(--color-warning)" }}>⚠</span>
+          <div className={styles.aiFallbackBody}>
+            <strong style={{ color: "var(--color-warning)" }}>AI Needs Attention</strong>
+            <span className={styles.aiFallbackSub}>Your AI provider is configured but the last connection test failed. Check your API key, model access, and billing in Settings.</span>
+          </div>
+        </div>
+      )}
+
       {/* AI Fallback Banner */}
-      {aiStatus && !aiStatus.connected && (
+      {aiStatus?.status === 'not_configured' && (
         <div className={styles.aiFallbackBanner}>
           <span className={styles.aiFallbackIcon}>!</span>
           <div className={styles.aiFallbackBody}>
             <strong>Your AI team is operating in data-driven mode</strong>
             <span className={styles.aiFallbackSub}>Connect an AI provider to unlock full specialist intelligence across all 5 agents.</span>
-          </div>
-        </div>
-      )}
-
-      {/* AI Needs Attention Banner */}
-      {aiStatus && aiStatus.connected && aiStatus.status === 'needs_attention' && (
-        <div className={styles.aiFallbackBanner} style={{ background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.3)" }}>
-          <span className={styles.aiFallbackIcon} style={{ color: "var(--color-warning)" }}>⚠</span>
-          <div className={styles.aiFallbackBody}>
-            <strong style={{ color: "var(--color-warning)" }}>AI provider needs attention</strong>
-            <span className={styles.aiFallbackSub}>Your API key or model may have an issue. Check Settings to restore full AI intelligence.</span>
           </div>
         </div>
       )}

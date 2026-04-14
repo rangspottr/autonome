@@ -103,7 +103,28 @@ router.put('/:provider', ...guard, async (req, res, next) => {
       [req.workspace.id, provider, JSON.stringify(encrypted)]
     );
 
-    res.json({ success: true, provider, message: 'Credentials saved.' });
+    // Auto-verify AI credentials immediately after save so the UI reflects the
+    // real runtime status without requiring a separate "Test Connection" click.
+    let verified = false;
+    if (provider === 'anthropic' || provider === 'openai') {
+      try {
+        const testFn = provider === 'anthropic' ? testAnthropic : testOpenAI;
+        const testResult = await testFn(credentials);
+        if (testResult.success) {
+          await pool.query(
+            `UPDATE workspace_credentials SET is_verified = true, last_verified_at = NOW(), updated_at = NOW()
+             WHERE workspace_id = $1 AND provider = $2`,
+            [req.workspace.id, provider]
+          );
+          verified = true;
+        }
+      } catch (verifyErr) {
+        // Non-fatal: credentials are always saved regardless of verification outcome
+        console.error(`[credentials] Auto-verify failed for provider=${provider}:`, verifyErr.message);
+      }
+    }
+
+    res.json({ success: true, provider, message: 'Credentials saved.', verified });
   } catch (err) {
     next(err);
   }
