@@ -124,6 +124,7 @@ const BUSINESS_SYSTEMS = [
 const ROADMAP_SYSTEMS = ['Calendar', 'HubSpot', 'OpenPhone / RingCentral', 'QuickBooks'];
 
 function Step2({ onNext, onBack, onOpenConnections }) {
+function Step2({ onNext, onBack, onOpenConnections, canOpenConnections }) {
   return (
     <div>
       <ProgressBar step={2} total={3} />
@@ -171,6 +172,11 @@ function Step2({ onNext, onBack, onOpenConnections }) {
       <button onClick={onOpenConnections} style={{ ...secondaryBtn, marginBottom: 10, color: 'var(--color-brand)', fontWeight: 700 }}>
         Open live Connections setup →
       </button>
+      {canOpenConnections && (
+        <button onClick={onOpenConnections} style={{ ...secondaryBtn, marginBottom: 10, color: 'var(--color-brand)', fontWeight: 700 }}>
+          Open live Connections setup →
+        </button>
+      )}
       <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Continue →</button>
       <div style={{ textAlign: 'center' }}>
         <button onClick={onBack} style={secondaryBtn}>← Back</button>
@@ -352,6 +358,8 @@ export default function OnboardingPage() {
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
             onOpenConnections={() => navigate('/setup/connections')}
+            canOpenConnections={isActive}
+            onOpenConnections={() => navigate('/?view=connections')}
           />
         )}
         {step === 3 && (
