@@ -123,6 +123,7 @@ const BUSINESS_SYSTEMS = [
 
 const ROADMAP_SYSTEMS = ['Calendar', 'HubSpot', 'OpenPhone / RingCentral', 'QuickBooks'];
 
+function Step2({ onNext, onBack, onOpenConnections }) {
 function Step2({ onNext, onBack, onOpenConnections, canOpenConnections }) {
   return (
     <div>
@@ -168,6 +169,9 @@ function Step2({ onNext, onBack, onOpenConnections, canOpenConnections }) {
         <strong style={{ color: 'var(--color-text-primary)' }}>Roadmap only (not yet live):</strong> {ROADMAP_SYSTEMS.join(', ')}.
       </div>
 
+      <button onClick={onOpenConnections} style={{ ...secondaryBtn, marginBottom: 10, color: 'var(--color-brand)', fontWeight: 700 }}>
+        Open live Connections setup →
+      </button>
       {canOpenConnections && (
         <button
           onClick={onOpenConnections}
@@ -356,6 +360,7 @@ export default function OnboardingPage() {
           <Step2
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
+            onOpenConnections={() => navigate('/setup/connections')}
             canOpenConnections={isActive}
             onOpenConnections={() => navigate('/?view=connections')}
           />

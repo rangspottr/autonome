@@ -66,7 +66,7 @@ export async function generateWeeklyReport(workspaceId) {
       [workspaceId]
     ),
     pool.query(
-      `SELECT title FROM workflows WHERE workspace_id = $1 AND status = 'blocked' LIMIT 5`,
+      `SELECT template AS title FROM workflows WHERE workspace_id = $1 AND status = 'blocked' LIMIT 5`,
       [workspaceId]
     ),
     pool.query(

@@ -41,6 +41,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
 import CreateWorkspacePage from "./pages/CreateWorkspacePage.jsx";
 import OnboardingPage from "./pages/OnboardingPage.jsx";
+import SetupConnectionsPage from "./pages/SetupConnectionsPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import CheckoutSuccessPage from "./pages/CheckoutSuccessPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
@@ -484,6 +485,14 @@ export default function App() {
             element={
               <RequireWorkspace>
                 <OnboardingPage />
+              </RequireWorkspace>
+            }
+          />
+          <Route
+            path="/setup/connections"
+            element={
+              <RequireWorkspace>
+                <SetupConnectionsPage />
               </RequireWorkspace>
             }
           />

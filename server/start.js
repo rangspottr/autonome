@@ -30,6 +30,13 @@ const { Pool } = pg;
 // SQL error surfacing in the UI at runtime.
 const REQUIRED_SCHEMA = {
   outputs: ['id', 'workspace_id', 'output_type', 'title', 'content', 'data', 'period_start', 'period_end', 'created_at'],
+  workflows: ['id', 'workspace_id', 'template', 'status', 'updated_at'],
+  agent_actions: ['id', 'workspace_id', 'agent', 'action_type', 'outcome', 'description', 'created_at'],
+  invoices: ['id', 'workspace_id', 'status', 'amount', 'due_date', 'updated_at'],
+  tasks: ['id', 'workspace_id', 'status', 'priority', 'due_date', 'updated_at'],
+  deals: ['id', 'workspace_id', 'title', 'stage', 'value', 'expected_close_date', 'updated_at'],
+  contacts: ['id', 'workspace_id', 'name', 'type', 'created_at'],
+  proactive_alerts: ['id', 'workspace_id', 'severity', 'title', 'status', 'created_at'],
   job_health_runs: ['id', 'job_name', 'status', 'created_at'],
   workspaces: ['id'],
   users: ['id'],

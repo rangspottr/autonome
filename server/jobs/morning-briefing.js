@@ -72,7 +72,7 @@ export async function generateMorningBriefing(workspaceId) {
       [workspaceId, since.toISOString()]
     ),
     pool.query(
-      `SELECT title, status FROM workflows
+      `SELECT template AS title, status FROM workflows
        WHERE workspace_id = $1 AND status = 'blocked'
        LIMIT 5`,
       [workspaceId]
