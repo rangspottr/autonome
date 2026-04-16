@@ -8,9 +8,54 @@
 import { Router } from 'express';
 import { pool } from '../db/index.js';
 import { requireAuth, requireWorkspace, requireActiveSubscription } from '../middleware/auth.js';
+import { getWorkspaceWorkflowHealth } from '../lib/job-health.js';
 
 const router = Router();
 const guard = [requireAuth, requireWorkspace, requireActiveSubscription];
+
+// GET /api/operator/health — workspace workflow + job reliability snapshot
+router.get('/health', ...guard, async (req, res, next) => {
+  try {
+    const wsId = req.workspace.id;
+    const [health, outputRuns, integrations, latestOutputs] = await Promise.all([
+      getWorkspaceWorkflowHealth(wsId),
+      pool.query(
+        `SELECT output_type, COUNT(*)::int AS count
+         FROM outputs
+         WHERE workspace_id = $1
+           AND created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY output_type`,
+        [wsId]
+      ),
+      pool.query(
+        `SELECT type, status, last_sync_at, error_message
+         FROM integrations
+         WHERE workspace_id = $1
+         ORDER BY created_at DESC`,
+        [wsId]
+      ),
+      pool.query(
+        `SELECT output_type, title, created_at
+         FROM outputs
+         WHERE workspace_id = $1
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [wsId]
+      ),
+    ]);
+
+    res.json({
+      workflow_health: health.workflow_counts,
+      job_runs: health.recent_runs,
+      failed_runs_24h: health.failed_runs_24h,
+      outputs_7d: outputRuns.rows,
+      latest_outputs: latestOutputs.rows,
+      integrations: integrations.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /api/operator/inbox — inbox/lead operator status
 router.get('/inbox', ...guard, async (req, res, next) => {

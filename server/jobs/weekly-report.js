@@ -1,4 +1,5 @@
 import { pool } from '../db/index.js';
+import { recordJobHealthRun } from '../lib/job-health.js';
 
 /**
  * Generate a polished weekly owner report for a workspace.
@@ -246,12 +247,35 @@ export async function runWeeklyReportForAllWorkspaces() {
     );
     console.log(`[WeeklyReport] Generating reports for ${result.rows.length} workspace(s)`);
     for (const { id } of result.rows) {
-      await generateWeeklyReport(id).catch((err) => {
-        console.error(`[WeeklyReport] Failed for workspace ${id}:`, err.message);
-      });
+      const startedAt = Date.now();
+      await generateWeeklyReport(id)
+        .then(async (output) => {
+          await recordJobHealthRun({
+            workspaceId: id,
+            jobName: 'weekly_report',
+            status: 'success',
+            durationMs: Date.now() - startedAt,
+            metadata: { output_id: output?.id || null },
+          });
+        })
+        .catch(async (err) => {
+          console.error(`[WeeklyReport] Failed for workspace ${id}:`, err.message);
+          await recordJobHealthRun({
+            workspaceId: id,
+            jobName: 'weekly_report',
+            status: 'failed',
+            durationMs: Date.now() - startedAt,
+            errorMessage: err.message,
+          }).catch(() => {});
+        });
     }
   } catch (err) {
     console.error('[WeeklyReport] Failed to run:', err.message);
+    await recordJobHealthRun({
+      jobName: 'weekly_report',
+      status: 'failed',
+      errorMessage: `workspace_lookup_failed: ${err.message}`,
+    }).catch(() => {});
   }
 }
 
