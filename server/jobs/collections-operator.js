@@ -1,4 +1,5 @@
 import { pool } from '../db/index.js';
+import { recordJobHealthRun } from '../lib/job-health.js';
 
 /**
  * Collections Operator
@@ -167,12 +168,39 @@ export async function runCollectionsForAllWorkspaces() {
        WHERE s.status IN ('active', 'trialing')`
     );
     for (const { id } of result.rows) {
-      await runCollectionsOperator(id).catch((err) => {
-        console.error(`[Collections] Failed for workspace ${id}:`, err.message);
-      });
+      const startedAt = Date.now();
+      await runCollectionsOperator(id)
+        .then(async (summary) => {
+          await recordJobHealthRun({
+            workspaceId: id,
+            jobName: 'collections_operator',
+            status: 'success',
+            durationMs: Date.now() - startedAt,
+            metadata: {
+              overdue_count: summary?.overdue_count || 0,
+              escalated_count: summary?.escalated_count || 0,
+              reminders_sent: summary?.reminders_sent || 0,
+            },
+          });
+        })
+        .catch(async (err) => {
+          console.error(`[Collections] Failed for workspace ${id}:`, err.message);
+          await recordJobHealthRun({
+            workspaceId: id,
+            jobName: 'collections_operator',
+            status: 'failed',
+            durationMs: Date.now() - startedAt,
+            errorMessage: err.message,
+          }).catch(() => {});
+        });
     }
   } catch (err) {
     console.error('[Collections] Failed to run:', err.message);
+    await recordJobHealthRun({
+      jobName: 'collections_operator',
+      status: 'failed',
+      errorMessage: `workspace_lookup_failed: ${err.message}`,
+    }).catch(() => {});
   }
 }
 

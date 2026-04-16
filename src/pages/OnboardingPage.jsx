@@ -115,12 +115,15 @@ function Step1({ workspace, formData, onChange, onNext }) {
 }
 
 const BUSINESS_SYSTEMS = [
-  { key: 'email', icon: 'EM', label: 'Email', desc: 'Receive and respond to customer emails', hint: 'SMTP' },
-  { key: 'phone', icon: 'PH', label: 'Phone / SMS', desc: 'Handle calls and text messages', hint: 'Twilio' },
-  { key: 'payments', icon: 'PM', label: 'Payments', desc: 'Track invoices and payments', hint: 'Stripe' },
+  { key: 'email', icon: 'EM', label: 'Email', desc: 'Live now via SMTP (Gmail, Outlook, custom domains)', status: 'Supported now' },
+  { key: 'phone', icon: 'PH', label: 'Phone / SMS', desc: 'Live now via Twilio for SMS and missed-call recovery', status: 'Supported now' },
+  { key: 'payments', icon: 'PM', label: 'Payments', desc: 'Live now via Stripe for invoicing and collections', status: 'Supported now' },
+  { key: 'leads', icon: 'LD', label: 'CSV / Lead Intake', desc: 'CSV lead import + webhook intake are live in Connections', status: 'Supported now' },
 ];
 
-function Step2({ onNext, onBack }) {
+const ROADMAP_SYSTEMS = ['Calendar', 'HubSpot', 'OpenPhone / RingCentral', 'QuickBooks'];
+
+function Step2({ onNext, onBack, onOpenConnections }) {
   return (
     <div>
       <ProgressBar step={2} total={3} />
@@ -129,7 +132,7 @@ function Step2({ onNext, onBack }) {
           Connect your business
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          Your agents are ready to work with the data you import.
+          Use this same live setup in <strong>Connections</strong> to connect Email, Phone/SMS, Payments, and Lead Intake.
         </div>
       </div>
 
@@ -155,16 +158,19 @@ function Step2({ onNext, onBack }) {
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{sys.desc}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Coming soon</span>
+              <span style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 700 }}>{sys.status}</span>
             </div>
           </div>
         ))}
       </div>
 
       <div style={{ padding: '12px 16px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: 28, fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-        We're building integrations for email, phone, and payments. For now, your agents work with the data you import from the dashboard.
+        <strong style={{ color: 'var(--color-text-primary)' }}>Roadmap only (not yet live):</strong> {ROADMAP_SYSTEMS.join(', ')}.
       </div>
 
+      <button onClick={onOpenConnections} style={{ ...secondaryBtn, marginBottom: 10, color: 'var(--color-brand)', fontWeight: 700 }}>
+        Open live Connections setup →
+      </button>
       <button onClick={onNext} style={{ ...primaryBtn(false), marginBottom: 10 }}>Continue →</button>
       <div style={{ textAlign: 'center' }}>
         <button onClick={onBack} style={secondaryBtn}>← Back</button>
@@ -184,6 +190,13 @@ function Step3({ onSubmit, loading, error }) {
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 340, margin: '0 auto' }}>
           Five specialist agents — Finance, Revenue, Operations, Growth, and Support — are standing by to run your business.
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 14px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: 18 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 6 }}>Implementation sequence</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+          1) Business basics → 2) System connections → 3) Workflow preferences → 4) Approval thresholds → 5) Activation → 6) First briefing + outputs.
         </div>
       </div>
 
@@ -338,6 +351,7 @@ export default function OnboardingPage() {
           <Step2
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
+            onOpenConnections={() => navigate('/setup/connections')}
           />
         )}
         {step === 3 && (
@@ -353,4 +367,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-

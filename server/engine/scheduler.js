@@ -1,6 +1,7 @@
 import { pool } from '../db/index.js';
 import { advanceWorkflows } from './workflows.js';
 import { runAgentCycle } from './cycle.js';
+import { recordJobHealthRun } from '../lib/job-health.js';
 
 const WORKFLOW_INTERVAL_MS = 5 * 60 * 1000;  // 5 minutes
 const CYCLE_INTERVAL_MS = 15 * 60 * 1000;    // 15 minutes
@@ -35,17 +36,37 @@ async function workflowTick() {
   try {
     const ids = await getActiveWorkspaceIds();
     for (const wsId of ids) {
+      const startedAt = Date.now();
       try {
         const { advanced, completed } = await advanceWorkflows(wsId);
+        await recordJobHealthRun({
+          workspaceId: wsId,
+          jobName: 'workflow_tick',
+          status: 'success',
+          durationMs: Date.now() - startedAt,
+          metadata: { advanced, completed },
+        });
         if (advanced > 0 || completed > 0) {
           console.log(`[Workflow Scheduler] Workspace ${wsId}: ${advanced} advanced, ${completed} completed`);
         }
       } catch (err) {
         console.error(`[Workflow Scheduler] Workspace ${wsId} error:`, err.message);
+        await recordJobHealthRun({
+          workspaceId: wsId,
+          jobName: 'workflow_tick',
+          status: 'failed',
+          durationMs: Date.now() - startedAt,
+          errorMessage: err.message,
+        }).catch(() => {});
       }
     }
   } catch (err) {
     console.error('[Workflow Scheduler] Failed to fetch workspaces:', err.message);
+    await recordJobHealthRun({
+      jobName: 'workflow_tick',
+      status: 'failed',
+      errorMessage: `workspace_lookup_failed: ${err.message}`,
+    }).catch(() => {});
   } finally {
     workflowRunning = false;
   }
@@ -66,18 +87,38 @@ async function cycleTick() {
     const ids = await getActiveWorkspaceIds();
     console.log(`[Cycle Scheduler] Processing ${ids.length} workspace(s)`);
     for (const wsId of ids) {
+      const startedAt = Date.now();
       try {
         const result = await runAgentCycle(wsId);
+        await recordJobHealthRun({
+          workspaceId: wsId,
+          jobName: 'agent_cycle',
+          status: 'success',
+          durationMs: Date.now() - startedAt,
+          metadata: result,
+        });
         console.log(
           `[Cycle Scheduler] Workspace ${wsId}: ${result.decisionsAutoExecuted} auto-executed, ` +
           `${result.decisionsPending} pending, ${result.workflowsAdvanced} workflows advanced`
         );
       } catch (err) {
         console.error(`[Cycle Scheduler] Workspace ${wsId} error:`, err.message);
+        await recordJobHealthRun({
+          workspaceId: wsId,
+          jobName: 'agent_cycle',
+          status: 'failed',
+          durationMs: Date.now() - startedAt,
+          errorMessage: err.message,
+        }).catch(() => {});
       }
     }
   } catch (err) {
     console.error('[Cycle Scheduler] Failed to fetch workspaces:', err.message);
+    await recordJobHealthRun({
+      jobName: 'agent_cycle',
+      status: 'failed',
+      errorMessage: `workspace_lookup_failed: ${err.message}`,
+    }).catch(() => {});
   } finally {
     cycleRunning = false;
   }

@@ -41,6 +41,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
 import CreateWorkspacePage from "./pages/CreateWorkspacePage.jsx";
 import OnboardingPage from "./pages/OnboardingPage.jsx";
+import SetupConnectionsPage from "./pages/SetupConnectionsPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import CheckoutSuccessPage from "./pages/CheckoutSuccessPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
@@ -133,7 +134,11 @@ function RequireSubscription({ children }) {
 
 function MainApp() {
   const { user, workspace, logout } = useAuth();
-  const [view, setView] = useState("cmd");
+  const initialView = (() => {
+    const fromQuery = new URLSearchParams(window.location.search).get("view");
+    return ALL_NAV.some((item) => item.id === fromQuery) ? fromQuery : "cmd";
+  })();
+  const [view, setView] = useState(initialView);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -187,6 +192,14 @@ function MainApp() {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    query.set("view", view);
+    const qs = query.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [view]);
 
   if (loading) {
     return (
@@ -472,6 +485,14 @@ export default function App() {
             element={
               <RequireWorkspace>
                 <OnboardingPage />
+              </RequireWorkspace>
+            }
+          />
+          <Route
+            path="/setup/connections"
+            element={
+              <RequireWorkspace>
+                <SetupConnectionsPage />
               </RequireWorkspace>
             }
           />

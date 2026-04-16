@@ -156,7 +156,7 @@ function SMSForm({ dbCreds, onSaved }) {
       </button>
       {showAdvanced && (
         <div className={styles.advancedSection}>
-          <p className={styles.advancedNote}>Twilio · OpenPhone (coming soon) · RingCentral (coming soon)</p>
+          <p className={styles.advancedNote}>Live now: Twilio. Roadmap: OpenPhone, RingCentral.</p>
           <p className={styles.formHint}>Find these in your Twilio dashboard at twilio.com/console.</p>
           <Input label="Twilio Account ID" value={accountId} onChange={setAccountId} placeholder="Your Twilio Account ID" style={{ marginBottom: "var(--space-3)" }} />
           <Input label="Auth Token" type="password" value={authToken} onChange={setAuthToken} placeholder={existing.auth_token ? "••••••••" : "Auth token"} style={{ marginBottom: "var(--space-3)" }} />
@@ -298,7 +298,7 @@ function StripeForm({ dbCreds, onSaved }) {
       </button>
       {showAdvanced && (
         <div className={styles.advancedSection}>
-          <p className={styles.advancedNote}>Stripe · QuickBooks (coming soon)</p>
+          <p className={styles.advancedNote}>Live now: Stripe. Roadmap: QuickBooks.</p>
           <Input label="Stripe Webhook Secret (optional)" type="password" value={webhookSecret} onChange={setWebhookSecret} placeholder={existing.webhook_secret ? "••••••••" : "whsec_…"} style={{ marginBottom: "var(--space-4)" }} />
         </div>
       )}
@@ -496,7 +496,7 @@ export default function ConnectionsView() {
           >
             <div className={styles.comingSoon}>
               <div className={styles.comingSoonIcon}>—</div>
-              <div className={styles.comingSoonText}>Calendar integrations are coming soon.</div>
+              <div className={styles.comingSoonText}>Calendar integrations are roadmap only today.</div>
               <div className={styles.comingSoonDesc}>Google Calendar, Calendly, and Outlook will be supported.</div>
             </div>
           </ConnectionCard>
@@ -509,7 +509,7 @@ export default function ConnectionsView() {
             statusVariant="green"
             connected={true}
           >
-            <div className={styles.providerNote}>Website forms · CSV import · HubSpot (coming soon)</div>
+            <div className={styles.providerNote}>Live now: Website forms + CSV import. Roadmap: HubSpot.</div>
 
             <div className={styles.subSection}>
               <div className={styles.subSectionTitle}>Your lead intake URL</div>
