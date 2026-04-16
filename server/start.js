@@ -145,8 +145,9 @@ async function main() {
   }
 
   console.log('[start] Starting HTTP server…');
-  // Dynamic import so the server module only loads after migrations succeed.
-  await import('./index.js');
+  // Dynamic import so the server module only loads after migrations+schema checks succeed.
+  const { startHttpServer } = await import('./index.js');
+  startHttpServer();
 }
 
 main();
