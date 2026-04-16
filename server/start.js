@@ -30,6 +30,7 @@ const { Pool } = pg;
 // SQL error surfacing in the UI at runtime.
 const REQUIRED_SCHEMA = {
   outputs: ['id', 'workspace_id', 'output_type', 'title', 'content', 'data', 'period_start', 'period_end', 'created_at'],
+  job_health_runs: ['id', 'job_name', 'status', 'created_at'],
   workspaces: ['id'],
   users: ['id'],
 };
