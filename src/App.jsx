@@ -133,7 +133,11 @@ function RequireSubscription({ children }) {
 
 function MainApp() {
   const { user, workspace, logout } = useAuth();
-  const [view, setView] = useState("cmd");
+  const initialView = (() => {
+    const fromQuery = new URLSearchParams(window.location.search).get("view");
+    return ALL_NAV.some((item) => item.id === fromQuery) ? fromQuery : "cmd";
+  })();
+  const [view, setView] = useState(initialView);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -187,6 +191,14 @@ function MainApp() {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    query.set("view", view);
+    const qs = query.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [view]);
 
   if (loading) {
     return (
