@@ -51,6 +51,52 @@ import { startMorningBriefingScheduler } from './jobs/morning-briefing.js';
 import { startWeeklyReportScheduler } from './jobs/weekly-report.js';
 import { startCollectionsScheduler } from './jobs/collections-operator.js';
 
+let schedulerBooted = false;
+
+async function bootSchedulersAndSeed() {
+  if (schedulerBooted) {
+    console.log('[startup] Scheduler/bootstrap already initialized; skipping duplicate boot.');
+    return;
+  }
+  schedulerBooted = true;
+
+  try {
+    await autoSeed();
+  } catch (err) {
+    console.error('[Auto-Seed] Failed:', err.message);
+  }
+  try {
+    startScheduler();
+  } catch (err) {
+    console.error('[Agent Scheduler] Failed to start scheduler:', err);
+  }
+  try {
+    startCleanupScheduler();
+  } catch (err) {
+    console.error('[Cleanup Scheduler] Failed to start:', err.message);
+  }
+  try {
+    startDailyDigestScheduler();
+  } catch (err) {
+    console.error('[Daily Digest Scheduler] Failed to start:', err.message);
+  }
+  try {
+    startMorningBriefingScheduler();
+  } catch (err) {
+    console.error('[Morning Briefing Scheduler] Failed to start:', err.message);
+  }
+  try {
+    startWeeklyReportScheduler();
+  } catch (err) {
+    console.error('[Weekly Report Scheduler] Failed to start:', err.message);
+  }
+  try {
+    startCollectionsScheduler();
+  } catch (err) {
+    console.error('[Collections Scheduler] Failed to start:', err.message);
+  }
+}
+
 export function createApp() {
   const app = express();
 
@@ -215,45 +261,16 @@ export function createApp() {
   return app;
 }
 
+export function startHttpServer() {
+  const app = createApp();
+  const server = app.listen(config.PORT, async () => {
+    console.log(`Autonome server running on port ${config.PORT}`);
+    await bootSchedulersAndSeed();
+  });
+  return server;
+}
+
 // Only start the server when run directly
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const app = createApp();
-  app.listen(config.PORT, async () => {
-    console.log(`Autonome server running on port ${config.PORT}`);
-    try {
-      await autoSeed();
-    } catch (err) {
-      console.error('[Auto-Seed] Failed:', err.message);
-    }
-    try {
-      startScheduler();
-    } catch (err) {
-      console.error('[Agent Scheduler] Failed to start scheduler:', err);
-    }
-    try {
-      startCleanupScheduler();
-    } catch (err) {
-      console.error('[Cleanup Scheduler] Failed to start:', err.message);
-    }
-    try {
-      startDailyDigestScheduler();
-    } catch (err) {
-      console.error('[Daily Digest Scheduler] Failed to start:', err.message);
-    }
-    try {
-      startMorningBriefingScheduler();
-    } catch (err) {
-      console.error('[Morning Briefing Scheduler] Failed to start:', err.message);
-    }
-    try {
-      startWeeklyReportScheduler();
-    } catch (err) {
-      console.error('[Weekly Report Scheduler] Failed to start:', err.message);
-    }
-    try {
-      startCollectionsScheduler();
-    } catch (err) {
-      console.error('[Collections Scheduler] Failed to start:', err.message);
-    }
-  });
+  startHttpServer();
 }

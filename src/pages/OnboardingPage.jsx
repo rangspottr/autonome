@@ -173,7 +173,10 @@ function Step2({ onNext, onBack, onOpenConnections, canOpenConnections }) {
         Open live Connections setup →
       </button>
       {canOpenConnections && (
-        <button onClick={onOpenConnections} style={{ ...secondaryBtn, marginBottom: 10, color: 'var(--color-brand)', fontWeight: 700 }}>
+        <button
+          onClick={onOpenConnections}
+          style={{ ...secondaryBtn, marginBottom: 10, color: 'var(--color-brand)', fontWeight: 700 }}
+        >
           Open live Connections setup →
         </button>
       )}
