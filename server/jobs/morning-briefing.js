@@ -1,4 +1,5 @@
 import { pool } from '../db/index.js';
+import { recordJobHealthRun } from '../lib/job-health.js';
 
 /**
  * Generate a structured morning briefing for a workspace.
@@ -245,12 +246,35 @@ export async function runMorningBriefingForAllWorkspaces() {
     );
     console.log(`[MorningBriefing] Generating briefings for ${result.rows.length} workspace(s)`);
     for (const { id } of result.rows) {
-      await generateMorningBriefing(id).catch((err) => {
-        console.error(`[MorningBriefing] Failed for workspace ${id}:`, err.message);
-      });
+      const startedAt = Date.now();
+      await generateMorningBriefing(id)
+        .then(async (output) => {
+          await recordJobHealthRun({
+            workspaceId: id,
+            jobName: 'morning_briefing',
+            status: 'success',
+            durationMs: Date.now() - startedAt,
+            metadata: { output_id: output?.id || null },
+          });
+        })
+        .catch(async (err) => {
+          console.error(`[MorningBriefing] Failed for workspace ${id}:`, err.message);
+          await recordJobHealthRun({
+            workspaceId: id,
+            jobName: 'morning_briefing',
+            status: 'failed',
+            durationMs: Date.now() - startedAt,
+            errorMessage: err.message,
+          }).catch(() => {});
+        });
     }
   } catch (err) {
     console.error('[MorningBriefing] Failed to run:', err.message);
+    await recordJobHealthRun({
+      jobName: 'morning_briefing',
+      status: 'failed',
+      errorMessage: `workspace_lookup_failed: ${err.message}`,
+    }).catch(() => {});
   }
 }
 
